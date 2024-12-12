@@ -120,9 +120,7 @@ function HomePage({ categories, tags, addExpense, loading }: HomePageProps) {
         <Row className="mb-3">
           <Col md={6}>
             <Form.Group controlId="formCategories">
-              <Form.Label>
-                Categories
-              </Form.Label>
+              <Form.Label>Categories</Form.Label>
               <Form.Select
                 multiple
                 value={selectedCategories}
@@ -139,9 +137,7 @@ function HomePage({ categories, tags, addExpense, loading }: HomePageProps) {
           </Col>
           <Col md={6}>
             <Form.Group controlId="formTags">
-              <Form.Label>
-                Tags
-              </Form.Label>
+              <Form.Label>Tags</Form.Label>
               <Form.Select
                 multiple
                 value={selectedTags}
