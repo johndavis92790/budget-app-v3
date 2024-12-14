@@ -1,0 +1,16 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Run concat.js",
+      "type": "shell",
+      "command": "npm i puppeteer cross-spawn prettier clipboardy --force; npm run pretty; node concat.js",
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "presentation": {
+        "close": false
+      }
+    }
+  ]
+}
