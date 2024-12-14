@@ -18,7 +18,6 @@ export const expenses = onRequest(
       );
     }
 
-    // Replace escaped \n in the private key if needed
     const privateKey = SERVICE_ACCOUNT_PRIVATE_KEY.replace(/\\n/g, "\n");
 
     const SCOPES = ["https://www.googleapis.com/auth/spreadsheets"];
@@ -31,9 +30,8 @@ export const expenses = onRequest(
 
     const sheets = google.sheets({ version: "v4", auth: jwtClient });
 
-    // Set CORS headers
     res.set("Access-Control-Allow-Origin", "*");
-    res.set("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
+    res.set("Access-Control-Allow-Methods", "GET, POST, OPTIONS, PUT");
     res.set("Access-Control-Allow-Headers", "Content-Type");
 
     if (req.method === "OPTIONS") {
@@ -43,28 +41,32 @@ export const expenses = onRequest(
 
     try {
       if (req.method === "GET") {
+        // Fetch Expenses
         const expensesRes = await sheets.spreadsheets.values.get({
           spreadsheetId: SPREADSHEET_ID,
           range: "Expenses!A1:F",
         });
 
         const expensesRows = expensesRes.data.values || [];
-        expensesRows.shift(); // remove headers
+        expensesRows.shift(); // Remove headers
 
-        const expensesData = expensesRows.map((row) => {
+        const expensesData = expensesRows.map((row, index) => {
+          const rawValue = row[4];
+          const cleanedValue = rawValue
+            ? rawValue.replace(/[^0-9.-]/g, "")
+            : "0";
+          const value = parseFloat(cleanedValue);
           return {
             date: row[0],
             type: row[1],
-            categories: row[2]
-              .split(",")
-              .map((c: string) => c.trim())
-              .filter(Boolean),
+            categories: row[2],
             tags: row[3]
               .split(",")
               .map((t: string) => t.trim())
               .filter(Boolean),
-            value: parseFloat(row[4]),
+            value: value,
             notes: row[5],
+            rowIndex: index + 2, // Track row number in the sheet
           };
         });
 
@@ -75,29 +77,21 @@ export const expenses = onRequest(
         });
 
         const listsRows = listsRes.data.values || [];
-        listsRows.shift(); // remove headers
+        listsRows.shift(); // Remove headers row
 
-        const categories = listsRows.map((row) => row[0]).filter((c) => c);
-        const tags = listsRows.map((row) => row[1]).filter((t) => t);
+        const categories = listsRows.map((row) => row[0]).filter(Boolean); // Column A
+        const tags = listsRows.map((row) => row[1]).filter(Boolean); // Column B
 
         res.status(200).json({ expenses: expensesData, categories, tags });
         return;
       } else if (req.method === "POST") {
         const data = req.body;
-        // Expecting:
-        // {
-        //   "date": "2024-12-07",
-        //   "type": "Expense" or "Refund",
-        //   "categories": ["Food", "Groceries"],
-        //   "tags": ["Urgent", "Family"],
-        //   "value": 5.99,
-        //   "notes": "Milk and bread"
-        // }
+        const dateFormatted = convertToMMDDYYYY(data.date);
 
         if (
           !data.date ||
           !data.type ||
-          !Array.isArray(data.categories) ||
+          typeof data.categories !== "string" ||
           !Array.isArray(data.tags) ||
           typeof data.value !== "number"
         ) {
@@ -105,7 +99,6 @@ export const expenses = onRequest(
           return;
         }
 
-        const categoriesStr = data.categories.join(", ");
         const tagsStr = data.tags.join(", ");
 
         await sheets.spreadsheets.values.append({
@@ -115,9 +108,49 @@ export const expenses = onRequest(
           requestBody: {
             values: [
               [
-                data.date,
+                dateFormatted,
                 data.type,
-                categoriesStr,
+                data.categories,
+                tagsStr,
+                data.value,
+                data.notes || "",
+              ],
+            ],
+          },
+        });
+
+        res.status(200).json({ status: "success" });
+        return;
+      } else if (req.method === "PUT") {
+        const data = req.body;
+        const dateFormatted = convertToMMDDYYYY(data.date);
+
+        if (
+          !data.rowIndex ||
+          !data.date ||
+          !data.type ||
+          typeof data.categories !== "string" ||
+          !Array.isArray(data.tags) ||
+          typeof data.value !== "number"
+        ) {
+          res.status(400).json({ error: "Missing or invalid required fields" });
+          return;
+        }
+
+        const tagsStr = data.tags.join(", ");
+        const rowIndex = data.rowIndex;
+
+        // Update the specific row
+        await sheets.spreadsheets.values.update({
+          spreadsheetId: SPREADSHEET_ID,
+          range: `Expenses!A${rowIndex}:F${rowIndex}`,
+          valueInputOption: "RAW",
+          requestBody: {
+            values: [
+              [
+                dateFormatted,
+                data.type,
+                data.categories,
                 tagsStr,
                 data.value,
                 data.notes || "",
@@ -139,3 +172,8 @@ export const expenses = onRequest(
     }
   }
 );
+
+function convertToMMDDYYYY(isoDateStr: string): string {
+  const [yyyy, mm, dd] = isoDateStr.split("-");
+  return `${parseInt(mm)}/${parseInt(dd)}/${yyyy}`;
+}

@@ -11,21 +11,10 @@ interface HomePageProps {
 function HomePage({ categories, tags, addExpense, loading }: HomePageProps) {
   const [date, setDate] = useState<string>("");
   const [type, setType] = useState<"Expense" | "Refund">("Expense");
-  const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
+  const [selectedCategory, setSelectedCategory] = useState<string>(""); // Single category
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const [value, setValue] = useState<string>("");
   const [notes, setNotes] = useState<string>("");
-
-  const handleCategoryChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    const options = e.target.options;
-    const selected: string[] = [];
-    for (let i = 0; i < options.length; i++) {
-      if (options[i].selected) {
-        selected.push(options[i].value);
-      }
-    }
-    setSelectedCategories(selected);
-  };
 
   const handleTagsChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const options = e.target.options;
@@ -43,20 +32,18 @@ function HomePage({ categories, tags, addExpense, loading }: HomePageProps) {
     if (
       !date ||
       !type ||
-      selectedCategories.length === 0 ||
+      !selectedCategory ||
       selectedTags.length === 0 ||
       !value
     ) {
-      alert(
-        "Date, Type, at least one Category, at least one Tag, and Value are required.",
-      );
+      alert("Date, Type, Category, at least one Tag, and Value are required.");
       return;
     }
 
     const newExpense = {
       date,
       type,
-      categories: selectedCategories,
+      categories: selectedCategory, // Single category
       tags: selectedTags,
       value: parseFloat(value),
       notes,
@@ -67,7 +54,7 @@ function HomePage({ categories, tags, addExpense, loading }: HomePageProps) {
       // Clear form
       setDate("");
       setType("Expense");
-      setSelectedCategories([]);
+      setSelectedCategory("");
       setSelectedTags([]);
       setValue("");
       setNotes("");
@@ -119,14 +106,14 @@ function HomePage({ categories, tags, addExpense, loading }: HomePageProps) {
 
         <Row className="mb-3">
           <Col md={6}>
-            <Form.Group controlId="formCategories">
-              <Form.Label>Categories</Form.Label>
+            <Form.Group controlId="formCategory">
+              <Form.Label>Category</Form.Label>
               <Form.Select
-                multiple
-                value={selectedCategories}
-                onChange={handleCategoryChange}
+                value={selectedCategory}
+                onChange={(e) => setSelectedCategory(e.target.value)}
                 required
               >
+                <option value="">Select a Category</option>
                 {categories.map((cat, idx) => (
                   <option key={idx} value={cat}>
                     {cat}

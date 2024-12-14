@@ -1,7 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { BrowserRouter as Router, Routes, Route, Link } from "react-router-dom";
 import { Expense } from "./types";
-import axios from "axios";
 import HomePage from "./HomePage";
 import HistoryPage from "./HistoryPage";
 import { Navbar, Nav, Container } from "react-bootstrap";
@@ -16,10 +15,19 @@ function App() {
   const fetchData = async () => {
     setLoading(true);
     try {
-      const response = await axios.get(API_URL);
-      setExpenses(response.data.expenses || []);
-      setCategories(response.data.categories || []);
-      setTags(response.data.tags || []);
+      const response = await fetch(API_URL);
+      if (!response.ok) {
+        throw new Error(`Error: ${response.statusText}`);
+      }
+      const data = await response.json();
+      setExpenses(
+        data.expenses.map((expense: Expense, index: number) => ({
+          ...expense,
+          rowIndex: index + 2, // Row index for updating (headers are row 1)
+        })),
+      );
+      setCategories(data.categories || []);
+      setTags(data.tags || []);
     } catch (error) {
       console.error("Error fetching data:", error);
     }
@@ -30,21 +38,41 @@ function App() {
     fetchData();
   }, []);
 
-  const addExpense = async (
-    newExpense: Omit<Expense, "notes"> & { notes?: string },
-  ) => {
+  const addExpense = async (newExpense: Expense) => {
     try {
-      await axios.post(API_URL, newExpense, {
+      const response = await fetch(API_URL, {
+        method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
+        body: JSON.stringify(newExpense),
       });
-      // Reload after adding
-      fetchData();
+      if (!response.ok) {
+        throw new Error(`Error: ${response.statusText}`);
+      }
+      fetchData(); // Refresh data after adding
       return true;
     } catch (error) {
       console.error("Error adding expense:", error);
       return false;
+    }
+  };
+
+  const onUpdateExpense = async (updatedExpense: Expense) => {
+    try {
+      const response = await fetch(API_URL, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(updatedExpense),
+      });
+      if (!response.ok) {
+        throw new Error(`Error: ${response.statusText}`);
+      }
+      fetchData(); // Refresh data after updating
+    } catch (error) {
+      console.error("Error updating expense:", error);
     }
   };
 
@@ -84,7 +112,14 @@ function App() {
           />
           <Route
             path="/history"
-            element={<HistoryPage expenses={expenses} loading={loading} />}
+            element={
+              <HistoryPage
+                categories={categories}
+                expenses={expenses}
+                loading={loading}
+                onUpdateExpense={onUpdateExpense}
+              />
+            }
           />
         </Routes>
       </Container>
