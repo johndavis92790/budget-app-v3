@@ -1,5 +1,8 @@
 import React, { FormEvent, useState } from "react";
 import { Form, Button, Row, Col, Spinner } from "react-bootstrap";
+import { storage } from "./firebase";
+import { ref, uploadBytes } from "firebase/storage";
+import { FaTimes } from "react-icons/fa";
 
 interface HomePageProps {
   categories: string[];
@@ -16,6 +19,8 @@ function HomePage({ categories, tags, addExpense, loading }: HomePageProps) {
   const [value, setValue] = useState<string>("");
   const [notes, setNotes] = useState<string>("");
 
+  const [receiptFiles, setReceiptFiles] = useState<File[]>([]);
+
   const handleTagsChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const options = e.target.options;
     const selected: string[] = [];
@@ -25,6 +30,21 @@ function HomePage({ categories, tags, addExpense, loading }: HomePageProps) {
       }
     }
     setSelectedTags(selected);
+  };
+
+  const handleReceiptChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+
+    const newFiles = Array.from(files);
+    setReceiptFiles((prevFiles) => [...prevFiles, ...newFiles]);
+
+    // Reset the input so the user can trigger camera again
+    e.target.value = "";
+  };
+
+  const handleRemoveImage = (index: number) => {
+    setReceiptFiles((prevFiles) => prevFiles.filter((_, i) => i !== index));
   };
 
   const handleSubmit = async (e: FormEvent) => {
@@ -40,13 +60,27 @@ function HomePage({ categories, tags, addExpense, loading }: HomePageProps) {
       return;
     }
 
+    // Create a unique folder name for this expense
+    const folderName = `expense-${Date.now()}`;
+
+    // Upload all images into this folder
+    for (const file of receiptFiles) {
+      const fileRef = ref(
+        storage,
+        `receipts/${folderName}/${Date.now()}-${file.name}`,
+      );
+      await uploadBytes(fileRef, file);
+    }
+
+    // We no longer gather URLs here. We just send folderName to backend.
     const newExpense = {
       date,
       type,
-      categories: selectedCategory, // Single category
+      categories: selectedCategory,
       tags: selectedTags,
       value: parseFloat(value),
       notes,
+      folderName, // let the backend construct the link
     };
 
     const success = await addExpense(newExpense);
@@ -58,6 +92,7 @@ function HomePage({ categories, tags, addExpense, loading }: HomePageProps) {
       setSelectedTags([]);
       setValue("");
       setNotes("");
+      setReceiptFiles([]);
     } else {
       alert("Failed to add expense.");
     }
@@ -165,6 +200,73 @@ function HomePage({ categories, tags, addExpense, loading }: HomePageProps) {
             </Form.Group>
           </Col>
         </Row>
+
+        <Row className="mb-3">
+          <Col md={4}>
+            <Form.Group controlId="formReceipts" className="mb-3">
+              <Form.Label>Receipts</Form.Label>
+              <Form.Control
+                type="file"
+                accept="image/*;capture=camera"
+                onChange={handleReceiptChange}
+              />
+              <Form.Text className="text-muted">
+                Take a photo for each receipt. To add more receipts, tap this
+                input again after taking the first photo.
+              </Form.Text>
+            </Form.Group>
+          </Col>
+        </Row>
+
+        {receiptFiles.length > 0 && (
+          <div
+            style={{
+              display: "flex",
+              flexWrap: "wrap",
+              gap: "10px",
+              marginBottom: "10px",
+            }}
+          >
+            {receiptFiles.map((file, index) => {
+              const url = URL.createObjectURL(file);
+              return (
+                <div
+                  key={index}
+                  style={{
+                    position: "relative",
+                    display: "inline-block",
+                  }}
+                >
+                  <img
+                    src={url}
+                    alt="Receipt"
+                    style={{
+                      width: "100px",
+                      height: "auto",
+                      borderRadius: "4px",
+                    }}
+                    onLoad={() => URL.revokeObjectURL(url)}
+                  />
+                  <Button
+                    variant="light"
+                    size="sm"
+                    style={{
+                      position: "absolute",
+                      top: "0",
+                      right: "0",
+                      transform: "translate(50%, -50%)",
+                      borderRadius: "50%",
+                      padding: "0.2rem",
+                    }}
+                    onClick={() => handleRemoveImage(index)}
+                  >
+                    <FaTimes />
+                  </Button>
+                </div>
+              );
+            })}
+          </div>
+        )}
 
         <Button type="submit" variant="primary">
           Add

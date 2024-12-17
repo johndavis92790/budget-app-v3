@@ -5,6 +5,7 @@ import HomePage from "./HomePage";
 import HistoryPage from "./HistoryPage";
 import { Navbar, Nav, Container } from "react-bootstrap";
 import { API_URL } from "./config";
+import ReceiptListingPage from "./ReceiptListingPage";
 
 function App() {
   const [expenses, setExpenses] = useState<Expense[]>([]);
@@ -38,7 +39,7 @@ function App() {
     fetchData();
   }, []);
 
-  const addExpense = async (newExpense: Expense) => {
+  const addExpense = async (newExpense: any) => {
     try {
       const response = await fetch(API_URL, {
         method: "POST",
@@ -121,6 +122,7 @@ function App() {
               />
             }
           />
+          <Route path="/receipts" element={<ReceiptListingPage />} />
         </Routes>
       </Container>
     </Router>

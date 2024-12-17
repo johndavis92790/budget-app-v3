@@ -3,6 +3,12 @@ import { Request, Response } from "express";
 import { google } from "googleapis";
 
 const SPREADSHEET_ID = "1KROs_Swh-1zeQhLajtRw-E7DcYnJRMHEOXX5ECwTGSI";
+const FRONTEND_URL = "https://budget-app-v3.web.app";
+const EXPENSES_TABLE_NAME = "Expenses";
+const EXPENSES_FIRST_COLUMN = "A";
+const EXPENSES_LAST_COLUMN = "H";
+const EXPENSES_RANGE = `${EXPENSES_TABLE_NAME}!${EXPENSES_FIRST_COLUMN}1:${EXPENSES_LAST_COLUMN}`;
+const METADATA_RANGE = "Metadata!A1:B";
 
 export const expenses = onRequest(
   {
@@ -44,11 +50,13 @@ export const expenses = onRequest(
         // Fetch Expenses
         const expensesRes = await sheets.spreadsheets.values.get({
           spreadsheetId: SPREADSHEET_ID,
-          range: "Expenses!A1:F",
+          range: EXPENSES_RANGE,
         });
 
         const expensesRows = expensesRes.data.values || [];
         expensesRows.shift(); // Remove headers
+
+        const receiptsColIndex = 6; // G=6 (0-based: A=0,B=1,...G=6)
 
         const expensesData = expensesRows.map((row, index) => {
           const rawValue = row[4];
@@ -56,6 +64,10 @@ export const expenses = onRequest(
             ? rawValue.replace(/[^0-9.-]/g, "")
             : "0";
           const value = parseFloat(cleanedValue);
+
+          // Receipts link in G
+          const receiptLink = row[receiptsColIndex] || "";
+
           return {
             date: row[0],
             type: row[1],
@@ -66,6 +78,7 @@ export const expenses = onRequest(
               .filter(Boolean),
             value: value,
             notes: row[5],
+            receipts: receiptLink,
             rowIndex: index + 2, // Track row number in the sheet
           };
         });
@@ -73,7 +86,7 @@ export const expenses = onRequest(
         // Fetch Lists for Categories and Tags
         const listsRes = await sheets.spreadsheets.values.get({
           spreadsheetId: SPREADSHEET_ID,
-          range: "Lists!A1:B",
+          range: METADATA_RANGE,
         });
 
         const listsRows = listsRes.data.values || [];
@@ -99,25 +112,39 @@ export const expenses = onRequest(
           return;
         }
 
-        const tagsStr = data.tags.join(", ");
+        // folderName provided by frontend
+        const folderName = data.folderName || "";
+
+        // Construct a single link to a page that lists all images in that folder
+        const folderLink = folderName
+          ? `${FRONTEND_URL}/receipts?folder=${encodeURIComponent(folderName)}`
+          : "";
+
+        // Create a hyperlink formula for column H
+        const hyperlinkFormula = folderLink
+          ? `=HYPERLINK("${folderLink}", "Receipt")`
+          : "";
 
         await sheets.spreadsheets.values.append({
           spreadsheetId: SPREADSHEET_ID,
-          range: "Expenses!A:F",
-          valueInputOption: "RAW",
+          range: EXPENSES_RANGE,
+          valueInputOption: "USER_ENTERED",
           requestBody: {
             values: [
               [
                 dateFormatted,
                 data.type,
                 data.categories,
-                tagsStr,
+                data.tags.join(", "),
                 data.value,
                 data.notes || "",
+                folderLink,
+                hyperlinkFormula,
               ],
             ],
           },
         });
+
 
         res.status(200).json({ status: "success" });
         return;
@@ -143,7 +170,7 @@ export const expenses = onRequest(
         // Update the specific row
         await sheets.spreadsheets.values.update({
           spreadsheetId: SPREADSHEET_ID,
-          range: `Expenses!A${rowIndex}:F${rowIndex}`,
+          range: `${EXPENSES_TABLE_NAME}!${EXPENSES_FIRST_COLUMN}${rowIndex}:${EXPENSES_LAST_COLUMN}${rowIndex}`,
           valueInputOption: "RAW",
           requestBody: {
             values: [
