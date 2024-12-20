@@ -3,6 +3,8 @@ import { Form, Button, Row, Col, Spinner } from "react-bootstrap";
 import { storage } from "./firebase";
 import { ref, uploadBytes } from "firebase/storage";
 import { FaTimes } from "react-icons/fa";
+import FullSizeImageModal from "./FullSizeImageModal";
+import FullPageSpinner from "./FullPageSpinner";
 
 interface HomePageProps {
   categories: string[];
@@ -12,14 +14,22 @@ interface HomePageProps {
 }
 
 function HomePage({ categories, tags, addExpense, loading }: HomePageProps) {
-  const [date, setDate] = useState<string>("");
+  const [date, setDate] = useState<string>(() => {
+    const today = new Date();
+    const yyyy = today.getFullYear();
+    const mm = String(today.getMonth() + 1).padStart(2, "0");
+    const dd = String(today.getDate()).padStart(2, "0");
+    return `${yyyy}-${mm}-${dd}`;
+  });
   const [type, setType] = useState<"Expense" | "Refund">("Expense");
-  const [selectedCategory, setSelectedCategory] = useState<string>(""); // Single category
+  const [selectedCategory, setSelectedCategory] = useState<string>("");
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const [value, setValue] = useState<string>("");
   const [notes, setNotes] = useState<string>("");
-
   const [receiptFiles, setReceiptFiles] = useState<File[]>([]);
+  const [selectedImageUrl, setSelectedImageUrl] = useState<string | null>(null);
+
+  const [submitting, setSubmitting] = useState(false);
 
   const handleTagsChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const options = e.target.options;
@@ -39,7 +49,6 @@ function HomePage({ categories, tags, addExpense, loading }: HomePageProps) {
     const newFiles = Array.from(files);
     setReceiptFiles((prevFiles) => [...prevFiles, ...newFiles]);
 
-    // Reset the input so the user can trigger camera again
     e.target.value = "";
   };
 
@@ -49,6 +58,7 @@ function HomePage({ categories, tags, addExpense, loading }: HomePageProps) {
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
+
     if (
       !date ||
       !type ||
@@ -60,50 +70,60 @@ function HomePage({ categories, tags, addExpense, loading }: HomePageProps) {
       return;
     }
 
-    // Create a unique folder name for this expense
-    const folderName = `expense-${Date.now()}`;
+    setSubmitting(true);
+    try {
+      // Always create a unique ID for this expense
+      const uniqueId = String(Date.now());
 
-    // Upload all images into this folder
-    for (const file of receiptFiles) {
-      const fileRef = ref(
-        storage,
-        `receipts/${folderName}/${Date.now()}-${file.name}`,
-      );
-      await uploadBytes(fileRef, file);
-    }
+      // If we have files, upload them using the uniqueId as the folder name
+      if (receiptFiles.length > 0) {
+        for (const file of receiptFiles) {
+          const fileRef = ref(
+            storage,
+            `receipts/${uniqueId}/${uniqueId}-${file.name}`,
+          );
+          await uploadBytes(fileRef, file);
+        }
+      }
 
-    // We no longer gather URLs here. We just send folderName to backend.
-    const newExpense = {
-      date,
-      type,
-      categories: selectedCategory,
-      tags: selectedTags,
-      value: parseFloat(value),
-      notes,
-      folderName, // let the backend construct the link
-    };
+      // Send one POST call to the backend
+      const newExpense = {
+        date,
+        type,
+        categories: selectedCategory,
+        tags: selectedTags,
+        value: parseFloat(value),
+        notes,
+        id: uniqueId,
+      };
 
-    const success = await addExpense(newExpense);
-    if (success) {
-      // Clear form
-      setDate("");
-      setType("Expense");
-      setSelectedCategory("");
-      setSelectedTags([]);
-      setValue("");
-      setNotes("");
-      setReceiptFiles([]);
-    } else {
-      alert("Failed to add expense.");
+      const success = await addExpense(newExpense);
+      if (success) {
+        // Clear form
+        const today = new Date();
+        const yyyy = today.getFullYear();
+        const mm = String(today.getMonth() + 1).padStart(2, "0");
+        const dd = String(today.getDate()).padStart(2, "0");
+        setDate(`${yyyy}-${mm}-${dd}`);
+        setType("Expense");
+        setSelectedCategory("");
+        setSelectedTags([]);
+        setValue("");
+        setNotes("");
+        setReceiptFiles([]);
+      } else {
+        alert("Failed to add expense.");
+      }
+    } catch (error) {
+      console.error("Error adding expense:", error);
+      alert("An error occurred while adding the expense.");
+    } finally {
+      setSubmitting(false);
     }
   };
 
   if (loading && categories.length === 0 && tags.length === 0) {
-    return (
-      <div className="text-center">
-        <Spinner animation="border" />
-      </div>
-    );
+    return <FullPageSpinner />;
   }
 
   return (
@@ -119,6 +139,7 @@ function HomePage({ categories, tags, addExpense, loading }: HomePageProps) {
                 value={date}
                 onChange={(e) => setDate(e.target.value)}
                 required
+                disabled={submitting}
               />
             </Form.Group>
           </Col>
@@ -131,6 +152,7 @@ function HomePage({ categories, tags, addExpense, loading }: HomePageProps) {
                   setType(e.target.value as "Expense" | "Refund")
                 }
                 required
+                disabled={submitting}
               >
                 <option value="Expense">Expense</option>
                 <option value="Refund">Refund</option>
@@ -147,6 +169,7 @@ function HomePage({ categories, tags, addExpense, loading }: HomePageProps) {
                 value={selectedCategory}
                 onChange={(e) => setSelectedCategory(e.target.value)}
                 required
+                disabled={submitting}
               >
                 <option value="">Select a Category</option>
                 {categories.map((cat, idx) => (
@@ -165,6 +188,7 @@ function HomePage({ categories, tags, addExpense, loading }: HomePageProps) {
                 value={selectedTags}
                 onChange={handleTagsChange}
                 required
+                disabled={submitting}
               >
                 {tags.map((tag, idx) => (
                   <option key={idx} value={tag}>
@@ -186,6 +210,7 @@ function HomePage({ categories, tags, addExpense, loading }: HomePageProps) {
                 value={value}
                 onChange={(e) => setValue(e.target.value)}
                 required
+                disabled={submitting}
               />
             </Form.Group>
           </Col>
@@ -196,6 +221,7 @@ function HomePage({ categories, tags, addExpense, loading }: HomePageProps) {
                 type="text"
                 value={notes}
                 onChange={(e) => setNotes(e.target.value)}
+                disabled={submitting}
               />
             </Form.Group>
           </Col>
@@ -209,6 +235,7 @@ function HomePage({ categories, tags, addExpense, loading }: HomePageProps) {
                 type="file"
                 accept="image/*;capture=camera"
                 onChange={handleReceiptChange}
+                disabled={submitting}
               />
               <Form.Text className="text-muted">
                 Take a photo for each receipt. To add more receipts, tap this
@@ -244,8 +271,9 @@ function HomePage({ categories, tags, addExpense, loading }: HomePageProps) {
                       width: "100px",
                       height: "auto",
                       borderRadius: "4px",
+                      cursor: "pointer",
                     }}
-                    onLoad={() => URL.revokeObjectURL(url)}
+                    onClick={() => setSelectedImageUrl(url)}
                   />
                   <Button
                     variant="light"
@@ -259,6 +287,7 @@ function HomePage({ categories, tags, addExpense, loading }: HomePageProps) {
                       padding: "0.2rem",
                     }}
                     onClick={() => handleRemoveImage(index)}
+                    disabled={submitting}
                   >
                     <FaTimes />
                   </Button>
@@ -268,10 +297,20 @@ function HomePage({ categories, tags, addExpense, loading }: HomePageProps) {
           </div>
         )}
 
-        <Button type="submit" variant="primary">
-          Add
+        <Button type="submit" variant="primary" disabled={submitting}>
+          {submitting ? (
+            <Spinner as="span" animation="border" size="sm" />
+          ) : (
+            "Add"
+          )}
         </Button>
       </Form>
+
+      <FullSizeImageModal
+        show={selectedImageUrl !== null}
+        imageUrl={selectedImageUrl}
+        onClose={() => setSelectedImageUrl(null)}
+      />
     </>
   );
 }

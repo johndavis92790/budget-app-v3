@@ -1,11 +1,12 @@
-import React, { useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { BrowserRouter as Router, Routes, Route, Link } from "react-router-dom";
 import { Expense } from "./types";
 import HomePage from "./HomePage";
 import HistoryPage from "./HistoryPage";
 import { Navbar, Nav, Container } from "react-bootstrap";
 import { API_URL } from "./config";
-import ReceiptListingPage from "./ReceiptListingPage";
+import { mmddyyyyToYyyyMmDd } from "./helpers";
+import EditExpensePage from "./EditExpensePage";
 
 function App() {
   const [expenses, setExpenses] = useState<Expense[]>([]);
@@ -24,7 +25,8 @@ function App() {
       setExpenses(
         data.expenses.map((expense: Expense, index: number) => ({
           ...expense,
-          rowIndex: index + 2, // Row index for updating (headers are row 1)
+          rowIndex: index + 2,
+          date: mmddyyyyToYyyyMmDd(expense.date), // Ensure consistent YYYY-MM-DD format
         })),
       );
       setCategories(data.categories || []);
@@ -51,6 +53,8 @@ function App() {
       if (!response.ok) {
         throw new Error(`Error: ${response.statusText}`);
       }
+      const result = await response.json();
+      console.log("Expense added with ID:", result.id);
       fetchData(); // Refresh data after adding
       return true;
     } catch (error) {
@@ -119,10 +123,22 @@ function App() {
                 expenses={expenses}
                 loading={loading}
                 onUpdateExpense={onUpdateExpense}
+                tags={tags}
               />
             }
           />
-          <Route path="/receipts" element={<ReceiptListingPage />} />
+          <Route
+            path="/edit"
+            element={
+              <EditExpensePage
+                categories={categories}
+                tags={tags}
+                onUpdateExpense={onUpdateExpense}
+                loading={loading}
+                expenses={expenses}
+              />
+            }
+          />
         </Routes>
       </Container>
     </Router>

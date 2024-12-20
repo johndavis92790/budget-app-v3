@@ -6,7 +6,7 @@ const SPREADSHEET_ID = "1KROs_Swh-1zeQhLajtRw-E7DcYnJRMHEOXX5ECwTGSI";
 const FRONTEND_URL = "https://budget-app-v3.web.app";
 const EXPENSES_TABLE_NAME = "Expenses";
 const EXPENSES_FIRST_COLUMN = "A";
-const EXPENSES_LAST_COLUMN = "H";
+const EXPENSES_LAST_COLUMN = "I"; // A-I includes ID in column I
 const EXPENSES_RANGE = `${EXPENSES_TABLE_NAME}!${EXPENSES_FIRST_COLUMN}1:${EXPENSES_LAST_COLUMN}`;
 const METADATA_RANGE = "Metadata!A1:B";
 
@@ -25,7 +25,6 @@ export const expenses = onRequest(
     }
 
     const privateKey = SERVICE_ACCOUNT_PRIVATE_KEY.replace(/\\n/g, "\n");
-
     const SCOPES = ["https://www.googleapis.com/auth/spreadsheets"];
     const jwtClient = new google.auth.JWT(
       SERVICE_ACCOUNT_EMAIL,
@@ -33,7 +32,6 @@ export const expenses = onRequest(
       privateKey,
       SCOPES
     );
-
     const sheets = google.sheets({ version: "v4", auth: jwtClient });
 
     res.set("Access-Control-Allow-Origin", "*");
@@ -47,16 +45,18 @@ export const expenses = onRequest(
 
     try {
       if (req.method === "GET") {
-        // Fetch Expenses
+        // Get expenses
         const expensesRes = await sheets.spreadsheets.values.get({
           spreadsheetId: SPREADSHEET_ID,
           range: EXPENSES_RANGE,
         });
 
         const expensesRows = expensesRes.data.values || [];
-        expensesRows.shift(); // Remove headers
+        expensesRows.shift(); // Remove headers row
 
-        const receiptsColIndex = 6; // G=6 (0-based: A=0,B=1,...G=6)
+        // Indices: A=0,B=1,C=2,D=3,E=4,F=5,G=6(editURL),H=7(hyperlink),I=8(id)
+        const editURLColIndex = 6;
+        const idColIndex = 8;
 
         const expensesData = expensesRows.map((row, index) => {
           const rawValue = row[4];
@@ -64,9 +64,8 @@ export const expenses = onRequest(
             ? rawValue.replace(/[^0-9.-]/g, "")
             : "0";
           const value = parseFloat(cleanedValue);
-
-          // Receipts link in G
-          const receiptLink = row[receiptsColIndex] || "";
+          const editURL = row[editURLColIndex] || "";
+          const id = row[idColIndex] || "";
 
           return {
             date: row[0],
@@ -78,22 +77,22 @@ export const expenses = onRequest(
               .filter(Boolean),
             value: value,
             notes: row[5],
-            receipts: receiptLink,
-            rowIndex: index + 2, // Track row number in the sheet
+            receipts: editURL,
+            rowIndex: index + 2,
+            id: id,
           };
         });
 
-        // Fetch Lists for Categories and Tags
+        // Get categories & tags lists
         const listsRes = await sheets.spreadsheets.values.get({
           spreadsheetId: SPREADSHEET_ID,
           range: METADATA_RANGE,
         });
 
         const listsRows = listsRes.data.values || [];
-        listsRows.shift(); // Remove headers row
-
-        const categories = listsRows.map((row) => row[0]).filter(Boolean); // Column A
-        const tags = listsRows.map((row) => row[1]).filter(Boolean); // Column B
+        listsRows.shift(); // Remove headers
+        const categories = listsRows.map((row) => row[0]).filter(Boolean);
+        const tags = listsRows.map((row) => row[1]).filter(Boolean);
 
         res.status(200).json({ expenses: expensesData, categories, tags });
         return;
@@ -106,24 +105,16 @@ export const expenses = onRequest(
           !data.type ||
           typeof data.categories !== "string" ||
           !Array.isArray(data.tags) ||
-          typeof data.value !== "number"
+          typeof data.value !== "number" ||
+          !data.id
         ) {
           res.status(400).json({ error: "Missing or invalid required fields" });
           return;
         }
 
-        // folderName provided by frontend
-        const folderName = data.folderName || "";
-
-        // Construct a single link to a page that lists all images in that folder
-        const folderLink = folderName
-          ? `${FRONTEND_URL}/receipts?folder=${encodeURIComponent(folderName)}`
-          : "";
-
-        // Create a hyperlink formula for column H
-        const hyperlinkFormula = folderLink
-          ? `=HYPERLINK("${folderLink}", "Receipt")`
-          : "";
+        const id = data.id; // This is the numeric ID from the frontend
+        const editURL = `${FRONTEND_URL}/edit?id=${encodeURIComponent(id)}`;
+        const hyperlinkFormula = `=HYPERLINK("${editURL}", "Receipt")`;
 
         await sheets.spreadsheets.values.append({
           spreadsheetId: SPREADSHEET_ID,
@@ -132,21 +123,21 @@ export const expenses = onRequest(
           requestBody: {
             values: [
               [
-                dateFormatted,
-                data.type,
-                data.categories,
-                data.tags.join(", "),
-                data.value,
-                data.notes || "",
-                folderLink,
-                hyperlinkFormula,
+                dateFormatted, // A=date
+                data.type, // B=type
+                data.categories, // C=categories
+                data.tags.join(", "), // D=tags
+                data.value, // E=value
+                data.notes || "", // F=notes
+                editURL, // G=editLink
+                hyperlinkFormula, // H=hyperlink
+                id, // I=id (no prefix, just the numeric string)
               ],
             ],
           },
         });
 
-
-        res.status(200).json({ status: "success" });
+        res.status(200).json({ status: "success", id: id });
         return;
       } else if (req.method === "PUT") {
         const data = req.body;
@@ -158,7 +149,8 @@ export const expenses = onRequest(
           !data.type ||
           typeof data.categories !== "string" ||
           !Array.isArray(data.tags) ||
-          typeof data.value !== "number"
+          typeof data.value !== "number" ||
+          !data.id
         ) {
           res.status(400).json({ error: "Missing or invalid required fields" });
           return;
@@ -167,11 +159,36 @@ export const expenses = onRequest(
         const tagsStr = data.tags.join(", ");
         const rowIndex = data.rowIndex;
 
-        // Update the specific row
+        // Fetch existing row to get its ID
+        const rowRange = `${EXPENSES_TABLE_NAME}!A${rowIndex}:I${rowIndex}`;
+        const existingRowRes = await sheets.spreadsheets.values.get({
+          spreadsheetId: SPREADSHEET_ID,
+          range: rowRange,
+        });
+
+        const existingRow =
+          existingRowRes.data.values && existingRowRes.data.values[0];
+        if (!existingRow) {
+          res.status(404).json({ error: "Expense not found" });
+          return;
+        }
+
+        const existingId = existingRow[8]; // column I for id
+        if (!existingId) {
+          res
+            .status(500)
+            .json({ error: "ID not found in the existing expense row" });
+          return;
+        }
+
+        // The editURL should always use the existingId, no matter what
+        const editURL = `${FRONTEND_URL}/receipts?folder=${encodeURIComponent(existingId)}`;
+        const hyperlinkFormula = `=HYPERLINK("${editURL}", "Receipt")`;
+
         await sheets.spreadsheets.values.update({
           spreadsheetId: SPREADSHEET_ID,
           range: `${EXPENSES_TABLE_NAME}!${EXPENSES_FIRST_COLUMN}${rowIndex}:${EXPENSES_LAST_COLUMN}${rowIndex}`,
-          valueInputOption: "RAW",
+          valueInputOption: "USER_ENTERED",
           requestBody: {
             values: [
               [
@@ -181,12 +198,16 @@ export const expenses = onRequest(
                 tagsStr,
                 data.value,
                 data.notes || "",
+                editURL,
+                hyperlinkFormula,
+                existingId, // Preserve the same numeric ID
               ],
             ],
           },
         });
 
-        res.status(200).json({ status: "success" });
+        // No matter if images are removed or added outside, the ID and link remain stable.
+        res.status(200).json({ status: "success", id: existingId });
         return;
       } else {
         res.status(405).json({ error: "Method Not Allowed" });
