@@ -4,10 +4,11 @@ import { google } from "googleapis";
 
 const SPREADSHEET_ID = "1KROs_Swh-1zeQhLajtRw-E7DcYnJRMHEOXX5ECwTGSI";
 const FRONTEND_URL = "https://budget-app-v3.web.app";
-const EXPENSES_TABLE_NAME = "Expenses";
-const EXPENSES_FIRST_COLUMN = "A";
-const EXPENSES_LAST_COLUMN = "I"; // A-I includes ID in column I
-const EXPENSES_RANGE = `${EXPENSES_TABLE_NAME}!${EXPENSES_FIRST_COLUMN}1:${EXPENSES_LAST_COLUMN}`;
+const NON_RECURRING_TABLE_NAME = "Non-Recurring";
+// const RECURRING_TABLE_NAME = "Recurring";
+const FIRST_COLUMN = "A";
+const LAST_COLUMN = "I"; // A-I includes ID in column I
+const NON_RECURRING_RANGE = `${NON_RECURRING_TABLE_NAME}!${FIRST_COLUMN}1:${LAST_COLUMN}`;
 const METADATA_RANGE = "Metadata!A1:B";
 
 export const expenses = onRequest(
@@ -48,7 +49,7 @@ export const expenses = onRequest(
         // Get expenses
         const expensesRes = await sheets.spreadsheets.values.get({
           spreadsheetId: SPREADSHEET_ID,
-          range: EXPENSES_RANGE,
+          range: NON_RECURRING_RANGE,
         });
 
         const expensesRows = expensesRes.data.values || [];
@@ -77,7 +78,7 @@ export const expenses = onRequest(
               .filter(Boolean),
             value: value,
             notes: row[5],
-            receipts: editURL,
+            editURL: editURL,
             rowIndex: index + 2,
             id: id,
           };
@@ -114,11 +115,11 @@ export const expenses = onRequest(
 
         const id = data.id; // This is the numeric ID from the frontend
         const editURL = `${FRONTEND_URL}/edit?id=${encodeURIComponent(id)}`;
-        const hyperlinkFormula = `=HYPERLINK("${editURL}", "Receipt")`;
+        const hyperlinkFormula = `=HYPERLINK("${editURL}", "Edit")`;
 
         await sheets.spreadsheets.values.append({
           spreadsheetId: SPREADSHEET_ID,
-          range: EXPENSES_RANGE,
+          range: NON_RECURRING_RANGE,
           valueInputOption: "USER_ENTERED",
           requestBody: {
             values: [
@@ -160,7 +161,7 @@ export const expenses = onRequest(
         const rowIndex = data.rowIndex;
 
         // Fetch existing row to get its ID
-        const rowRange = `${EXPENSES_TABLE_NAME}!A${rowIndex}:I${rowIndex}`;
+        const rowRange = `${NON_RECURRING_TABLE_NAME}!${FIRST_COLUMN}${rowIndex}:${LAST_COLUMN}${rowIndex}`;
         const existingRowRes = await sheets.spreadsheets.values.get({
           spreadsheetId: SPREADSHEET_ID,
           range: rowRange,
@@ -182,12 +183,12 @@ export const expenses = onRequest(
         }
 
         // The editURL should always use the existingId, no matter what
-        const editURL = `${FRONTEND_URL}/receipts?folder=${encodeURIComponent(existingId)}`;
-        const hyperlinkFormula = `=HYPERLINK("${editURL}", "Receipt")`;
+        const editURL = `${FRONTEND_URL}/edit?id=${encodeURIComponent(existingId)}`;
+        const hyperlinkFormula = `=HYPERLINK("${editURL}", "Edit")`;
 
         await sheets.spreadsheets.values.update({
           spreadsheetId: SPREADSHEET_ID,
-          range: `${EXPENSES_TABLE_NAME}!${EXPENSES_FIRST_COLUMN}${rowIndex}:${EXPENSES_LAST_COLUMN}${rowIndex}`,
+          range: rowRange,
           valueInputOption: "USER_ENTERED",
           requestBody: {
             values: [

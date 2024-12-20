@@ -232,20 +232,6 @@ function generateFileMap(filePaths) {
   return JSON.stringify(fileTree, null, 2);
 }
 
-// // Example usage
-// const filePaths = [
-//   "/project/src/index.js",
-//   "/project/src/App.js",
-//   "/project/src/components/Header.js",
-//   "/project/src/components/Footer.js",
-//   "/project/tests/App.test.js",
-//   "/project/public/index.html",
-//   "/project/public/favicon.ico"
-// ];
-
-// console.log(generateFileMap(filePaths));
-
-
 // Function to generate the output in markdown format
 function generateOutput(
   codeFiles,

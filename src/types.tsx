@@ -5,6 +5,6 @@ export interface Expense {
   tags: string[];
   value: number;
   notes: string;
-  receipts: string;
+  editURL: string;
   id: string;
 }
