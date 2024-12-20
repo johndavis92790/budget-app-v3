@@ -4,8 +4,7 @@ import { Expense } from "./types";
 import HomePage from "./HomePage";
 import HistoryPage from "./HistoryPage";
 import { Navbar, Nav, Container } from "react-bootstrap";
-import { API_URL } from "./config";
-import { mmddyyyyToYyyyMmDd } from "./helpers";
+import { API_URL, mmddyyyyToYyyyMmDd } from "./helpers";
 import EditExpensePage from "./EditExpensePage";
 
 function App() {

@@ -63,6 +63,7 @@ function shouldIncludeFile(filePath) {
 const excludeFiles = [
   ...readGitignore(".gitignore"),
   "concat.js",
+  "index.js",
   "package-lock.json",
   ".gitignore",
   "tasks.json",
@@ -200,15 +201,50 @@ function getProjectName() {
   return "Unknown Project";
 }
 
-// Function to generate a limited JSON mapping of included files
 function generateFileMap(filePaths) {
-  // Limit to first 50 files and shorten paths to 100 chars
-  const limited = filePaths.slice(0, 50).map((file) => {
-    const rel = path.relative(__dirname, file);
-    return rel.length > 100 ? rel.substring(0, 100) + "..." : rel;
+  const fileTree = {};
+
+  // Build the nested structure
+  filePaths.forEach((file) => {
+    const relPath = path.relative(__dirname, file);
+    const parts = relPath.split(path.sep); // Split into folder and file parts
+    let current = fileTree;
+
+    // Build nested structure
+    parts.forEach((part, index) => {
+      if (index === parts.length - 1) {
+        // It's a file, add to the current folder
+        if (!Array.isArray(current.files)) {
+          current.files = [];
+        }
+        current.files.push(part);
+      } else {
+        // It's a folder, drill down or create
+        if (!current[part]) {
+          current[part] = {};
+        }
+        current = current[part];
+      }
+    });
   });
-  return JSON.stringify({ files: limited });
+
+  // Return the structured JSON as a formatted string
+  return JSON.stringify(fileTree, null, 2);
 }
+
+// // Example usage
+// const filePaths = [
+//   "/project/src/index.js",
+//   "/project/src/App.js",
+//   "/project/src/components/Header.js",
+//   "/project/src/components/Footer.js",
+//   "/project/tests/App.test.js",
+//   "/project/public/index.html",
+//   "/project/public/favicon.ico"
+// ];
+
+// console.log(generateFileMap(filePaths));
+
 
 // Function to generate the output in markdown format
 function generateOutput(

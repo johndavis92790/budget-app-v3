@@ -1,3 +1,5 @@
+export const API_URL = process.env.REACT_APP_API_URL!;
+
 export function getDaySuffix(day: number) {
   if (day >= 11 && day <= 13) {
     return "th";
