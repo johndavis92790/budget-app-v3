@@ -3,7 +3,7 @@ import { Expense } from "./types";
 import { ListGroup, Badge, Row, Col } from "react-bootstrap";
 import { formatDateFromYYYYMMDD } from "./helpers";
 import FullPageSpinner from "./FullPageSpinner";
-import "./HistoryPage.css"
+import "./HistoryPage.css";
 
 interface HistoryPageProps {
   expenses: Expense[];

@@ -195,7 +195,7 @@ function EditExpensePage({
   return (
     <div>
       <div style={{ marginBottom: "20px" }}>
-        <Button variant="link" onClick={() => navigate("/history")}>
+        <Button variant="secondary" onClick={() => navigate("/history")}>
           <FaArrowLeft /> Back
         </Button>
       </div>

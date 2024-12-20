@@ -82,58 +82,60 @@ function App() {
   };
 
   return (
-    <Router>
-      <Navbar bg="dark" variant="dark" expand="lg" className="mb-4">
-        <Container>
-          <Navbar.Brand as={Link} to="/">
-            Family Expense Tracker
-          </Navbar.Brand>
-          <Navbar.Toggle aria-controls="main-nav" />
-          <Navbar.Collapse id="main-nav">
-            <Nav className="me-auto">
-              <Nav.Link as={Link} to="/">
-                Add Expense/Refund
-              </Nav.Link>
-              <Nav.Link as={Link} to="/history">
-                History
-              </Nav.Link>
-            </Nav>
-          </Navbar.Collapse>
-        </Container>
-      </Navbar>
+    <div className="mb-5">
+      <Router>
+        <Navbar bg="dark" variant="dark" expand="lg" className="mb-4">
+          <Container>
+            <Navbar.Brand as={Link} to="/">
+              Family Expense Tracker
+            </Navbar.Brand>
+            <Navbar.Toggle aria-controls="main-nav" />
+            <Navbar.Collapse id="main-nav">
+              <Nav className="me-auto">
+                <Nav.Link as={Link} to="/">
+                  Add Expense/Refund
+                </Nav.Link>
+                <Nav.Link as={Link} to="/history">
+                  History
+                </Nav.Link>
+              </Nav>
+            </Navbar.Collapse>
+          </Container>
+        </Navbar>
 
-      <Container>
-        <Routes>
-          <Route
-            path="/"
-            element={
-              <HomePage
-                categories={categories}
-                tags={tags}
-                addExpense={addExpense}
-                loading={loading}
-              />
-            }
-          />
-          <Route
-            path="/history"
-            element={<HistoryPage expenses={expenses} loading={loading} />}
-          />
-          <Route
-            path="/edit"
-            element={
-              <EditExpensePage
-                categories={categories}
-                tags={tags}
-                onUpdateExpense={onUpdateExpense}
-                loading={loading}
-                expenses={expenses}
-              />
-            }
-          />
-        </Routes>
-      </Container>
-    </Router>
+        <Container>
+          <Routes>
+            <Route
+              path="/"
+              element={
+                <HomePage
+                  categories={categories}
+                  tags={tags}
+                  addExpense={addExpense}
+                  loading={loading}
+                />
+              }
+            />
+            <Route
+              path="/history"
+              element={<HistoryPage expenses={expenses} loading={loading} />}
+            />
+            <Route
+              path="/edit"
+              element={
+                <EditExpensePage
+                  categories={categories}
+                  tags={tags}
+                  onUpdateExpense={onUpdateExpense}
+                  loading={loading}
+                  expenses={expenses}
+                />
+              }
+            />
+          </Routes>
+        </Container>
+      </Router>
+    </div>
   );
 }
 
