@@ -117,15 +117,7 @@ function App() {
           />
           <Route
             path="/history"
-            element={
-              <HistoryPage
-                categories={categories}
-                expenses={expenses}
-                loading={loading}
-                onUpdateExpense={onUpdateExpense}
-                tags={tags}
-              />
-            }
+            element={<HistoryPage expenses={expenses} loading={loading} />}
           />
           <Route
             path="/edit"

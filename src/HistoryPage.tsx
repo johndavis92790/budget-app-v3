@@ -3,22 +3,14 @@ import { Expense } from "./types";
 import { ListGroup, Badge, Row, Col } from "react-bootstrap";
 import { formatDateFromYYYYMMDD } from "./helpers";
 import FullPageSpinner from "./FullPageSpinner";
+import "./HistoryPage.css"
 
 interface HistoryPageProps {
-  categories: string[];
   expenses: Expense[];
   loading: boolean;
-  onUpdateExpense: (updatedExpense: any) => Promise<void>;
-  tags: string[];
 }
 
-function HistoryPage({
-  categories,
-  expenses,
-  loading,
-  onUpdateExpense,
-  tags,
-}: HistoryPageProps) {
+function HistoryPage({ expenses, loading }: HistoryPageProps) {
   const navigate = useNavigate();
 
   if (loading) {
