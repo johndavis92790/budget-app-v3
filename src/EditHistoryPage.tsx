@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import { Expense } from "./types";
+import { History } from "./types";
 import { Form, Button, Spinner } from "react-bootstrap";
 import {
   getStorage,
@@ -15,25 +15,27 @@ import { FaArrowLeft } from "react-icons/fa";
 import FullSizeImageModal from "./FullSizeImageModal";
 import FullPageSpinner from "./FullPageSpinner";
 
-interface EditExpensePageProps {
+interface EditHistoryPageProps {
+  historyTypes: string[];
   categories: string[];
-  tags: string[];
-  onUpdateExpense: (updatedExpense: any) => Promise<void>;
+  nonRecurringTags: string[];
+  onUpdateItem: (updatedHistory: History) => Promise<void>;
   loading: boolean;
-  expenses: Expense[];
+  history: History[];
 }
 
-function EditExpensePage({
+function EditHistoryPage({
+  historyTypes,
   categories,
-  tags,
-  onUpdateExpense,
+  nonRecurringTags,
+  onUpdateItem,
   loading,
-  expenses,
-}: EditExpensePageProps) {
+  history,
+}: EditHistoryPageProps) {
   const location = useLocation();
   const navigate = useNavigate();
 
-  const [selectedExpense, setSelectedExpense] = useState<Expense | null>(null);
+  const [selectedHistory, setSelectedHistory] = useState<History | null>(null);
   const [existingReceiptItems, setExistingReceiptItems] = useState<
     { url: string; fullPath: string }[]
   >([]);
@@ -47,7 +49,7 @@ function EditExpensePage({
   const [submitting, setSubmitting] = useState(false);
   const [initialized, setInitialized] = useState(false);
 
-  // We now rely on the ID in the expense directly, not parsing from URL queries
+  // We now rely on the ID in the history directly, not parsing from URL queries
   const queryParams = new URLSearchParams(location.search);
   const idParam = queryParams.get("id");
 
@@ -58,23 +60,23 @@ function EditExpensePage({
       return;
     }
 
-    const foundExpense = expenses.find((exp) => exp.id === idParam);
-    if (!foundExpense) {
-      // If no matching expense found, go back to history
+    const foundHistory = history.find((hist) => hist.id === idParam);
+    if (!foundHistory) {
+      // If no matching history found, go back to history
       navigate("/history");
       return;
     }
-    setSelectedExpense(foundExpense);
-  }, [loading, idParam, expenses, navigate]);
+    setSelectedHistory(foundHistory);
+  }, [loading, idParam, history, navigate]);
 
   useEffect(() => {
-    if (selectedExpense && !initialized) {
+    if (selectedHistory && !initialized) {
       const loadExistingReceipts = async () => {
         setExistingReceiptItems([]);
         setRemovedExistingPaths([]);
         setNewReceiptFiles([]);
 
-        const id = selectedExpense.id;
+        const id = selectedHistory.id;
 
         if (!id) {
           // No ID means no folder name, just mark as initialized
@@ -108,15 +110,15 @@ function EditExpensePage({
 
       loadExistingReceipts();
     }
-  }, [selectedExpense, initialized]);
+  }, [selectedHistory, initialized]);
 
   const handleFieldChange = (
-    field: keyof Expense,
+    field: keyof History,
     value: string | number | string[],
   ) => {
-    if (selectedExpense) {
-      setSelectedExpense({
-        ...selectedExpense,
+    if (selectedHistory) {
+      setSelectedHistory({
+        ...selectedHistory,
         [field]: value,
       });
     }
@@ -143,11 +145,11 @@ function EditExpensePage({
   };
 
   const handleSave = async () => {
-    if (!selectedExpense) return;
+    if (!selectedHistory) return;
 
     setSubmitting(true);
     try {
-      const id = selectedExpense.id; // Use the original ID from creation
+      const id = selectedHistory.id; // Use the original ID from creation
 
       const storage = getStorage();
 
@@ -167,18 +169,18 @@ function EditExpensePage({
         }
       }
 
-      // Just update the expense on the backend, no new IDs or folder names
+      // Just update the history on the backend, no new IDs or folder names
       // The backend will reuse the existing ID from the original creation
-      const updatedExpense = {
-        ...selectedExpense,
+      const updatedHistory = {
+        ...selectedHistory,
       };
 
-      await onUpdateExpense(updatedExpense);
+      await onUpdateItem(updatedHistory);
 
       navigate("/history");
     } catch (error) {
-      console.error("Error saving expense:", error);
-      alert("An error occurred while saving the expense.");
+      console.error("Error saving history:", error);
+      alert("An error occurred while saving the history.");
     } finally {
       setSubmitting(false);
     }
@@ -188,8 +190,8 @@ function EditExpensePage({
     return <FullPageSpinner />;
   }
 
-  if (!selectedExpense) {
-    return <p>Loading expense data or no expense found...</p>;
+  if (!selectedHistory) {
+    return <p>Loading history data or no history found...</p>;
   }
 
   return (
@@ -200,14 +202,14 @@ function EditExpensePage({
         </Button>
       </div>
 
-      <h2 className="mb-4">Edit Expense</h2>
+      <h2 className="mb-4">Edit History</h2>
 
       <Form>
         <Form.Group className="mb-3">
           <Form.Label>Date</Form.Label>
           <Form.Control
             type="date"
-            value={selectedExpense.date}
+            value={selectedHistory.date}
             onChange={(e) => handleFieldChange("date", e.target.value)}
             disabled={submitting}
           />
@@ -215,25 +217,45 @@ function EditExpensePage({
         <Form.Group className="mb-3">
           <Form.Label>Type</Form.Label>
           <Form.Select
-            value={selectedExpense.type}
-            onChange={(e) => handleFieldChange("type", e.target.value)}
+            value={selectedHistory?.type || ""}
+            onChange={(e) => {
+              const selectedType = e.target.value;
+              if (historyTypes.includes(selectedType) && selectedHistory) {
+                setSelectedHistory({
+                  ...selectedHistory,
+                  type: selectedType,
+                });
+              }
+            }}
+            required
             disabled={submitting}
           >
-            <option>Expense</option>
-            <option>Refund</option>
+            {historyTypes.map((type, idx) => (
+              <option key={idx} value={type}>
+                {type}
+              </option>
+            ))}
           </Form.Select>
         </Form.Group>
         <Form.Group className="mb-3">
           <Form.Label>Category</Form.Label>
           <Form.Select
-            value={selectedExpense.categories}
-            onChange={(e) => handleFieldChange("categories", e.target.value)}
+            value={selectedHistory?.category || ""}
+            onChange={(e) => {
+              const selectedCategory = e.target.value;
+              if (categories.includes(selectedCategory) && selectedHistory) {
+                setSelectedHistory({
+                  ...selectedHistory,
+                  category: selectedCategory,
+                });
+              }
+            }}
+            required
             disabled={submitting}
           >
-            <option value="">Select a Category</option>
-            {categories.map((cat, idx) => (
-              <option key={idx} value={cat}>
-                {cat}
+            {categories.map((category, idx) => (
+              <option key={idx} value={category}>
+                {category}
               </option>
             ))}
           </Form.Select>
@@ -242,7 +264,7 @@ function EditExpensePage({
           <Form.Label>Tags</Form.Label>
           <Form.Select
             multiple
-            value={selectedExpense.tags}
+            value={selectedHistory.tags}
             onChange={(e) => {
               const options = e.target.options;
               const selected: string[] = [];
@@ -256,9 +278,9 @@ function EditExpensePage({
             required
             disabled={submitting}
           >
-            {tags.map((tag: string, idx: number) => (
-              <option key={idx} value={tag}>
-                {tag}
+            {nonRecurringTags.map((nonRecurringTag: string, idx: number) => (
+              <option key={idx} value={nonRecurringTag}>
+                {nonRecurringTag}
               </option>
             ))}
           </Form.Select>
@@ -267,7 +289,7 @@ function EditExpensePage({
           <Form.Label>Value</Form.Label>
           <Form.Control
             type="number"
-            value={selectedExpense.value}
+            value={selectedHistory.value}
             onChange={(e) =>
               handleFieldChange("value", parseFloat(e.target.value))
             }
@@ -279,7 +301,7 @@ function EditExpensePage({
           <Form.Control
             as="textarea"
             rows={3}
-            value={selectedExpense.notes}
+            value={selectedHistory.notes}
             onChange={(e) => handleFieldChange("notes", e.target.value)}
             disabled={submitting}
           />
@@ -415,7 +437,7 @@ function EditExpensePage({
         <Button
           variant="primary"
           onClick={handleSave}
-          disabled={!selectedExpense || submitting}
+          disabled={!selectedHistory || submitting}
           style={{ marginLeft: "10px" }}
         >
           {submitting ? (
@@ -435,4 +457,4 @@ function EditExpensePage({
   );
 }
 
-export default EditExpensePage;
+export default EditHistoryPage;

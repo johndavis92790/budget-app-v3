@@ -1,41 +1,42 @@
 import { useNavigate } from "react-router-dom";
-import { Expense } from "./types";
+import { History } from "./types";
 import { ListGroup, Badge, Row, Col } from "react-bootstrap";
 import { formatDateFromYYYYMMDD } from "./helpers";
 import FullPageSpinner from "./FullPageSpinner";
 import "./HistoryPage.css";
 
 interface HistoryPageProps {
-  expenses: Expense[];
+  history: History[];
   loading: boolean;
 }
 
-function HistoryPage({ expenses, loading }: HistoryPageProps) {
+function HistoryPage({ history, loading }: HistoryPageProps) {
   const navigate = useNavigate();
 
   if (loading) {
     return <FullPageSpinner />;
   }
 
-  const handleRowClick = (expense: Expense) => {
-    console.log("Row clicked", expense);
-    if (!expense.id) {
-      console.error("Expense has no id, cannot navigate.");
+  const handleRowClick = (history: History) => {
+    console.log("Row clicked", history);
+    if (!history.id) {
+      console.error("History has no id, cannot navigate.");
       return;
     }
-    navigate(`/edit?id=${encodeURIComponent(expense.id)}`);
+    navigate(history.editURL);
   };
 
   return (
     <div>
       <h2 className="mb-4">History</h2>
       <ListGroup variant="flush">
-        {expenses.map((exp, index) => {
-          const isRefund = exp.type === "Refund";
-          const valueColor = isRefund ? "text-success" : "text-danger";
+        {history.map((hist, index) => {
+          const isExpense =
+            hist.type === "Expense" || hist.type === "Recurring Expense";
+          const valueColor = isExpense ? "text-danger" : "text-success";
           const formattedValue =
-            (isRefund ? "+" : "-") +
-            exp.value.toLocaleString("en-US", {
+            (isExpense ? "-" : "+") +
+            hist.value.toLocaleString("en-US", {
               style: "currency",
               currency: "USD",
             });
@@ -44,20 +45,20 @@ function HistoryPage({ expenses, loading }: HistoryPageProps) {
 
           return (
             <ListGroup.Item
-              key={exp.id} // Use exp.id here
+              key={hist.id}
               className={`py-3 ${backgroundColorClass}`}
-              onClick={() => handleRowClick(exp)}
+              onClick={() => handleRowClick(hist)}
               style={{ cursor: "pointer" }}
             >
               <Row>
                 <Col xs={8}>
-                  <div style={{ fontSize: "1.1em" }}>{exp.categories}</div>
+                  <div style={{ fontSize: "1.1em" }}>{hist.category}</div>
                   <div className="text-muted" style={{ fontSize: "0.9em" }}>
-                    {exp.type}
+                    {hist.type}
                   </div>
-                  {exp.tags.length > 0 && (
+                  {hist.tags.length > 0 && (
                     <div className="mt-1">
-                      {exp.tags.map((tag, i) => (
+                      {hist.tags.map((tag, i) => (
                         <Badge key={i} bg="secondary" className="me-1">
                           {tag}
                         </Badge>
@@ -73,7 +74,7 @@ function HistoryPage({ expenses, loading }: HistoryPageProps) {
                     {formattedValue}
                   </div>
                   <div className="text-muted" style={{ fontSize: "0.9em" }}>
-                    {formatDateFromYYYYMMDD(exp.date)}
+                    {formatDateFromYYYYMMDD(hist.date)}
                   </div>
                 </Col>
               </Row>

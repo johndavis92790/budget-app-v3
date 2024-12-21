@@ -5,36 +5,27 @@ import { ref, uploadBytes } from "firebase/storage";
 import { FaTimes } from "react-icons/fa";
 import FullSizeImageModal from "./FullSizeImageModal";
 import FullPageSpinner from "./FullPageSpinner";
-import { History } from "./types";
+import { Recurring } from "./types";
 
-interface HomePageProps {
-  categories: string[];
-  nonRecurringTags: string[];
-  nonRecurringTypes: string[];
-  addItem: (history: History) => Promise<boolean>;
+interface AddRecurringProps {
+  recurringTags: string[];
+  recurringTypes: string[];
+  addItem: (recurring: Recurring) => Promise<boolean>;
   loading: boolean;
 }
 
-function HomePage({
-  categories,
-  nonRecurringTags,
-  nonRecurringTypes,
+function AddRecurring({
+  recurringTags,
+  recurringTypes,
   addItem,
   loading,
-}: HomePageProps) {
-  const [date, setDate] = useState<string>(() => {
-    const today = new Date();
-    const yyyy = today.getFullYear();
-    const mm = String(today.getMonth() + 1).padStart(2, "0");
-    const dd = String(today.getDate()).padStart(2, "0");
-    return `${yyyy}-${mm}-${dd}`;
-  });
+}: AddRecurringProps) {
   const [type, setType] = useState<string>("Expense");
-  const [selectedCategory, setSelectedCategory] = useState<string>("");
+  const [name, setName] = useState<string>("");
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const [value, setValue] = useState<string>("");
-  const [notes, setNotes] = useState<string>("");
-  const [receiptFiles, setReceiptFiles] = useState<File[]>([]);
+
+  const [imageFiles, setImageFiles] = useState<File[]>([]);
   const [selectedImageUrl, setSelectedImageUrl] = useState<string | null>(null);
 
   const editURLFragment = "https://budget-app-v3.web.app/edit?id=";
@@ -52,45 +43,39 @@ function HomePage({
     setSelectedTags(selected);
   };
 
-  const handleReceiptChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (!files || files.length === 0) return;
 
     const newFiles = Array.from(files);
-    setReceiptFiles((prevFiles) => [...prevFiles, ...newFiles]);
+    setImageFiles((prevFiles) => [...prevFiles, ...newFiles]);
 
     e.target.value = "";
   };
 
   const handleRemoveImage = (index: number) => {
-    setReceiptFiles((prevFiles) => prevFiles.filter((_, i) => i !== index));
+    setImageFiles((prevFiles) => prevFiles.filter((_, i) => i !== index));
   };
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
 
-    if (
-      !date ||
-      !type ||
-      !selectedCategory ||
-      selectedTags.length === 0 ||
-      !value
-    ) {
-      alert("Date, Type, Category, at least one Tag, and Value are required.");
+    if (!type || selectedTags.length === 0 || !value) {
+      alert("Type, at least one Tag, and Value are required.");
       return;
     }
 
     setSubmitting(true);
     try {
-      // Always create a unique ID for this history
+      // Always create a unique ID for this recurring
       const uniqueId = String(Date.now());
 
       // If we have files, upload them using the uniqueId as the folder name
-      if (receiptFiles.length > 0) {
-        for (const file of receiptFiles) {
+      if (imageFiles.length > 0) {
+        for (const file of imageFiles) {
           const fileRef = ref(
             storage,
-            `receipts/${uniqueId}/${uniqueId}-${file.name}`,
+            `images/${uniqueId}/${uniqueId}-${file.name}`,
           );
           await uploadBytes(fileRef, file);
         }
@@ -99,44 +84,36 @@ function HomePage({
       const editURL: string = `${editURLFragment}${uniqueId}`;
 
       // Send one POST call to the backend
-      const newHistory: History = {
-        date,
+      const newRecurring: Recurring = {
         type,
-        category: selectedCategory,
+        name,
         tags: selectedTags,
         value: parseFloat(value),
-        notes,
         editURL,
         id: uniqueId,
-        itemType: "history",
+        itemType: "recurring",
       };
 
-      const success = await addItem(newHistory);
+      const success = await addItem(newRecurring);
       if (success) {
         // Clear form
-        const today = new Date();
-        const yyyy = today.getFullYear();
-        const mm = String(today.getMonth() + 1).padStart(2, "0");
-        const dd = String(today.getDate()).padStart(2, "0");
-        setDate(`${yyyy}-${mm}-${dd}`);
         setType("Expense");
-        setSelectedCategory("");
+        setName("");
         setSelectedTags([]);
         setValue("");
-        setNotes("");
-        setReceiptFiles([]);
+        setImageFiles([]);
       } else {
-        alert("Failed to add history.");
+        alert("Failed to add recurring.");
       }
     } catch (error) {
-      console.error("Error adding history:", error);
-      alert("An error occurred while adding the history.");
+      console.error("Error adding recurring:", error);
+      alert("An error occurred while adding the recurring.");
     } finally {
       setSubmitting(false);
     }
   };
 
-  if (loading && categories.length === 0 && nonRecurringTags.length === 0) {
+  if (loading && recurringTags.length === 0) {
     return <FullPageSpinner />;
   }
 
@@ -146,32 +123,20 @@ function HomePage({
       <Form onSubmit={handleSubmit}>
         <Row className="mb-3">
           <Col md={4}>
-            <Form.Group controlId="formDate">
-              <Form.Label>Date</Form.Label>
-              <Form.Control
-                type="date"
-                value={date}
-                onChange={(e) => setDate(e.target.value)}
-                required
-                disabled={submitting}
-              />
-            </Form.Group>
-          </Col>
-          <Col md={4}>
             <Form.Group controlId="formType">
               <Form.Label>Type</Form.Label>
               <Form.Select
                 value={type}
                 onChange={(e) => {
                   const selectedType = e.target.value;
-                  if (nonRecurringTypes.includes(selectedType)) {
+                  if (recurringTypes.includes(selectedType)) {
                     setType(selectedType);
                   }
                 }}
                 required
                 disabled={submitting}
               >
-                {nonRecurringTypes.map((typeOption, idx) => (
+                {recurringTypes.map((typeOption, idx) => (
                   <option key={idx} value={typeOption}>
                     {typeOption}
                   </option>
@@ -181,30 +146,19 @@ function HomePage({
           </Col>
         </Row>
 
+        <Col md={8}>
+          <Form.Group controlId="formName">
+            <Form.Label>Name</Form.Label>
+            <Form.Control
+              type="text"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              disabled={submitting}
+            />
+          </Form.Group>
+        </Col>
+
         <Row className="mb-3">
-          <Col md={6}>
-            <Form.Group controlId="formCategory">
-              <Form.Label>Category</Form.Label>
-              <Form.Select
-                value={selectedCategory}
-                onChange={(e) => {
-                  const selectedCategory = e.target.value;
-                  if (categories.includes(selectedCategory)) {
-                    setSelectedCategory(selectedCategory);
-                  }
-                }}
-                required
-                disabled={submitting}
-              >
-                <option value="">Select a Category</option>
-                {categories.map((cat, idx) => (
-                  <option key={idx} value={cat}>
-                    {cat}
-                  </option>
-                ))}
-              </Form.Select>
-            </Form.Group>
-          </Col>
           <Col md={6}>
             <Form.Group controlId="formTags">
               <Form.Label>Tags</Form.Label>
@@ -215,9 +169,9 @@ function HomePage({
                 required
                 disabled={submitting}
               >
-                {nonRecurringTags.map((nonRecurringTag, idx) => (
-                  <option key={idx} value={nonRecurringTag}>
-                    {nonRecurringTag}
+                {recurringTags.map((recurringTag, idx) => (
+                  <option key={idx} value={recurringTag}>
+                    {recurringTag}
                   </option>
                 ))}
               </Form.Select>
@@ -239,38 +193,27 @@ function HomePage({
               />
             </Form.Group>
           </Col>
-          <Col md={8}>
-            <Form.Group controlId="formNotes">
-              <Form.Label>Notes</Form.Label>
-              <Form.Control
-                type="text"
-                value={notes}
-                onChange={(e) => setNotes(e.target.value)}
-                disabled={submitting}
-              />
-            </Form.Group>
-          </Col>
         </Row>
 
         <Row className="mb-3">
           <Col md={4}>
-            <Form.Group controlId="formReceipts" className="mb-3">
-              <Form.Label>Receipts</Form.Label>
+            <Form.Group controlId="formImages" className="mb-3">
+              <Form.Label>Images</Form.Label>
               <Form.Control
                 type="file"
                 accept="image/*;capture=camera"
-                onChange={handleReceiptChange}
+                onChange={handleImageChange}
                 disabled={submitting}
               />
               <Form.Text className="text-muted">
-                Take a photo for each receipt. To add more receipts, tap this
-                input again after taking the first photo.
+                Take a photo for each image. To add more images, tap this input
+                again after taking the first photo.
               </Form.Text>
             </Form.Group>
           </Col>
         </Row>
 
-        {receiptFiles.length > 0 && (
+        {imageFiles.length > 0 && (
           <div
             style={{
               display: "flex",
@@ -279,7 +222,7 @@ function HomePage({
               marginBottom: "10px",
             }}
           >
-            {receiptFiles.map((file, index) => {
+            {imageFiles.map((file, index) => {
               const url = URL.createObjectURL(file);
               return (
                 <div
@@ -291,7 +234,7 @@ function HomePage({
                 >
                   <img
                     src={url}
-                    alt="Receipt"
+                    alt="Recurring Item"
                     style={{
                       width: "100px",
                       height: "auto",
@@ -340,4 +283,4 @@ function HomePage({
   );
 }
 
-export default HomePage;
+export default AddRecurring;
