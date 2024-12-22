@@ -23,7 +23,7 @@ function HistoryPage({ history, loading }: HistoryPageProps) {
       console.error("History has no id, cannot navigate.");
       return;
     }
-    navigate(history.editURL);
+    navigate(`/edit-history?id=${encodeURIComponent(history.id)}`);
   };
 
   return (

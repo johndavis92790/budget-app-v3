@@ -1,12 +1,15 @@
 import { useEffect, useState } from "react";
 import { BrowserRouter as Router, Routes, Route, Link } from "react-router-dom";
 import { History, Recurring } from "./types";
-import HomePage from "./HomePage";
 import HistoryPage from "./HistoryPage";
 import { Navbar, Nav, Container } from "react-bootstrap";
 import { API_URL, mmddyyyyToYyyyMmDd } from "./helpers";
 import EditHistoryPage from "./EditHistoryPage";
+import AddRecurringPage from "./AddRecurringPage";
 import RecurringPage from "./RecurringPage";
+import EditRecurringPage from "./EditRecurringPage";
+import AddHistoryPage from "./AddHistoryPage";
+import HomePage from "./HomePage";
 
 function App() {
   const [history, setHistory] = useState<History[]>([]);
@@ -110,14 +113,17 @@ function App() {
             <Navbar.Toggle aria-controls="main-nav" />
             <Navbar.Collapse id="main-nav">
               <Nav className="me-auto">
-                <Nav.Link as={Link} to="/">
+                <Nav.Link as={Link} to="/add-history">
                   Add Expense/Refund
                 </Nav.Link>
-                <Nav.Link as={Link} to="/recurring">
+                <Nav.Link as={Link} to="/add-recurring">
                   Add Recurring Expense/Income
                 </Nav.Link>
                 <Nav.Link as={Link} to="/history">
                   History
+                </Nav.Link>
+                <Nav.Link as={Link} to="/recurring">
+                  Recurring
                 </Nav.Link>
               </Nav>
             </Navbar.Collapse>
@@ -126,10 +132,11 @@ function App() {
 
         <Container>
           <Routes>
+            <Route path="/" element={<HomePage />} />
             <Route
-              path="/"
+              path="/add-history"
               element={
-                <HomePage
+                <AddHistoryPage
                   categories={categories}
                   nonRecurringTags={nonRecurringTags}
                   nonRecurringTypes={nonRecurringTypes}
@@ -139,9 +146,9 @@ function App() {
               }
             />
             <Route
-              path="/recurring"
+              path="/add-recurring"
               element={
-                <RecurringPage
+                <AddRecurringPage
                   recurringTags={recurringTags}
                   recurringTypes={recurringTypes}
                   addItem={addItem}
@@ -154,7 +161,13 @@ function App() {
               element={<HistoryPage history={history} loading={loading} />}
             />
             <Route
-              path="/edit"
+              path="/recurring"
+              element={
+                <RecurringPage recurring={recurring} loading={loading} />
+              }
+            />
+            <Route
+              path="/edit-history"
               element={
                 <EditHistoryPage
                   historyTypes={historyTypes}
@@ -163,6 +176,18 @@ function App() {
                   onUpdateItem={onUpdateItem}
                   loading={loading}
                   history={history}
+                />
+              }
+            />
+            <Route
+              path="/edit-recurring"
+              element={
+                <EditRecurringPage
+                  recurringTypes={recurringTypes}
+                  nonRecurringTags={nonRecurringTags}
+                  onUpdateItem={onUpdateItem}
+                  loading={loading}
+                  recurring={recurring}
                 />
               }
             />

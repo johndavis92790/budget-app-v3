@@ -119,7 +119,7 @@ export const expenses = onRequest(
               .map((t: string) => t.trim())
               .filter(Boolean),
             value: value,
-            notes: row[3],
+            name: row[3],
             editURL: editURL,
             rowIndex: index + 2,
             id: id,
@@ -240,69 +240,134 @@ export const expenses = onRequest(
         //-------------------------PUT----------------------------------------------------
       } else if (req.method === "PUT") {
         const data = req.body;
-        const dateFormatted = convertToMMDDYYYY(data.date);
+        let existingId;
 
-        if (
-          !data.rowIndex ||
-          !data.date ||
-          !data.type ||
-          typeof data.category !== "string" ||
-          !Array.isArray(data.tags) ||
-          typeof data.value !== "number" ||
-          !data.id
-        ) {
-          res.status(400).json({ error: "Missing or invalid required fields" });
-          return;
-        }
+        if (data.itemType === "history") {
+          const dateFormatted = convertToMMDDYYYY(data.date);
 
-        const tagsStr = data.tags.join(", ");
-        const rowIndex = data.rowIndex;
+          if (
+            !data.rowIndex ||
+            !data.date ||
+            !data.type ||
+            typeof data.category !== "string" ||
+            !Array.isArray(data.tags) ||
+            typeof data.value !== "number" ||
+            !data.id
+          ) {
+            res.status(400).json({ error: "Missing or invalid required fields" });
+            return;
+          }
 
-        // Fetch existing row to get its ID
-        const rowRange = `${HISTORY_TABLE_NAME}!${HISTORY_FIRST_COLUMN}${rowIndex}:${HISTORY_LAST_COLUMN}${rowIndex}`;
-        const existingRowRes = await sheets.spreadsheets.values.get({
-          spreadsheetId: SPREADSHEET_ID,
-          range: rowRange,
-        });
+          const tagsStr = data.tags.join(", ");
+          const rowIndex = data.rowIndex;
 
-        const existingRow =
-          existingRowRes.data.values && existingRowRes.data.values[0];
-        if (!existingRow) {
-          res.status(404).json({ error: "Expense not found" });
-          return;
-        }
+          // Fetch existing row to get its ID
+          const rowRange = `${HISTORY_TABLE_NAME}!${HISTORY_FIRST_COLUMN}${rowIndex}:${HISTORY_LAST_COLUMN}${rowIndex}`;
+          const existingRowRes = await sheets.spreadsheets.values.get({
+            spreadsheetId: SPREADSHEET_ID,
+            range: rowRange,
+          });
 
-        const existingId = existingRow[8]; // column I for id
-        const existingEditURL = existingRow[6]; // column G for editURL
-        if (!existingId) {
-          res
-            .status(500)
-            .json({ error: "ID not found in the existing expense row" });
-          return;
-        }
+          const existingRow =
+            existingRowRes.data.values && existingRowRes.data.values[0];
+          if (!existingRow) {
+            res.status(404).json({ error: "History not found" });
+            return;
+          }
 
-        const hyperlinkFormula = `=HYPERLINK("${existingEditURL}", "Edit")`;
+          existingId = existingRow[8]; // column I for id
+          const existingEditURL = existingRow[6]; // column G for editURL
+          if (!existingId) {
+            res
+              .status(500)
+              .json({ error: "ID not found in the existing history row" });
+            return;
+          }
 
-        await sheets.spreadsheets.values.update({
-          spreadsheetId: SPREADSHEET_ID,
-          range: rowRange,
-          valueInputOption: "USER_ENTERED",
-          requestBody: {
-            values: [
-              [
-                dateFormatted,
-                data.type,
-                data.category,
-                tagsStr,
-                data.value,
-                data.notes || "",
-                existingEditURL,
-                hyperlinkFormula,
-                existingId, // Preserve the same numeric ID
+          const hyperlinkFormula = `=HYPERLINK("${existingEditURL}", "Edit")`;
+
+          await sheets.spreadsheets.values.update({
+            spreadsheetId: SPREADSHEET_ID,
+            range: rowRange,
+            valueInputOption: "USER_ENTERED",
+            requestBody: {
+              values: [
+                [
+                  dateFormatted,
+                  data.type,
+                  data.category,
+                  tagsStr,
+                  data.value,
+                  data.notes || "",
+                  existingEditURL,
+                  hyperlinkFormula,
+                  existingId, // Preserve the same numeric ID
+                ],
               ],
-            ],
-          },
-        });
+            },
+          });
+        } else if (data.itemType === "recurring") {
+          if (
+            !data.rowIndex ||
+            !data.type ||
+            !Array.isArray(data.tags) ||
+            typeof data.value !== "number" ||
+            !data.name ||
+            !data.id
+          ) {
+            res
+              .status(400)
+              .json({ error: "Missing or invalid required fields" });
+            return;
+          }
+
+          const tagsStr = data.tags.join(", ");
+          const rowIndex = data.rowIndex;
+
+          // Fetch existing row to get its ID
+          const rowRange = `${RECURRING_TABLE_NAME}!${RECURRING_FIRST_COLUMN}${rowIndex}:${RECURRING_LAST_COLUMN}${rowIndex}`;
+          const existingRowRes = await sheets.spreadsheets.values.get({
+            spreadsheetId: SPREADSHEET_ID,
+            range: rowRange,
+          });
+
+          const existingRow =
+            existingRowRes.data.values && existingRowRes.data.values[0];
+          if (!existingRow) {
+            res.status(404).json({ error: "Recurring not found" });
+            return;
+          }
+
+          existingId = existingRow[6]; // column G for id
+          const existingEditURL = existingRow[4]; // column E for editURL
+          if (!existingId) {
+            res
+              .status(500)
+              .json({ error: "ID not found in the existing recurring row" });
+            return;
+          }
+
+          const hyperlinkFormula = `=HYPERLINK("${existingEditURL}", "Edit")`;
+
+          await sheets.spreadsheets.values.update({
+            spreadsheetId: SPREADSHEET_ID,
+            range: rowRange,
+            valueInputOption: "USER_ENTERED",
+            requestBody: {
+              values: [
+                [
+                  data.type,
+                  tagsStr,
+                  data.value,
+                  data.name,
+                  existingEditURL,
+                  hyperlinkFormula,
+                  existingId, // Preserve the same numeric ID
+                ],
+              ],
+            },
+          });
+        }
 
         // No matter if images are removed or added outside, the ID and link remain stable.
         res.status(200).json({ status: "success", id: existingId });

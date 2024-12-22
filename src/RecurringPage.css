@@ -1,0 +1,22 @@
+/* Override borders and background for list-group-item */
+.list-group-item {
+  border: none !important; /* Completely remove borders */
+  box-shadow: none !important; /* Remove any shadows */
+  padding: 15px 10px !important; /* Ensure padding stays consistent */
+}
+
+/* Enforce custom alternating background colors */
+.list-group-item.row-light {
+  background-color: #ebebeb !important; /* Darker light grey */
+}
+
+.list-group-item.row-white {
+  background-color: #ffffff !important; /* White */
+}
+
+/* Styling for tag chips */
+.badge {
+  font-size: 0.85em;
+  font-weight: normal;
+  margin-right: 5px;
+}
