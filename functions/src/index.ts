@@ -14,6 +14,9 @@ const RECURRING_FIRST_COLUMN = "A";
 const RECURRING_LAST_COLUMN = "G";
 const RECURRING_RANGE = `${RECURRING_TABLE_NAME}!${RECURRING_FIRST_COLUMN}1:${RECURRING_LAST_COLUMN}`;
 
+const WEEKLY_GOAL_RANGE = "Goals!A2";
+const MONTHLY_GOAL_RANGE = "Goals!B2";
+
 const METADATA_RANGE = "Metadata!A1:F";
 
 export const expenses = onRequest(
@@ -143,9 +146,35 @@ export const expenses = onRequest(
         const recurringTypes = listsRows.map((row) => row[4]).filter(Boolean);
         const historyTypes = listsRows.map((row) => row[5]).filter(Boolean);
 
+        // Get current weekly goal
+        const currentWeeklyGoalRes = await sheets.spreadsheets.values.get({
+          spreadsheetId: SPREADSHEET_ID,
+          range: WEEKLY_GOAL_RANGE,
+        });
+        const rawWeeklyGoal =
+          currentWeeklyGoalRes.data.values?.[0]?.[0] || null;
+        const cleanedWeeklyGoal = rawWeeklyGoal
+          ? rawWeeklyGoal.replace(/[^0-9.-]/g, "")
+          : "0";
+        const weeklyGoal = parseFloat(cleanedWeeklyGoal);
+
+        // Get current monthly goal
+        const currentMonthlyGoalRes = await sheets.spreadsheets.values.get({
+          spreadsheetId: SPREADSHEET_ID,
+          range: MONTHLY_GOAL_RANGE,
+        });
+        const rawMonthlyGoal =
+          currentMonthlyGoalRes.data.values?.[0]?.[0] || null;
+        const cleanedMonthlyGoal = rawMonthlyGoal
+          ? rawMonthlyGoal.replace(/[^0-9.-]/g, "")
+          : "0";
+        const monthlyGoal = parseFloat(cleanedMonthlyGoal);
+
         res.status(200).json({
           history: historyData,
           recurring: recurringData,
+          weeklyGoal,
+          monthlyGoal,
           categories,
           nonRecurringTags,
           recurringTags,
@@ -157,7 +186,7 @@ export const expenses = onRequest(
         //-------------------------POST----------------------------------------------------
       } else if (req.method === "POST") {
         const data = req.body;
-        
+
         const id = data.id; // This is the numeric ID from the frontend
         const hyperlinkFormula = `=HYPERLINK("${data.editURL}", "Edit")`;
 
@@ -240,137 +269,189 @@ export const expenses = onRequest(
         //-------------------------PUT----------------------------------------------------
       } else if (req.method === "PUT") {
         const data = req.body;
-        let existingId;
+        let existingId: string | undefined; // We'll only set this if itemType is history or recurring
 
-        if (data.itemType === "history") {
-          const dateFormatted = convertToMMDDYYYY(data.date);
+        switch (data.itemType) {
+          case "history": {
+            const dateFormatted = convertToMMDDYYYY(data.date);
 
-          if (
-            !data.rowIndex ||
-            !data.date ||
-            !data.type ||
-            typeof data.category !== "string" ||
-            !Array.isArray(data.tags) ||
-            typeof data.value !== "number" ||
-            !data.id
-          ) {
-            res.status(400).json({ error: "Missing or invalid required fields" });
-            return;
-          }
+            if (
+              !data.rowIndex ||
+              !data.date ||
+              !data.type ||
+              typeof data.category !== "string" ||
+              !Array.isArray(data.tags) ||
+              typeof data.value !== "number" ||
+              !data.id
+            ) {
+              res
+                .status(400)
+                .json({ error: "Missing or invalid required fields" });
+              return;
+            }
 
-          const tagsStr = data.tags.join(", ");
-          const rowIndex = data.rowIndex;
+            const tagsStr = data.tags.join(", ");
+            const rowIndex = data.rowIndex;
 
-          // Fetch existing row to get its ID
-          const rowRange = `${HISTORY_TABLE_NAME}!${HISTORY_FIRST_COLUMN}${rowIndex}:${HISTORY_LAST_COLUMN}${rowIndex}`;
-          const existingRowRes = await sheets.spreadsheets.values.get({
-            spreadsheetId: SPREADSHEET_ID,
-            range: rowRange,
-          });
+            // Fetch existing row to get its ID
+            const rowRange = `${HISTORY_TABLE_NAME}!${HISTORY_FIRST_COLUMN}${rowIndex}:${HISTORY_LAST_COLUMN}${rowIndex}`;
+            const existingRowRes = await sheets.spreadsheets.values.get({
+              spreadsheetId: SPREADSHEET_ID,
+              range: rowRange,
+            });
 
-          const existingRow =
-            existingRowRes.data.values && existingRowRes.data.values[0];
-          if (!existingRow) {
-            res.status(404).json({ error: "History not found" });
-            return;
-          }
+            const existingRow =
+              existingRowRes.data.values && existingRowRes.data.values[0];
+            if (!existingRow) {
+              res.status(404).json({ error: "History not found" });
+              return;
+            }
 
-          existingId = existingRow[8]; // column I for id
-          const existingEditURL = existingRow[6]; // column G for editURL
-          if (!existingId) {
-            res
-              .status(500)
-              .json({ error: "ID not found in the existing history row" });
-            return;
-          }
+            existingId = existingRow[8]; // column I for id
+            const existingEditURL = existingRow[6]; // column G for editURL
+            if (!existingId) {
+              res
+                .status(500)
+                .json({ error: "ID not found in the existing history row" });
+              return;
+            }
 
-          const hyperlinkFormula = `=HYPERLINK("${existingEditURL}", "Edit")`;
+            const hyperlinkFormula = `=HYPERLINK("${existingEditURL}", "Edit")`;
 
-          await sheets.spreadsheets.values.update({
-            spreadsheetId: SPREADSHEET_ID,
-            range: rowRange,
-            valueInputOption: "USER_ENTERED",
-            requestBody: {
-              values: [
-                [
-                  dateFormatted,
-                  data.type,
-                  data.category,
-                  tagsStr,
-                  data.value,
-                  data.notes || "",
-                  existingEditURL,
-                  hyperlinkFormula,
-                  existingId, // Preserve the same numeric ID
+            await sheets.spreadsheets.values.update({
+              spreadsheetId: SPREADSHEET_ID,
+              range: rowRange,
+              valueInputOption: "USER_ENTERED",
+              requestBody: {
+                values: [
+                  [
+                    dateFormatted,
+                    data.type,
+                    data.category,
+                    tagsStr,
+                    data.value,
+                    data.notes || "",
+                    existingEditURL,
+                    hyperlinkFormula,
+                    existingId, // Preserve the same numeric ID
+                  ],
                 ],
-              ],
-            },
-          });
-        } else if (data.itemType === "recurring") {
-          if (
-            !data.rowIndex ||
-            !data.type ||
-            !Array.isArray(data.tags) ||
-            typeof data.value !== "number" ||
-            !data.name ||
-            !data.id
-          ) {
-            res
-              .status(400)
-              .json({ error: "Missing or invalid required fields" });
-            return;
+              },
+            });
+
+            break; // end case "history"
           }
 
-          const tagsStr = data.tags.join(", ");
-          const rowIndex = data.rowIndex;
+          case "recurring": {
+            if (
+              !data.rowIndex ||
+              !data.type ||
+              !Array.isArray(data.tags) ||
+              typeof data.value !== "number" ||
+              !data.name ||
+              !data.id
+            ) {
+              res
+                .status(400)
+                .json({ error: "Missing or invalid required fields" });
+              return;
+            }
 
-          // Fetch existing row to get its ID
-          const rowRange = `${RECURRING_TABLE_NAME}!${RECURRING_FIRST_COLUMN}${rowIndex}:${RECURRING_LAST_COLUMN}${rowIndex}`;
-          const existingRowRes = await sheets.spreadsheets.values.get({
-            spreadsheetId: SPREADSHEET_ID,
-            range: rowRange,
-          });
+            const tagsStr = data.tags.join(", ");
+            const rowIndex = data.rowIndex;
 
-          const existingRow =
-            existingRowRes.data.values && existingRowRes.data.values[0];
-          if (!existingRow) {
-            res.status(404).json({ error: "Recurring not found" });
-            return;
-          }
+            // Fetch existing row to get its ID
+            const rowRange = `${RECURRING_TABLE_NAME}!${RECURRING_FIRST_COLUMN}${rowIndex}:${RECURRING_LAST_COLUMN}${rowIndex}`;
+            const existingRowRes = await sheets.spreadsheets.values.get({
+              spreadsheetId: SPREADSHEET_ID,
+              range: rowRange,
+            });
 
-          existingId = existingRow[6]; // column G for id
-          const existingEditURL = existingRow[4]; // column E for editURL
-          if (!existingId) {
-            res
-              .status(500)
-              .json({ error: "ID not found in the existing recurring row" });
-            return;
-          }
+            const existingRow =
+              existingRowRes.data.values && existingRowRes.data.values[0];
+            if (!existingRow) {
+              res.status(404).json({ error: "Recurring not found" });
+              return;
+            }
 
-          const hyperlinkFormula = `=HYPERLINK("${existingEditURL}", "Edit")`;
+            existingId = existingRow[6]; // column G for id
+            const existingEditURL = existingRow[4]; // column E for editURL
+            if (!existingId) {
+              res
+                .status(500)
+                .json({ error: "ID not found in the existing recurring row" });
+              return;
+            }
 
-          await sheets.spreadsheets.values.update({
-            spreadsheetId: SPREADSHEET_ID,
-            range: rowRange,
-            valueInputOption: "USER_ENTERED",
-            requestBody: {
-              values: [
-                [
-                  data.type,
-                  tagsStr,
-                  data.value,
-                  data.name,
-                  existingEditURL,
-                  hyperlinkFormula,
-                  existingId, // Preserve the same numeric ID
+            const hyperlinkFormula = `=HYPERLINK("${existingEditURL}", "Edit")`;
+
+            await sheets.spreadsheets.values.update({
+              spreadsheetId: SPREADSHEET_ID,
+              range: rowRange,
+              valueInputOption: "USER_ENTERED",
+              requestBody: {
+                values: [
+                  [
+                    data.type,
+                    tagsStr,
+                    data.value,
+                    data.name,
+                    existingEditURL,
+                    hyperlinkFormula,
+                    existingId, // Preserve the same numeric ID
+                  ],
                 ],
-              ],
-            },
-          });
+              },
+            });
+
+            break; // end case "recurring"
+          }
+
+          case "weeklyGoal": {
+            if (typeof data.value !== "number") {
+              res.status(400).json({ error: "Missing or invalid goal" });
+              return;
+            }
+            await sheets.spreadsheets.values.update({
+              spreadsheetId: SPREADSHEET_ID,
+              range: WEEKLY_GOAL_RANGE,
+              valueInputOption: "USER_ENTERED",
+              requestBody: {
+                values: [[data.value]],
+              },
+            });
+            break; // end case "weeklyGoal"
+          }
+
+          case "monthlyGoal": {
+            if (typeof data.value !== "number") {
+              res.status(400).json({ error: "Missing or invalid goal" });
+              return;
+            }
+            await sheets.spreadsheets.values.update({
+              spreadsheetId: SPREADSHEET_ID,
+              range: MONTHLY_GOAL_RANGE,
+              valueInputOption: "USER_ENTERED",
+              requestBody: {
+                values: [[data.value]],
+              },
+            });
+            break; // end case "monthlyGoal"
+          }
+
+          default: {
+            res.status(400).json({ error: "Invalid or missing itemType" });
+            return;
+          }
+        } // end switch
+
+        // If we updated a history or recurring item, we have an existingId.
+        // For weeklyGoal or monthlyGoal, we don't have an ID to return.
+        if (data.itemType === "history" || data.itemType === "recurring") {
+          res.status(200).json({ status: "success", id: existingId });
+        } else {
+          res.status(200).json({ status: "success" });
         }
-
-        // No matter if images are removed or added outside, the ID and link remain stable.
-        res.status(200).json({ status: "success", id: existingId });
         return;
       } else {
         res.status(405).json({ error: "Method Not Allowed" });
