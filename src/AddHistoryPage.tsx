@@ -13,6 +13,12 @@ interface AddHistoryPageProps {
   nonRecurringTypes: string[];
   addItem: (history: History) => Promise<boolean>;
   loading: boolean;
+  weeklyGoal: number;
+  monthlyGoal: number;
+  onUpdateGoal: (
+    itemType: "weeklyGoal" | "monthlyGoal",
+    newValue: number
+  ) => Promise<void>;
 }
 
 function AddHistoryPage({
@@ -21,6 +27,9 @@ function AddHistoryPage({
   nonRecurringTypes,
   addItem,
   loading,
+  weeklyGoal,
+  monthlyGoal,
+  onUpdateGoal,
 }: AddHistoryPageProps) {
   const [date, setDate] = useState<string>(() => {
     const today = new Date();
@@ -38,7 +47,6 @@ function AddHistoryPage({
   const [selectedImageUrl, setSelectedImageUrl] = useState<string | null>(null);
 
   const editURLFragment = "https://budget-app-v3.web.app/edit?id=";
-
   const [submitting, setSubmitting] = useState(false);
 
   const handleTagsChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
@@ -90,21 +98,22 @@ function AddHistoryPage({
         for (const file of receiptFiles) {
           const fileRef = ref(
             storage,
-            `receipts/${uniqueId}/${uniqueId}-${file.name}`,
+            `receipts/${uniqueId}/${uniqueId}-${file.name}`
           );
           await uploadBytes(fileRef, file);
         }
       }
 
       const editURL: string = `${editURLFragment}${uniqueId}`;
+      const numericValue = parseFloat(value);
 
-      // Send one POST call to the backend
+      // Send one POST call to the backend for the new history
       const newHistory: History = {
         date,
-        type,
+        type, // e.g. "Expense" or "Refund"
         category: selectedCategory,
         tags: selectedTags,
-        value: parseFloat(value),
+        value: numericValue,
         notes,
         editURL,
         id: uniqueId,
@@ -112,22 +121,35 @@ function AddHistoryPage({
       };
 
       const success = await addItem(newHistory);
-      if (success) {
-        // Clear form
-        const today = new Date();
-        const yyyy = today.getFullYear();
-        const mm = String(today.getMonth() + 1).padStart(2, "0");
-        const dd = String(today.getDate()).padStart(2, "0");
-        setDate(`${yyyy}-${mm}-${dd}`);
-        setType("Expense");
-        setSelectedCategory("");
-        setSelectedTags([]);
-        setValue("");
-        setNotes("");
-        setReceiptFiles([]);
-      } else {
+      if (!success) {
         alert("Failed to add history.");
+        return;
       }
+
+      // If the item is an Expense, subtract from goals; if it's a Refund, add back
+      if (type.toLowerCase().includes("expense")) {
+        // e.g. "Expense", "expense", "Recurring Expense" etc.
+        await onUpdateGoal("weeklyGoal", weeklyGoal - numericValue);
+        await onUpdateGoal("monthlyGoal", monthlyGoal - numericValue);
+      } else if (type.toLowerCase().includes("refund")) {
+        // e.g. "Refund", "refund"
+        await onUpdateGoal("weeklyGoal", weeklyGoal + numericValue);
+        await onUpdateGoal("monthlyGoal", monthlyGoal + numericValue);
+      }
+      // If you have other item types, you can adapt logic as needed
+
+      // Clear the form
+      const today = new Date();
+      const yyyy = today.getFullYear();
+      const mm = String(today.getMonth() + 1).padStart(2, "0");
+      const dd = String(today.getDate()).padStart(2, "0");
+      setDate(`${yyyy}-${mm}-${dd}`);
+      setType("Expense");
+      setSelectedCategory("");
+      setSelectedTags([]);
+      setValue("");
+      setNotes("");
+      setReceiptFiles([]);
     } catch (error) {
       console.error("Error adding history:", error);
       alert("An error occurred while adding the history.");

@@ -10,6 +10,7 @@ import RecurringPage from "./RecurringPage";
 import EditRecurringPage from "./EditRecurringPage";
 import AddHistoryPage from "./AddHistoryPage";
 import HomePage from "./HomePage";
+import GoalsBanner from "./GoalsBanner";
 
 function App() {
   const [history, setHistory] = useState<History[]>([]);
@@ -20,6 +21,8 @@ function App() {
   const [nonRecurringTypes, setNonRecurringTypes] = useState<string[]>([]);
   const [recurringTypes, setRecurringTypes] = useState<string[]>([]);
   const [historyTypes, setHistoryTypes] = useState<string[]>([]);
+  const [weeklyGoal, setWeeklyGoal] = useState<number>(0);
+  const [monthlyGoal, setMonthlyGoal] = useState<number>(0);
   const [loading, setLoading] = useState<boolean>(true);
 
   const fetchData = async () => {
@@ -36,13 +39,13 @@ function App() {
           ...history,
           rowIndex: index + 2,
           date: mmddyyyyToYyyyMmDd(history.date), // Ensure consistent YYYY-MM-DD format
-        })),
+        }))
       );
       setRecurring(
         data.recurring.map((recurring: Recurring, index: number) => ({
           ...recurring,
           rowIndex: index + 2,
-        })),
+        }))
       );
       setCategories(data.categories || []);
       setNonRecurringTags(data.nonRecurringTags || []);
@@ -50,6 +53,8 @@ function App() {
       setNonRecurringTypes(data.nonRecurringTypes || []);
       setRecurringTypes(data.recurringTypes || []);
       setHistoryTypes(data.historyTypes || []);
+      setWeeklyGoal(data.weeklyGoal);
+      setMonthlyGoal(data.monthlyGoal);
     } catch (error) {
       console.error("Error fetching data:", error);
     }
@@ -102,6 +107,24 @@ function App() {
     }
   };
 
+  const onUpdateGoal = async (
+    itemType: "weeklyGoal" | "monthlyGoal",
+    newValue: number
+  ) => {
+    try {
+      await fetch(API_URL, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ itemType, value: newValue }),
+      });
+
+      // re-fetch data (which will update weeklyGoal and monthlyGoal)
+      await fetchData();
+    } catch (err) {
+      console.error("Error updating goal:", err);
+    }
+  };
+
   return (
     <div className="mb-5">
       <Router>
@@ -130,6 +153,8 @@ function App() {
           </Container>
         </Navbar>
 
+        <GoalsBanner weeklyGoal={weeklyGoal} monthlyGoal={monthlyGoal} />
+
         <Container>
           <Routes>
             <Route path="/" element={<HomePage />} />
@@ -142,6 +167,9 @@ function App() {
                   nonRecurringTypes={nonRecurringTypes}
                   addItem={addItem}
                   loading={loading}
+                  weeklyGoal={weeklyGoal}
+                  monthlyGoal={monthlyGoal}
+                  onUpdateGoal={onUpdateGoal}
                 />
               }
             />
