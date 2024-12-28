@@ -7,6 +7,9 @@ export interface History {
   notes: string;
   editURL: string;
   id: string;
+  fiscalYearId?: string;
+  fiscalMonthId?: string;
+  fiscalWeekId?: string;
   itemType: "history";
 }
 

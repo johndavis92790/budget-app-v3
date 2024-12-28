@@ -6,7 +6,7 @@ const SPREADSHEET_ID = "1KROs_Swh-1zeQhLajtRw-E7DcYnJRMHEOXX5ECwTGSI";
 // const FRONTEND_URL = "https://budget-app-v3.web.app";
 const HISTORY_TABLE_NAME = "History";
 const HISTORY_FIRST_COLUMN = "A";
-const HISTORY_LAST_COLUMN = "I";
+const HISTORY_LAST_COLUMN = "L";
 const HISTORY_RANGE = `${HISTORY_TABLE_NAME}!${HISTORY_FIRST_COLUMN}1:${HISTORY_LAST_COLUMN}`;
 
 const RECURRING_TABLE_NAME = "Recurring";
@@ -19,9 +19,216 @@ const MONTHLY_GOAL_RANGE = "Goals!B2";
 
 const METADATA_RANGE = "Metadata!A1:F";
 
-const FISCAL_WEEKS_RANGE = "Fiscal Weeks!A1:H";
-const FISCAL_MONTHS_RANGE = "Fiscal Months!A1:F";
-const FISCAL_YEARS_RANGE = "Fiscal Years!A1:F";
+const FISCAL_WEEKS_RANGE = "Fiscal Weeks!A1:F";
+const FISCAL_MONTHS_RANGE = "Fiscal Months!A1:D";
+const FISCAL_YEARS_RANGE = "Fiscal Years!A1:D";
+
+// Interfaces
+interface FiscalYear {
+  id: string;
+  title: string;
+  start_date: string;
+  end_date: string;
+  itemType: "fiscalYear";
+}
+
+interface FiscalMonth {
+  id: string;
+  start_date: string;
+  end_date: string;
+  year_title: string;
+  itemType: "fiscalMonth";
+}
+
+interface FiscalWeek {
+  id: string;
+  number: string;
+  start_date: string;
+  end_date: string;
+  year_title: string;
+  month_id: string;
+  itemType: "fiscalWeek";
+}
+
+interface IncomingObject {
+  date: string;
+  // ... other fields as needed
+}
+
+// Global variables to cache fiscal data
+let cachedFiscalYears: FiscalYear[] | null = null;
+let cachedFiscalMonths: FiscalMonth[] | null = null;
+let cachedFiscalWeeks: FiscalWeek[] | null = null;
+
+/**
+ * Fetches and caches fiscal data if not already cached.
+ *
+ * @param {google.sheets_v4.Sheets} sheets - The Google Sheets API client.
+ * @returns {Promise<void>}
+ */
+async function fetchAndCacheFiscalData(sheets: any): Promise<void> {
+  if (cachedFiscalYears && cachedFiscalMonths && cachedFiscalWeeks) {
+    // Data already cached
+    return;
+  }
+
+  // Fetch Fiscal Years
+  const fiscalYearRes = await sheets.spreadsheets.values.get({
+    spreadsheetId: SPREADSHEET_ID,
+    range: FISCAL_YEARS_RANGE,
+  });
+
+  const fiscalYearRows = fiscalYearRes.data.values || [];
+  fiscalYearRows.shift(); // Remove headers row
+
+  cachedFiscalYears = fiscalYearRows.map((row: any) => ({
+    id: row[0],
+    title: row[1],
+    start_date: row[2],
+    end_date: row[3],
+    itemType: "fiscalYear",
+  }));
+
+  // Fetch Fiscal Months
+  const fiscalMonthRes = await sheets.spreadsheets.values.get({
+    spreadsheetId: SPREADSHEET_ID,
+    range: FISCAL_MONTHS_RANGE,
+  });
+
+  const fiscalMonthRows = fiscalMonthRes.data.values || [];
+  fiscalMonthRows.shift(); // Remove headers row
+
+  cachedFiscalMonths = fiscalMonthRows.map((row: any) => ({
+    id: row[0],
+    start_date: row[1],
+    end_date: row[2],
+    year_title: row[3],
+    itemType: "fiscalMonth",
+  }));
+
+  // Fetch Fiscal Weeks
+  const fiscalWeekRes = await sheets.spreadsheets.values.get({
+    spreadsheetId: SPREADSHEET_ID,
+    range: FISCAL_WEEKS_RANGE,
+  });
+
+  const fiscalWeekRows = fiscalWeekRes.data.values || [];
+  fiscalWeekRows.shift(); // Remove headers row
+
+  cachedFiscalWeeks = fiscalWeekRows.map((row: any) => ({
+    id: row[0],
+    number: row[1],
+    start_date: row[2],
+    end_date: row[3],
+    year_title: row[4],
+    month_id: row[5],
+    itemType: "fiscalWeek",
+  }));
+}
+
+/**
+ * Calculates the associated fiscal year, month, and week IDs for a given date.
+ *
+ * @param {IncomingObject} item - The incoming object containing the date.
+ * @param {FiscalYear[]} fiscalYears - Array of fiscal year data.
+ * @param {FiscalMonth[]} fiscalMonths - Array of fiscal month data.
+ * @param {FiscalWeek[]} fiscalWeeks - Array of fiscal week data.
+ * @returns {{
+ *   fiscalYearId: string;
+ *   fiscalMonthId: string;
+ *   fiscalWeekId: string;
+ * } | null} - An object containing the fiscal IDs or null if not found.
+ */
+function getFiscalIDs(
+  item: IncomingObject,
+  fiscalYears: FiscalYear[],
+  fiscalMonths: FiscalMonth[],
+  fiscalWeeks: FiscalWeek[]
+): {
+  fiscalYearId: string;
+  fiscalMonthId: string;
+  fiscalWeekId: string;
+} | null {
+  const { date: dateStr } = item;
+
+  // Helper function to parse date strings to Date objects
+  const parseDate = (dateStr: string): Date | null => {
+    const date = new Date(dateStr);
+    return isNaN(date.getTime()) ? null : date;
+  };
+
+  const date = parseDate(dateStr);
+  if (!date) {
+    console.error(`Invalid date format: ${dateStr}`);
+    return null;
+  }
+
+  // Find Fiscal Year
+  const fiscalYear = fiscalYears.find((year) => {
+    const start = new Date(year.start_date);
+    const end = new Date(year.end_date);
+    return date >= start && date <= end;
+  });
+
+  if (!fiscalYear) {
+    console.error(`No Fiscal Year found for date: ${dateStr}`);
+    return null;
+  }
+
+  // Find Fiscal Month within the found Fiscal Year
+  const fiscalMonth = fiscalMonths.find((month) => {
+    if (month.year_title !== fiscalYear.title) return false;
+    const start = new Date(month.start_date);
+    const end = new Date(month.end_date);
+    return date >= start && date <= end;
+  });
+
+  if (!fiscalMonth) {
+    console.error(
+      `No Fiscal Month found for date: ${dateStr} within Fiscal Year: ${fiscalYear.title}`
+    );
+    return null;
+  }
+
+  // Find Fiscal Week within the found Fiscal Month and Fiscal Year
+  const fiscalWeek = fiscalWeeks.find((week) => {
+    if (week.year_title !== fiscalYear.title) return false;
+    if (week.month_id !== fiscalMonth.id) return false;
+    const start = new Date(week.start_date);
+    const end = new Date(week.end_date);
+    return date >= start && date <= end;
+  });
+
+  if (!fiscalWeek) {
+    console.error(
+      `No Fiscal Week found for date: ${dateStr} within Fiscal Year: ${fiscalYear.title} and Fiscal Month ID: ${fiscalMonth.id}`
+    );
+    return null;
+  }
+
+  return {
+    fiscalYearId: fiscalYear.id,
+    fiscalMonthId: fiscalMonth.id,
+    fiscalWeekId: fiscalWeek.id,
+  };
+}
+
+/**
+ * Converts an array of objects to an object indexed by the 'id' property.
+ *
+ * @param {any[]} arr - The array to convert.
+ * @returns {Record<string, any>} - The resulting object.
+ */
+function convertArrayToObjectById(arr: any[]): Record<string, any> {
+  return arr.reduce(
+    (obj, item) => {
+      const { id, ...rest } = item;
+      obj[id] = rest;
+      return obj;
+    },
+    {} as Record<string, any>
+  );
+}
 
 export const expenses = onRequest(
   {
@@ -57,6 +264,9 @@ export const expenses = onRequest(
     }
 
     try {
+      // Fetch and cache fiscal data
+      await fetchAndCacheFiscalData(sheets);
+
       //-------------------------GET----------------------------------------------------
       if (req.method === "GET") {
         // Get history
@@ -68,7 +278,7 @@ export const expenses = onRequest(
         const historyRows = historyRes.data.values || [];
         historyRows.shift(); // Remove headers row
 
-        // Indices: A=0,B=1,C=2,D=3,E=4,F=5,G=6,H=7,I=8
+        // Indices: A=0,B=1,C=2,D=3,E=4,F=5,G=6,H=7,I=8,J=9,K=10,L=11
         const historyEditURLColIndex = 6;
         const historyIDColIndex = 8;
 
@@ -94,6 +304,9 @@ export const expenses = onRequest(
             editURL: editURL,
             rowIndex: index + 2,
             id: id,
+            fiscalYearId: row[9],
+            fiscalMonthId: row[10],
+            fiscalWeekId: row[11],
             itemType: "history",
           };
         });
@@ -185,16 +398,14 @@ export const expenses = onRequest(
         const fiscalWeekRows = fiscalWeekRes.data.values || [];
         fiscalWeekRows.shift(); // Remove headers row
 
-        const fiscalWeekData = fiscalWeekRows.map((row, index) => {
+        let fiscalWeekData = fiscalWeekRows.map((row, index) => {
           return {
             id: row[0],
             number: row[1],
-            title: row[2],
-            start_date: row[3],
-            end_date: row[4],
-            year_id: row[5],
-            year_title: row[6],
-            month_id: row[7],
+            start_date: row[2],
+            end_date: row[3],
+            year_title: row[4],
+            month_id: row[5],
             itemType: "fiscalWeek",
           };
         });
@@ -208,14 +419,12 @@ export const expenses = onRequest(
         const fiscalMonthRows = fiscalMonthRes.data.values || [];
         fiscalMonthRows.shift(); // Remove headers row
 
-        const fiscalMonthData = fiscalMonthRows.map((row, index) => {
+        let fiscalMonthData = fiscalMonthRows.map((row, index) => {
           return {
             id: row[0],
             start_date: row[1],
             end_date: row[2],
-            year_id: row[3],
-            year_title: row[4],
-            weeks: row[5],
+            year_title: row[3],
             itemType: "fiscalMonth",
           };
         });
@@ -229,17 +438,51 @@ export const expenses = onRequest(
         const fiscalYearRows = fiscalYearRes.data.values || [];
         fiscalYearRows.shift(); // Remove headers row
 
-        const fiscalYearData = fiscalYearRows.map((row, index) => {
+        let fiscalYearData = fiscalYearRows.map((row, index) => {
           return {
             id: row[0],
             title: row[1],
             start_date: row[2],
             end_date: row[3],
-            months: row[4],
-            weeks: row[5],
             itemType: "fiscalYear",
           };
         });
+
+        // ----------------- Filtering Fiscal Data -----------------
+
+        // Helper function to parse date strings to Date objects
+        const parseDate = (dateStr: string): Date | null => {
+          const date = new Date(dateStr);
+          return isNaN(date.getTime()) ? null : date;
+        };
+
+        // Get today's date and the date 365 days from now
+        const oneYearFromToday = new Date();
+        oneYearFromToday.setDate(oneYearFromToday.getDate() + 365);
+
+        // Function to filter data based on start_date
+        const filterByStartDate = (data: any[]) => {
+          return data.filter((item) => {
+            const startDate = parseDate(item.start_date);
+            if (!startDate) return false; // Exclude if date is invalid
+            return (
+              startDate >= new Date("2021-01-01") &&
+              startDate <= oneYearFromToday
+            );
+          });
+        };
+
+        // Apply filtering
+        fiscalWeekData = filterByStartDate(fiscalWeekData);
+        fiscalMonthData = filterByStartDate(fiscalMonthData);
+        fiscalYearData = filterByStartDate(fiscalYearData);
+
+        // ----------------- End of Filtering -----------------
+
+        // Convert Fiscal Data Arrays to Objects Indexed by ID
+        const fiscalYearsObj = convertArrayToObjectById(fiscalYearData);
+        const fiscalMonthsObj = convertArrayToObjectById(fiscalMonthData);
+        const fiscalWeeksObj = convertArrayToObjectById(fiscalWeekData);
 
         res.status(200).json({
           history: historyData,
@@ -252,9 +495,9 @@ export const expenses = onRequest(
           nonRecurringTypes,
           recurringTypes,
           historyTypes,
-          fiscalWeekData,
-          fiscalMonthData,
-          fiscalYearData,
+          fiscalWeeks: fiscalWeeksObj, // Updated to object
+          fiscalMonths: fiscalMonthsObj, // Updated to object
+          fiscalYears: fiscalYearsObj, // Updated to object
         });
         return;
         //-------------------------POST----------------------------------------------------
@@ -279,6 +522,22 @@ export const expenses = onRequest(
               .json({ error: "Missing or invalid required fields" });
             return;
           }
+
+          // Calculate Fiscal IDs
+          const fiscalIDs = getFiscalIDs(
+            data,
+            cachedFiscalYears!,
+            cachedFiscalMonths!,
+            cachedFiscalWeeks!
+          );
+
+          if (!fiscalIDs) {
+            res
+              .status(400)
+              .json({ error: "Invalid date or fiscal period not found." });
+            return;
+          }
+
           const dateFormatted = convertToMMDDYYYY(data.date);
 
           await sheets.spreadsheets.values.append({
@@ -297,10 +556,16 @@ export const expenses = onRequest(
                   data.editURL, // G=editLink
                   hyperlinkFormula, // H=hyperlink
                   id, // I=id (no prefix, just the numeric string)
+                  fiscalIDs.fiscalYearId, // J=fiscalYearId
+                  fiscalIDs.fiscalMonthId, // K=fiscalMonthId
+                  fiscalIDs.fiscalWeekId, // L=fiscalWeekId
                 ],
               ],
             },
           });
+
+          res.status(200).json({ status: "success", id: id, fiscalIDs });
+          return;
         } else if (data.itemType === "recurring") {
           if (
             !data.type ||
@@ -333,13 +598,13 @@ export const expenses = onRequest(
               ],
             },
           });
+
+          res.status(200).json({ status: "success", id: id });
+          return;
         } else {
           res.status(400).json({ error: "Missing or invalid itemType" });
           return;
         }
-
-        res.status(200).json({ status: "success", id: id });
-        return;
         //-------------------------PUT----------------------------------------------------
       } else if (req.method === "PUT") {
         const data = req.body;
@@ -539,6 +804,12 @@ export const expenses = onRequest(
   }
 );
 
+/**
+ * Helper function to convert ISO date string to MM/DD/YYYY format.
+ *
+ * @param {string} isoDateStr - The ISO date string (YYYY-MM-DD).
+ * @returns {string} - The formatted date string (MM/DD/YYYY).
+ */
 function convertToMMDDYYYY(isoDateStr: string): string {
   const [yyyy, mm, dd] = isoDateStr.split("-");
   return `${parseInt(mm)}/${parseInt(dd)}/${yyyy}`;
