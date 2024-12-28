@@ -19,6 +19,10 @@ const MONTHLY_GOAL_RANGE = "Goals!B2";
 
 const METADATA_RANGE = "Metadata!A1:F";
 
+const FISCAL_WEEKS_RANGE = "Fiscal Weeks!A1:H";
+const FISCAL_MONTHS_RANGE = "Fiscal Months!A1:F";
+const FISCAL_YEARS_RANGE = "Fiscal Years!A1:F";
+
 export const expenses = onRequest(
   {
     secrets: ["SERVICE_ACCOUNT_CLIENT_EMAIL", "SERVICE_ACCOUNT_PRIVATE_KEY"],
@@ -90,7 +94,7 @@ export const expenses = onRequest(
             editURL: editURL,
             rowIndex: index + 2,
             id: id,
-            itemType: "history"
+            itemType: "history",
           };
         });
 
@@ -172,6 +176,71 @@ export const expenses = onRequest(
           : "0";
         const monthlyGoal = parseFloat(cleanedMonthlyGoal);
 
+        // Get Fiscal Weeks
+        const fiscalWeekRes = await sheets.spreadsheets.values.get({
+          spreadsheetId: SPREADSHEET_ID,
+          range: FISCAL_WEEKS_RANGE,
+        });
+
+        const fiscalWeekRows = fiscalWeekRes.data.values || [];
+        fiscalWeekRows.shift(); // Remove headers row
+
+        const fiscalWeekData = fiscalWeekRows.map((row, index) => {
+          return {
+            id: row[0],
+            number: row[1],
+            title: row[2],
+            start_date: row[3],
+            end_date: row[4],
+            year_id: row[5],
+            year_title: row[6],
+            month_id: row[7],
+            itemType: "fiscalWeek",
+          };
+        });
+
+        // Get Fiscal Months
+        const fiscalMonthRes = await sheets.spreadsheets.values.get({
+          spreadsheetId: SPREADSHEET_ID,
+          range: FISCAL_MONTHS_RANGE,
+        });
+
+        const fiscalMonthRows = fiscalMonthRes.data.values || [];
+        fiscalMonthRows.shift(); // Remove headers row
+
+        const fiscalMonthData = fiscalMonthRows.map((row, index) => {
+          return {
+            id: row[0],
+            start_date: row[1],
+            end_date: row[2],
+            year_id: row[3],
+            year_title: row[4],
+            weeks: row[5],
+            itemType: "fiscalMonth",
+          };
+        });
+
+        // Get Fiscal Years
+        const fiscalYearRes = await sheets.spreadsheets.values.get({
+          spreadsheetId: SPREADSHEET_ID,
+          range: FISCAL_YEARS_RANGE,
+        });
+
+        const fiscalYearRows = fiscalYearRes.data.values || [];
+        fiscalYearRows.shift(); // Remove headers row
+
+        const fiscalYearData = fiscalYearRows.map((row, index) => {
+          return {
+            id: row[0],
+            title: row[1],
+            start_date: row[2],
+            end_date: row[3],
+            months: row[4],
+            weeks: row[5],
+            itemType: "fiscalYear",
+          };
+        });
+
         res.status(200).json({
           history: historyData,
           recurring: recurringData,
@@ -183,6 +252,9 @@ export const expenses = onRequest(
           nonRecurringTypes,
           recurringTypes,
           historyTypes,
+          fiscalWeekData,
+          fiscalMonthData,
+          fiscalYearData,
         });
         return;
         //-------------------------POST----------------------------------------------------
