@@ -7,14 +7,17 @@ import FullSizeImageModal from "./FullSizeImageModal";
 import FullPageSpinner from "./FullPageSpinner";
 import FileUploader from "./FileUploader"; // <-- from previous refactor
 
+// We'll import only DateField, TypeField, CategoryField, TagField, NotesField from CommonFormFields
 import {
   DateField,
   TypeField,
   CategoryField,
   TagField,
-  ValueField,
   NotesField,
-} from "./CommonFormFields"; // <-- new
+} from "./CommonFormFields";
+
+// Import your new typed CurrencyInput
+import CurrencyInput from "./CurrencyInput";
 
 import { History } from "./types";
 
@@ -28,7 +31,7 @@ interface AddHistoryPageProps {
   monthlyGoal: number;
   onUpdateGoal: (
     itemType: "weeklyGoal" | "monthlyGoal",
-    newValue: number
+    newValue: number,
   ) => Promise<void>;
 }
 
@@ -54,6 +57,7 @@ function AddHistoryPage({
   const [type, setType] = useState("Expense");
   const [category, setCategory] = useState("");
   const [tags, setTags] = useState<string[]>([]);
+  // We'll store the input as a string, e.g. "$1,234.56"
   const [value, setValue] = useState("");
   const [notes, setNotes] = useState("");
 
@@ -61,7 +65,7 @@ function AddHistoryPage({
   const [receiptFiles, setReceiptFiles] = useState<File[]>([]);
   const [selectedImageUrl, setSelectedImageUrl] = useState<string | null>(null);
 
-  const editURLFragment = "https://budget-app-v3.web.app/edit?id=";
+  const editURLFragment = "https://budget-app-v3.web.app/edit-history?id=";
   const [submitting, setSubmitting] = useState(false);
 
   const handleSubmit = async (e: FormEvent) => {
@@ -74,19 +78,28 @@ function AddHistoryPage({
     setSubmitting(true);
     try {
       const uniqueId = String(Date.now());
+
       // Upload receipts if present
       if (receiptFiles.length > 0) {
         for (const file of receiptFiles) {
           const fileRef = ref(
             storage,
-            `receipts/${uniqueId}/${uniqueId}-${file.name}`
+            `receipts/${uniqueId}/${uniqueId}-${file.name}`,
           );
           await uploadBytes(fileRef, file);
         }
       }
 
       const editURL = `${editURLFragment}${uniqueId}`;
-      const numericValue = parseFloat(value);
+
+      // Convert the masked currency string (e.g. "$1,234.56") to float
+      const numericStr = value.replace(/[^0-9.-]/g, ""); // "1234.56"
+      const numericValue = parseFloat(numericStr);
+      if (isNaN(numericValue)) {
+        alert("Invalid numeric value for 'Value'. Please check your input.");
+        setSubmitting(false);
+        return;
+      }
 
       // Construct the new History object
       const newHistory: History = {
@@ -187,12 +200,20 @@ function AddHistoryPage({
 
         <Row>
           <Col md={4}>
-            <ValueField
-              value={value}
-              onChange={setValue}
-              disabled={submitting}
-              required
-            />
+            {/* Replace the old ValueField with typed CurrencyInput */}
+            <Form.Group controlId="formValue" className="mb-3">
+              <Form.Label>Value</Form.Label>
+              <CurrencyInput
+                value={value} // e.g. "$123.45" or partial typed
+                onChange={(e) => {
+                  // e.target.value might be "$1,234.56"
+                  setValue(e.target.value);
+                }}
+                placeholder="$0.00"
+                disabled={submitting}
+                style={{ width: "100%" }}
+              />
+            </Form.Group>
           </Col>
           <Col md={8}>
             <NotesField
@@ -203,7 +224,7 @@ function AddHistoryPage({
           </Col>
         </Row>
 
-        {/* Reusable FileUploader */}
+        {/* Reusable File Uploader */}
         <Row>
           <Col md={4}>
             <FileUploader

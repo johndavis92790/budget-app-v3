@@ -90,6 +90,7 @@ export const expenses = onRequest(
             editURL: editURL,
             rowIndex: index + 2,
             id: id,
+            itemType: "history"
           };
         });
 
@@ -126,6 +127,7 @@ export const expenses = onRequest(
             editURL: editURL,
             rowIndex: index + 2,
             id: id,
+            itemType: "recurring",
           };
         });
 

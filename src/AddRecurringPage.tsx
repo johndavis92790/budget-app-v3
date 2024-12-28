@@ -5,9 +5,14 @@ import { ref, uploadBytes } from "firebase/storage";
 
 import FullSizeImageModal from "./FullSizeImageModal";
 import FullPageSpinner from "./FullPageSpinner";
-import FileUploader from "./FileUploader"; // from previous refactor
+import FileUploader from "./FileUploader";
 
-import { TypeField, TagField, ValueField, NameField } from "./CommonFormFields"; // new
+// We keep the TypeField, TagField, NameField from your common fields
+// But remove any old "CurrencyInput" from there
+import { TypeField, TagField, NameField } from "./CommonFormFields";
+
+// Import your newly typed CurrencyInput
+import CurrencyInput from "./CurrencyInput";
 
 import { Recurring } from "./types";
 
@@ -27,13 +32,14 @@ function AddRecurringPage({
   const [type, setType] = useState("Expense");
   const [name, setName] = useState("");
   const [tags, setTags] = useState<string[]>([]);
+  // We'll store the typed string in local state, e.g. "$1,234.56"
   const [value, setValue] = useState("");
 
   // FileUploader state
   const [imageFiles, setImageFiles] = useState<File[]>([]);
   const [selectedImageUrl, setSelectedImageUrl] = useState<string | null>(null);
 
-  const editURLFragment = "https://budget-app-v3.web.app/edit?id=";
+  const editURLFragment = "https://budget-app-v3.web.app/edit-recurring?id=";
   const [submitting, setSubmitting] = useState(false);
 
   const handleSubmit = async (e: FormEvent) => {
@@ -53,7 +59,7 @@ function AddRecurringPage({
         for (const file of imageFiles) {
           const fileRef = ref(
             storage,
-            `images/${uniqueId}/${uniqueId}-${file.name}`
+            `images/${uniqueId}/${uniqueId}-${file.name}`,
           );
           await uploadBytes(fileRef, file);
         }
@@ -61,11 +67,20 @@ function AddRecurringPage({
 
       const editURL = `${editURLFragment}${uniqueId}`;
 
+      // Convert user-typed currency string (e.g. "$1,234.56") to float
+      const numericStr = value.replace(/[^0-9.-]/g, ""); // "1234.56"
+      const floatVal = parseFloat(numericStr);
+      if (isNaN(floatVal)) {
+        alert("Invalid numeric value in the 'Value' field.");
+        setSubmitting(false);
+        return;
+      }
+
       const newRecurring: Recurring = {
         type,
         name,
         tags,
-        value: parseFloat(value),
+        value: floatVal, // store float in DB
         editURL,
         id: uniqueId,
         itemType: "recurring",
@@ -130,12 +145,19 @@ function AddRecurringPage({
 
         <Row>
           <Col md={4}>
-            <ValueField
-              value={value}
-              onChange={setValue}
-              disabled={submitting}
-              required
-            />
+            <Form.Group controlId="formValue" className="mb-3">
+              <Form.Label>Value</Form.Label>
+              <CurrencyInput
+                value={value}
+                onChange={(e) => {
+                  // maskedVal might be "$1,234.56"
+                  setValue(e.target.value);
+                }}
+                disabled={submitting}
+                placeholder="$0.00"
+                style={{ width: "100%" }}
+              />
+            </Form.Group>
           </Col>
         </Row>
 

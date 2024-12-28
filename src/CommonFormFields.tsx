@@ -58,28 +58,6 @@ export function NotesField({ value, onChange, disabled }: FieldProps) {
   );
 }
 
-/** ========== ValueField ========== */
-export function ValueField({
-  value,
-  onChange,
-  disabled,
-  required,
-}: FieldProps) {
-  return (
-    <Form.Group controlId="formValue" className="mb-3">
-      <Form.Label>Value</Form.Label>
-      <Form.Control
-        type="number"
-        step="0.01"
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        disabled={disabled}
-        required={required}
-      />
-    </Form.Group>
-  );
-}
-
 /** ========== TypeField ========== */
 interface TypeFieldProps {
   typeValue: string;

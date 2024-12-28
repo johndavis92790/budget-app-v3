@@ -10,10 +10,22 @@ import {
   deleteObject,
   uploadBytes,
 } from "firebase/storage";
-import { FaTimes } from "react-icons/fa";
-import { FaArrowLeft } from "react-icons/fa";
+import { FaTimes, FaArrowLeft } from "react-icons/fa";
+
 import FullSizeImageModal from "./FullSizeImageModal";
 import FullPageSpinner from "./FullPageSpinner";
+
+// Import your other common form fields
+import {
+  DateField,
+  TypeField,
+  CategoryField,
+  TagField,
+  NotesField,
+} from "./CommonFormFields";
+
+// Import your new CurrencyInput from text-mask code
+import CurrencyInput from "./CurrencyInput";
 
 interface EditHistoryPageProps {
   historyTypes: string[];
@@ -36,6 +48,8 @@ function EditHistoryPage({
   const navigate = useNavigate();
 
   const [selectedHistory, setSelectedHistory] = useState<History | null>(null);
+
+  // Existing receipts
   const [existingReceiptItems, setExistingReceiptItems] = useState<
     { url: string; fullPath: string }[]
   >([]);
@@ -44,116 +58,116 @@ function EditHistoryPage({
   const [removedExistingPaths, setRemovedExistingPaths] = useState<string[]>(
     [],
   );
+
+  // New receipts
   const [newReceiptFiles, setNewReceiptFiles] = useState<File[]>([]);
   const [selectedImageUrl, setSelectedImageUrl] = useState<string | null>(null);
+
   const [submitting, setSubmitting] = useState(false);
   const [initialized, setInitialized] = useState(false);
 
-  // We now rely on the ID in the history directly, not parsing from URL queries
+  // Grab ?id= from the URL
   const queryParams = new URLSearchParams(location.search);
   const idParam = queryParams.get("id");
 
+  // 1) Once data loaded, find the matching history item
   useEffect(() => {
     if (loading) return;
     if (!idParam) {
       navigate("/history");
       return;
     }
-
-    const foundHistory = history.find((hist) => hist.id === idParam);
+    const foundHistory = history.find((h) => h.id === idParam);
     if (!foundHistory) {
-      // If no matching history found, go back to history
       navigate("/history");
       return;
     }
     setSelectedHistory(foundHistory);
   }, [loading, idParam, history, navigate]);
 
+  // 2) Load existing receipts
   useEffect(() => {
-    if (selectedHistory && !initialized) {
-      const loadExistingReceipts = async () => {
-        setExistingReceiptItems([]);
-        setRemovedExistingPaths([]);
-        setNewReceiptFiles([]);
+    if (!selectedHistory || initialized) return;
 
-        const id = selectedHistory.id;
+    const loadExistingReceipts = async () => {
+      setExistingReceiptItems([]);
+      setRemovedExistingPaths([]);
+      setNewReceiptFiles([]);
 
-        if (!id) {
-          // No ID means no folder name, just mark as initialized
-          setInitialized(true);
-          return;
-        }
-
-        setExistingLoading(true);
-        setExistingError(null);
-
-        const storage = getStorage();
-        const folderRef = ref(storage, `receipts/${id}`);
-        try {
-          const res = await listAll(folderRef);
-          const urls = await Promise.all(
-            res.items.map(async (item) => {
-              const url = await getDownloadURL(item);
-              return { url, fullPath: item.fullPath };
-            }),
-          );
-          setExistingReceiptItems(urls);
-        } catch (error: any) {
-          console.error("Error loading existing receipts:", error);
-          setExistingError("Error loading existing receipts.");
-        } finally {
-          setExistingLoading(false);
-        }
-
+      const id = selectedHistory.id;
+      if (!id) {
         setInitialized(true);
-      };
+        return;
+      }
 
-      loadExistingReceipts();
-    }
+      setExistingLoading(true);
+      setExistingError(null);
+
+      const storage = getStorage();
+      const folderRef = ref(storage, `receipts/${id}`);
+      try {
+        const res = await listAll(folderRef);
+        const urls = await Promise.all(
+          res.items.map(async (item) => {
+            const url = await getDownloadURL(item);
+            return { url, fullPath: item.fullPath };
+          }),
+        );
+        setExistingReceiptItems(urls);
+      } catch (error: any) {
+        console.error("Error loading existing receipts:", error);
+        setExistingError("Error loading existing receipts.");
+      } finally {
+        setExistingLoading(false);
+      }
+
+      setInitialized(true);
+    };
+
+    loadExistingReceipts();
   }, [selectedHistory, initialized]);
 
+  // Helper to change one field in selectedHistory
   const handleFieldChange = (
     field: keyof History,
     value: string | number | string[],
   ) => {
-    if (selectedHistory) {
-      setSelectedHistory({
-        ...selectedHistory,
-        [field]: value,
-      });
-    }
+    if (!selectedHistory) return;
+    setSelectedHistory({ ...selectedHistory, [field]: value });
   };
 
+  // Handle file input
   const handleNewReceiptChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
-    if (!files || files.length === 0) return;
+    if (!files) return;
     const newFiles = Array.from(files);
     setNewReceiptFiles((prev) => [...prev, ...newFiles]);
     e.target.value = "";
   };
 
+  // Remove existing
   const handleRemoveExistingReceipt = (fullPath: string) => {
-    // Mark for deletion
     setRemovedExistingPaths((prev) => [...prev, fullPath]);
     setExistingReceiptItems((prev) =>
       prev.filter((item) => item.fullPath !== fullPath),
     );
   };
 
+  // Remove new
   const handleRemoveNewReceipt = (index: number) => {
     setNewReceiptFiles((prev) => prev.filter((_, i) => i !== index));
   };
 
+  // Save
   const handleSave = async () => {
     if (!selectedHistory) return;
-
     setSubmitting(true);
-    try {
-      const id = selectedHistory.id; // Use the original ID from creation
 
+    try {
+      const id = selectedHistory.id;
       const storage = getStorage();
 
-      // Delete removed receipts
+      // 1) Delete removed receipts
       for (const path of removedExistingPaths) {
         const fileRef = ref(storage, path);
         await deleteObject(fileRef).catch((err) =>
@@ -161,7 +175,7 @@ function EditHistoryPage({
         );
       }
 
-      // Upload any new receipts if we have a id (we always should, since it was created originally)
+      // 2) Upload new
       if (id && newReceiptFiles.length > 0) {
         for (const file of newReceiptFiles) {
           const fileRef = ref(storage, `receipts/${id}/${id}-${file.name}`);
@@ -169,14 +183,11 @@ function EditHistoryPage({
         }
       }
 
-      // Just update the history on the backend, no new IDs or folder names
-      // The backend will reuse the existing ID from the original creation
-      const updatedHistory = {
-        ...selectedHistory,
-      };
+      // 3) Update
+      console.log("Saving updated history:", selectedHistory);
+      await onUpdateItem(selectedHistory);
 
-      await onUpdateItem(updatedHistory);
-
+      // 4) Navigate
       navigate("/history");
     } catch (error) {
       console.error("Error saving history:", error);
@@ -189,7 +200,6 @@ function EditHistoryPage({
   if (loading) {
     return <FullPageSpinner />;
   }
-
   if (!selectedHistory) {
     return <p>Loading history data or no history found...</p>;
   }
@@ -205,107 +215,64 @@ function EditHistoryPage({
       <h2 className="mb-4">Edit History</h2>
 
       <Form>
-        <Form.Group className="mb-3">
-          <Form.Label>Date</Form.Label>
-          <Form.Control
-            type="date"
-            value={selectedHistory.date}
-            onChange={(e) => handleFieldChange("date", e.target.value)}
-            disabled={submitting}
-          />
-        </Form.Group>
-        <Form.Group className="mb-3">
-          <Form.Label>Type</Form.Label>
-          <Form.Select
-            value={selectedHistory?.type || ""}
-            onChange={(e) => {
-              const selectedType = e.target.value;
-              if (historyTypes.includes(selectedType) && selectedHistory) {
-                setSelectedHistory({
-                  ...selectedHistory,
-                  type: selectedType,
-                });
-              }
-            }}
-            required
-            disabled={submitting}
-          >
-            {historyTypes.map((type, idx) => (
-              <option key={idx} value={type}>
-                {type}
-              </option>
-            ))}
-          </Form.Select>
-        </Form.Group>
-        <Form.Group className="mb-3">
-          <Form.Label>Category</Form.Label>
-          <Form.Select
-            value={selectedHistory?.category || ""}
-            onChange={(e) => {
-              const selectedCategory = e.target.value;
-              if (categories.includes(selectedCategory) && selectedHistory) {
-                setSelectedHistory({
-                  ...selectedHistory,
-                  category: selectedCategory,
-                });
-              }
-            }}
-            required
-            disabled={submitting}
-          >
-            {categories.map((category, idx) => (
-              <option key={idx} value={category}>
-                {category}
-              </option>
-            ))}
-          </Form.Select>
-        </Form.Group>
-        <Form.Group className="mb-3">
-          <Form.Label>Tags</Form.Label>
-          <Form.Select
-            multiple
-            value={selectedHistory.tags}
-            onChange={(e) => {
-              const options = e.target.options;
-              const selected: string[] = [];
-              for (let i = 0; i < options.length; i++) {
-                if (options[i].selected) {
-                  selected.push(options[i].value);
-                }
-              }
-              handleFieldChange("tags", selected);
-            }}
-            required
-            disabled={submitting}
-          >
-            {nonRecurringTags.map((nonRecurringTag: string, idx: number) => (
-              <option key={idx} value={nonRecurringTag}>
-                {nonRecurringTag}
-              </option>
-            ))}
-          </Form.Select>
-        </Form.Group>
-        <Form.Group className="mb-3">
+        {/* Date */}
+        <DateField
+          value={selectedHistory.date}
+          onChange={(val) => handleFieldChange("date", val)}
+          disabled={submitting}
+        />
+        {/* Type */}
+        <TypeField
+          typeValue={selectedHistory.type}
+          setTypeValue={(val) => handleFieldChange("type", val)}
+          options={historyTypes}
+          disabled={submitting}
+        />
+        {/* Category */}
+        <CategoryField
+          categoryValue={selectedHistory.category}
+          setCategoryValue={(val) => handleFieldChange("category", val)}
+          categories={categories}
+          disabled={submitting}
+        />
+        {/* Tags */}
+        <TagField
+          tags={selectedHistory.tags}
+          setTags={(vals) => handleFieldChange("tags", vals)}
+          availableTags={nonRecurringTags}
+          disabled={submitting}
+        />
+        {/* Value using new CurrencyInput */}
+        <Form.Group controlId="formValue" className="mb-3">
           <Form.Label>Value</Form.Label>
-          <Form.Control
-            type="number"
-            value={selectedHistory.value}
-            onChange={(e) =>
-              handleFieldChange("value", parseFloat(e.target.value))
-            }
+          <CurrencyInput
+            // We'll pass the existing value as a string, e.g. "123.45" or "0"
+            // If your DB stored it as a number, do String(selectedHistory.value).
+            value={String(selectedHistory.value || 0)}
+            placeholder="$0.00"
+            style={{ width: "100%" }}
             disabled={submitting}
+            // We do an onChange that reads the masked string (like "$1,234.56") from e.target.value
+            onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
+              // text-mask returns the masked string in e.target.value,
+              // e.g. "$1,234.56"
+              const maskedVal = e.target.value;
+              // Remove all non-digit chars except '.' or '-'
+              const numericStr = maskedVal.replace(/[^0-9.-]/g, "");
+              const parsed = parseFloat(numericStr);
+              // Fallback to 0 if invalid
+              const finalNum = isNaN(parsed) ? 0 : parsed;
+              // Store in your state
+              handleFieldChange("value", finalNum);
+            }}
           />
         </Form.Group>
-        <Form.Group className="mb-3">
-          <Form.Label>Notes</Form.Label>
-          <Form.Control
-            as="textarea"
-            rows={3}
-            value={selectedHistory.notes}
-            onChange={(e) => handleFieldChange("notes", e.target.value)}
-            disabled={submitting}
-          />
-        </Form.Group>
+        {/* Notes */}
+        <NotesField
+          value={selectedHistory.notes}
+          onChange={(val) => handleFieldChange("notes", val)}
+          disabled={submitting}
+        />
       </Form>
 
       <hr />
@@ -313,6 +280,7 @@ function EditHistoryPage({
       {existingLoading && <Spinner animation="border" />}
       {existingError && <p className="text-danger">{existingError}</p>}
 
+      {/* Existing receipts */}
       {existingReceiptItems.length > 0 && (
         <div
           style={{
@@ -325,10 +293,7 @@ function EditHistoryPage({
           {existingReceiptItems.map((item, idx) => (
             <div
               key={idx}
-              style={{
-                position: "relative",
-                display: "inline-block",
-              }}
+              style={{ position: "relative", display: "inline-block" }}
             >
               <img
                 src={item.url}
@@ -362,6 +327,7 @@ function EditHistoryPage({
         </div>
       )}
 
+      {/* New receipts */}
       <Form.Group controlId="formNewReceipts" className="mb-3">
         <Form.Label>Add More Receipts</Form.Label>
         <Form.Control
@@ -387,10 +353,7 @@ function EditHistoryPage({
             return (
               <div
                 key={index}
-                style={{
-                  position: "relative",
-                  display: "inline-block",
-                }}
+                style={{ position: "relative", display: "inline-block" }}
               >
                 <img
                   src={url}

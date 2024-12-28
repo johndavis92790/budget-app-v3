@@ -37,15 +37,17 @@ function App() {
       setHistory(
         data.history.map((history: History, index: number) => ({
           ...history,
+          value: parseFloat(String(history.value)).toFixed(2),
           rowIndex: index + 2,
           date: mmddyyyyToYyyyMmDd(history.date), // Ensure consistent YYYY-MM-DD format
-        }))
+        })),
       );
       setRecurring(
         data.recurring.map((recurring: Recurring, index: number) => ({
           ...recurring,
+          value: parseFloat(String(recurring.value)).toFixed(2),
           rowIndex: index + 2,
-        }))
+        })),
       );
       setCategories(data.categories || []);
       setNonRecurringTags(data.nonRecurringTags || []);
@@ -90,6 +92,7 @@ function App() {
 
   const onUpdateItem = async (updatedItem: History | Recurring) => {
     try {
+      console.log("updatedItem: ", updatedItem);
       const response = await fetch(API_URL, {
         method: "PUT",
         headers: {
@@ -100,7 +103,7 @@ function App() {
       if (!response.ok) {
         throw new Error(`Error: ${response.statusText}`);
       }
-      console.log("Item updated with ID:", updatedItem.id);
+      console.log("Item updated with ID: ", updatedItem.id);
       fetchData(); // Refresh data after updating
     } catch (error) {
       console.error("Error updating item:", error);
@@ -109,7 +112,7 @@ function App() {
 
   const onUpdateGoal = async (
     itemType: "weeklyGoal" | "monthlyGoal",
-    newValue: number
+    newValue: number,
   ) => {
     try {
       await fetch(API_URL, {
