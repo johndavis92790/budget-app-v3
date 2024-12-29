@@ -11,6 +11,7 @@ import EditRecurringPage from "./EditRecurringPage";
 import AddHistoryPage from "./AddHistoryPage";
 import HomePage from "./HomePage";
 import GoalsBanner from "./GoalsBanner";
+import FiscalCalendar from "./FiscalCalendar";
 
 function App() {
   const [history, setHistory] = useState<History[]>([]);
@@ -23,6 +24,7 @@ function App() {
   const [historyTypes, setHistoryTypes] = useState<string[]>([]);
   const [weeklyGoal, setWeeklyGoal] = useState<number>(0);
   const [monthlyGoal, setMonthlyGoal] = useState<number>(0);
+  const [fiscalWeeks, setFiscalWeeks] = useState<Record<string, any>>({});
   const [loading, setLoading] = useState<boolean>(true);
 
   const fetchData = async () => {
@@ -57,6 +59,7 @@ function App() {
       setHistoryTypes(data.historyTypes || []);
       setWeeklyGoal(data.weeklyGoal);
       setMonthlyGoal(data.monthlyGoal);
+      setFiscalWeeks(data.fiscalWeeks || {});
     } catch (error) {
       console.error("Error fetching data:", error);
     }
@@ -157,6 +160,8 @@ function App() {
         </Navbar>
 
         <GoalsBanner weeklyGoal={weeklyGoal} monthlyGoal={monthlyGoal} />
+
+        <FiscalCalendar fiscalWeeks={fiscalWeeks} />
 
         <Container>
           <Routes>

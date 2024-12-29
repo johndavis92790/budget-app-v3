@@ -1,0 +1,232 @@
+/* 
+   ====== Container & Basic Layout ======
+*/
+.my-calendar-container {
+  max-width: 600px; /* Increased width for better event band display */
+  margin: 2rem auto;
+  background-color: #fff;
+  border-radius: 8px;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
+  padding: 1rem;
+  font-family: "Segoe UI", Tahoma, sans-serif;
+  text-align: center;
+}
+
+.my-calendar-container h2 {
+  margin-bottom: 1rem;
+}
+
+/* Remove the default react-calendar border */
+.react-calendar {
+  border: none;
+  width: 100%;
+}
+
+/* 
+   ====== Navigation Bar (Month Prev/Next) ======
+*/
+.react-calendar__navigation {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 1rem;
+}
+
+.react-calendar__navigation button {
+  background-color: #f7f7f7;
+  color: #333;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  padding: 8px 12px;
+  margin: 0 3px;
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition:
+    background-color 0.2s,
+    border-color 0.2s;
+}
+
+.react-calendar__navigation button:hover {
+  background-color: #e9e9e9;
+  border-color: #ccc;
+}
+
+/* 
+   ====== Weekday Headers (Sun, Mon, etc.) ======
+*/
+.react-calendar__month-view__weekdays {
+  background-color: #f3f3f3;
+  border-radius: 4px;
+}
+
+.react-calendar__month-view__weekdays__weekday {
+  font-weight: 600;
+  color: #666;
+  padding: 0.5rem 0;
+  text-align: center;
+  border: 1px solid #eee; /* subtle border */
+}
+
+.react-calendar__month-view__weekdays__weekday abbr {
+  text-decoration: none !important; /* remove underline */
+  cursor: default !important; /* remove question-mark pointer */
+  border-bottom: none !important; /* just in case */
+}
+
+/* 
+   ====== Day Tiles ======
+*/
+.react-calendar__tile {
+  margin: 2px;
+  height: 4rem; /* Increase height to allow more space */
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start; /* Align items to the top */
+  padding: 0.3rem;
+  cursor: pointer;
+  transition:
+    background-color 0.2s,
+    border-color 0.2s;
+  position: relative; /* For absolute positioning of event bands */
+  overflow: visible; /* Allow event bands and labels to overflow */
+  z-index: 2;
+}
+
+/* Use a pseudo-element for the border */
+.react-calendar__tile::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  border: 1px solid #eee; /* your gray border */
+  border-radius: 4px; /* same radius if you need it */
+  pointer-events: none; /* let clicks pass through */
+  z-index: 0; /* behind the tile contents */
+}
+
+/* Make sure the tile’s children (day number + event band) sit above z-index:0 */
+.react-calendar__tile > * {
+  position: relative;
+  z-index: 1;
+}
+
+.react-calendar__tile:hover {
+  background-color: #fafafa;
+  border-color: #ddd;
+}
+
+/* Reduce vertical centering on text */
+.react-calendar__tile > abbr {
+  line-height: 1.2;
+}
+
+/* 
+   ====== Today’s Date Highlight ======
+*/
+.react-calendar__tile--now {
+  background-color: #ffe066 !important; /* a bit darker yellow */
+  border-color: #ffca28 !important;
+  color: #333;
+  font-weight: 600;
+}
+
+/*
+   ====== Selected Date ======
+*/
+.react-calendar__tile--active {
+  background-color: #b2ebf2 !important;
+  border-color: #80deea !important;
+  color: #006064 !important;
+  font-weight: 600;
+}
+
+/*
+   ====== Neighboring Month Days ======
+*/
+.react-calendar__month-view__days__day--neighboringMonth {
+  color: #aaa; /* lighter text */
+  background-color: #f9f9f9; /* subtle background */
+  opacity: 0.9;
+}
+
+.react-calendar__month-view__days__day--neighboringMonth:hover {
+  background-color: #eaeaea;
+  border-color: #ccc;
+}
+
+/* ====== Event Bands ====== */
+
+/* Event container positioned at the bottom of the tile */
+.event-container {
+  position: absolute;
+  bottom: 4px; /* Adjust as needed to position below day number */
+  left: 0;
+  right: 0;
+  width: 100%;
+  height: 1.5rem; /* Adjust height as needed */
+  display: flex;
+  align-items: center;
+  justify-content: flex-start; /* Align label to the start */
+  pointer-events: none; /* Allow clicks to pass through */
+  z-index: 2; /* Ensure event container is above tile borders */
+  overflow: visible; /* Allow label to overflow */
+}
+
+/* Base styles for event bands */
+.event-band {
+  position: absolute;
+  bottom: 0;
+  height: 100%;
+  width: 100%; /* Ensure the band spans the full width */
+  display: flex;
+  align-items: center;
+  justify-content: flex-start; /* Align label to the start */
+  font-size: 0.75rem;
+  color: #333; /* Dark grey for text */
+  pointer-events: auto; /* Enable interactions if needed */
+  border-top: 1px solid #333; /* Consistent top border */
+  border-bottom: 1px solid #333; /* Consistent bottom border */
+  background-color: inherit; /* Inherit background color from inline style */
+  box-sizing: border-box; /* Ensure borders are included in width */
+  z-index: 3;
+}
+
+/* Styles for different roles in the event */
+.event-band.start {
+  border-left: 1px solid #333; /* Add left border for start */
+  border-top-left-radius: 4px;
+  border-bottom-left-radius: 4px;
+}
+
+.event-band.middle {
+  /* No left or right borders for middle bands */
+  border-left: none;
+  border-right: none;
+}
+
+.event-band.end {
+  border-right: 1px solid #333; /* Add right border for end */
+  border-top-right-radius: 4px;
+  border-bottom-right-radius: 4px;
+}
+
+.event-band.single {
+  border-radius: 4px;
+  border-left: 1px solid #333;
+  border-right: 1px solid #333;
+}
+
+/* Event label styling */
+.event-label {
+  white-space: nowrap;
+  overflow: visible; /* Allow overflow */
+  text-overflow: clip; /* Prevent ellipsis */
+  padding: 0 4px; /* Optional: add some padding */
+  position: absolute; /* Position absolutely within the event-band */
+  left: 0;
+  top: 50%;
+  transform: translateY(-50%); /* Center vertically */
+  z-index: 3; /* Ensure label is above the event band */
+  pointer-events: none; /* Allow clicks to pass through */
+}
