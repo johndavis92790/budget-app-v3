@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { BrowserRouter as Router, Routes, Route, Link } from "react-router-dom";
-import { History, Recurring } from "./types";
+import { FiscalWeek, History, Recurring } from "./types";
 import HistoryPage from "./HistoryPage";
 import { Navbar, Nav, Container } from "react-bootstrap";
 import { API_URL, mmddyyyyToYyyyMmDd } from "./helpers";
@@ -24,7 +24,9 @@ function App() {
   const [historyTypes, setHistoryTypes] = useState<string[]>([]);
   const [weeklyGoal, setWeeklyGoal] = useState<number>(0);
   const [monthlyGoal, setMonthlyGoal] = useState<number>(0);
-  const [fiscalWeeks, setFiscalWeeks] = useState<Record<string, any>>({});
+  const [fiscalWeeks, setFiscalWeeks] = useState<Record<string, FiscalWeek>>(
+    {},
+  );
   const [loading, setLoading] = useState<boolean>(true);
 
   const fetchData = async () => {
@@ -39,15 +41,15 @@ function App() {
       setHistory(
         data.history.map((history: History, index: number) => ({
           ...history,
-          value: parseFloat(String(history.value)).toFixed(2),
+          value: Math.round(history.value * 100) / 100,
           rowIndex: index + 2,
-          date: mmddyyyyToYyyyMmDd(history.date), // Ensure consistent YYYY-MM-DD format
+          date: mmddyyyyToYyyyMmDd(history.date),
         })),
       );
       setRecurring(
         data.recurring.map((recurring: Recurring, index: number) => ({
           ...recurring,
-          value: parseFloat(String(recurring.value)).toFixed(2),
+          value: Math.round(recurring.value * 100) / 100,
           rowIndex: index + 2,
         })),
       );
@@ -161,8 +163,6 @@ function App() {
 
         <GoalsBanner weeklyGoal={weeklyGoal} monthlyGoal={monthlyGoal} />
 
-        <FiscalCalendar fiscalWeeks={fiscalWeeks} />
-
         <Container>
           <Routes>
             <Route path="/" element={<HomePage />} />
@@ -229,6 +229,8 @@ function App() {
             />
           </Routes>
         </Container>
+
+        <FiscalCalendar fiscalWeeks={fiscalWeeks} history={history} />
       </Router>
     </div>
   );

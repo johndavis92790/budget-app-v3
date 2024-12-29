@@ -3,6 +3,7 @@ import Calendar, { CalendarProps } from "react-calendar";
 import "react-calendar/dist/Calendar.css"; // Default styles
 import "./FiscalCalendar.css"; // Custom styles
 import { FaChevronLeft, FaChevronRight } from "react-icons/fa";
+import { FiscalWeek, History } from "./types";
 
 interface CalendarEvent {
   id: string;
@@ -12,21 +13,30 @@ interface CalendarEvent {
   textColor: string;
   borderColor: string;
   label: string;
+  total: number;
 }
 
 interface FiscalCalendarProps {
-  fiscalWeeks: Record<string, any>;
+  fiscalWeeks: Record<string, FiscalWeek>;
+  history: History[];
 }
 
-function FiscalCalendar({ fiscalWeeks }: FiscalCalendarProps) {
+function FiscalCalendar({ fiscalWeeks, history }: FiscalCalendarProps) {
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
 
   // Transform fiscalWeeks into events
   const events = useMemo(() => {
     return Object.entries(fiscalWeeks).map(([key, weekData]) => {
-      let backgroundColor: string = "";
-      let textColor: string = "";
-      let borderColor: string = "";
+      const matchingHistory = history.filter(
+        (item) => item.fiscalWeekId === key,
+      );
+
+      const total = matchingHistory.reduce((sum, item) => sum + item.value, 0);
+
+      let backgroundColor = "rgb(209, 209, 209)";
+      let textColor = "rgb(82, 82, 82)";
+      let borderColor = "rgb(132, 132, 132)";
+
       switch (weekData.number) {
         case "1":
           backgroundColor = "rgb(212, 237, 218)";
@@ -48,42 +58,54 @@ function FiscalCalendar({ fiscalWeeks }: FiscalCalendarProps) {
           textColor = "rgb(110, 85, 85)";
           borderColor = "rgb(160, 135, 135)";
           break;
-        default:
-          backgroundColor = "rgb(209, 209, 209)";
-          textColor = "rgb(82, 82, 82)";
-          borderColor = "rgb(132, 132, 132)";
-          break;
       }
+
       return {
         id: key,
         start: new Date(`${weekData.start_date}T07:00:00Z`), // Use UTC explicitly
         end: new Date(`${weekData.end_date}T07:00:00Z`), // Ensure end date includes the whole day
-        backgroundColor: backgroundColor,
-        textColor: textColor,
-        borderColor: borderColor,
-        label: `Week ${weekData.number}`, // Use the week number as the label
+        backgroundColor,
+        textColor,
+        borderColor,
+        label: `Week ${weekData.number}`,
+        total,
       };
     });
-  }, [fiscalWeeks]);
+  }, [fiscalWeeks, history]);
 
-  // Preprocess events to map dates to events
   const dateToEventsMap = useMemo(() => {
     const map: Record<string, CalendarEvent[]> = {};
     events.forEach((event) => {
       let current = new Date(event.start);
+      let isFirstMiddleDateLogged = false;
+
       while (current <= event.end) {
         const key = current.toISOString().split("T")[0];
         if (!map[key]) {
           map[key] = [];
         }
-        map[key].push(event);
+
+        const isMiddleDay = current > event.start && current < event.end;
+
+        if (isMiddleDay && !isFirstMiddleDateLogged) {
+          map[key].push({
+            ...event,
+            label: `${event.total.toLocaleString("en-US", {
+              style: "currency",
+              currency: "USD",
+            })}`, // Display total on the first middle date
+          });
+          isFirstMiddleDateLogged = true;
+        } else {
+          map[key].push(event);
+        }
+
         current.setDate(current.getDate() + 1);
       }
     });
     return map;
   }, [events]);
 
-  // Handle date change
   const handleDateChange: CalendarProps["onChange"] = (value) => {
     if (Array.isArray(value)) {
       setSelectedDate(value[0] || new Date());
@@ -94,7 +116,6 @@ function FiscalCalendar({ fiscalWeeks }: FiscalCalendarProps) {
     }
   };
 
-  // Helper function to check if two dates are the same day
   const isSameDay = (date1: Date, date2: Date) => {
     return (
       date1.getDate() === date2.getDate() &&
@@ -103,7 +124,6 @@ function FiscalCalendar({ fiscalWeeks }: FiscalCalendarProps) {
     );
   };
 
-  // Determine the role of the day in the event (start, end, or middle)
   const getEventRole = (event: CalendarEvent, date: Date) => {
     if (isSameDay(date, event.start) && isSameDay(date, event.end)) {
       return "single";
@@ -153,7 +173,8 @@ function FiscalCalendar({ fiscalWeeks }: FiscalCalendarProps) {
                       borderColor: event.borderColor,
                     }}
                   >
-                    {role === "start" && (
+                    {(role === "start" ||
+                      (role === "middle" && event.label.startsWith("$"))) && (
                       <span
                         className="event-label"
                         style={{ color: event.textColor }}

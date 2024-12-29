@@ -279,17 +279,12 @@ export const expenses = onRequest(
         historyRows.shift(); // Remove headers row
 
         // Indices: A=0,B=1,C=2,D=3,E=4,F=5,G=6,H=7,I=8,J=9,K=10,L=11
-        const historyEditURLColIndex = 6;
-        const historyIDColIndex = 8;
 
         const historyData = historyRows.map((row, index) => {
           const rawValue = row[4];
-          const cleanedValue = rawValue
-            ? rawValue.replace(/[^0-9.-]/g, "")
-            : "0";
-          const value = parseFloat(cleanedValue);
-          const editURL = row[historyEditURLColIndex] || "";
-          const id = row[historyIDColIndex] || "";
+          const value = rawValue
+            ? parseFloat(rawValue.replace(/[^0-9.-]/g, ""))
+            : 0;
 
           return {
             date: row[0],
@@ -299,11 +294,10 @@ export const expenses = onRequest(
               .split(",")
               .map((t: string) => t.trim())
               .filter(Boolean),
-            value: value,
+            value,
             notes: row[5],
-            editURL: editURL,
-            rowIndex: index + 2,
-            id: id,
+            editURL: row[6] || "",
+            id: row[8] || "",
             fiscalYearId: row[9],
             fiscalMonthId: row[10],
             fiscalWeekId: row[11],
@@ -321,17 +315,12 @@ export const expenses = onRequest(
         recurringRows.shift(); // Remove headers row
 
         // Indices: A=0,B=1,C=2,D=3,E=4,F=5,G=6
-        const editURLColIndex = 4;
-        const idColIndex = 6;
 
         const recurringData = recurringRows.map((row, index) => {
           const rawValue = row[2];
-          const cleanedValue = rawValue
-            ? rawValue.replace(/[^0-9.-]/g, "")
-            : "0";
-          const value = parseFloat(cleanedValue);
-          const editURL = row[editURLColIndex] || "";
-          const id = row[idColIndex] || "";
+          const value = rawValue
+            ? parseFloat(rawValue.replace(/[^0-9.-]/g, ""))
+            : 0;
 
           return {
             type: row[0],
@@ -339,11 +328,10 @@ export const expenses = onRequest(
               .split(",")
               .map((t: string) => t.trim())
               .filter(Boolean),
-            value: value,
+            value,
             name: row[3],
-            editURL: editURL,
-            rowIndex: index + 2,
-            id: id,
+            editURL: row[4] || "",
+            id: row[6] || "",
             itemType: "recurring",
           };
         });

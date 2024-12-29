@@ -22,3 +22,12 @@ export interface Recurring {
   id: string;
   itemType: "recurring";
 }
+
+export interface FiscalWeek {
+  number: string;
+  start_date: string;
+  end_date: string;
+  year_title: string;
+  month_id: string;
+  itemType: string;
+}
