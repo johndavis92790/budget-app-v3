@@ -54,9 +54,9 @@ function FiscalCalendar({ fiscalWeeks, history }: FiscalCalendarProps) {
           borderColor = "rgb(135, 145, 160)";
           break;
         case "4":
-          backgroundColor = "rgb(209, 209, 209)";
-          textColor = "rgb(110, 85, 85)";
-          borderColor = "rgb(160, 135, 135)";
+          backgroundColor = "rgb(228, 191, 191)";
+          textColor = "rgb(112, 72, 72)";
+          borderColor = "rgb(168, 111, 111)";
           break;
       }
 
