@@ -33,7 +33,7 @@ function AddRecurringPage({
 }: AddRecurringPageProps) {
   const location = useLocation();
   const navigate = useNavigate();
-  
+
   const [type, setType] = useState("Expense");
   const [name, setName] = useState("");
   const [tags, setTags] = useState<string[]>([]);
@@ -130,7 +130,7 @@ function AddRecurringPage({
           <FaArrowLeft /> Back
         </Button>
       </div>
-      
+
       <h2 className="mb-4">Add a Recurring Expense or Income</h2>
       <Form onSubmit={handleSubmit}>
         <Row>
