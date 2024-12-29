@@ -6,9 +6,6 @@ function HomePage() {
       <Button size="lg" href="/add-history">
         Add Expense/Refund
       </Button>
-      <Button size="lg" href="/add-recurring">
-        Add Recurring Expense/Income
-      </Button>
       <Button size="lg" href="/history">
         History
       </Button>

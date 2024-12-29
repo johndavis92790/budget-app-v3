@@ -147,9 +147,6 @@ function App() {
                 <Nav.Link as={Link} to="/add-history">
                   Add Expense/Refund
                 </Nav.Link>
-                <Nav.Link as={Link} to="/add-recurring">
-                  Add Recurring Expense/Income
-                </Nav.Link>
                 <Nav.Link as={Link} to="/history">
                   History
                 </Nav.Link>

@@ -17,6 +17,13 @@ function HistoryPage({ history, loading }: HistoryPageProps) {
     return <FullPageSpinner />;
   }
 
+  // Sort history by date (latest to oldest)
+  const sortedHistory = [...history].sort((a, b) => {
+    const dateA = new Date(a.date);
+    const dateB = new Date(b.date);
+    return dateB.getTime() - dateA.getTime(); // Latest dates first
+  });
+
   const handleRowClick = (history: History) => {
     console.log("Row clicked", history);
     if (!history.id) {
@@ -30,7 +37,7 @@ function HistoryPage({ history, loading }: HistoryPageProps) {
     <div>
       <h2 className="mb-4">History</h2>
       <ListGroup variant="flush">
-        {history.map((hist, index) => {
+        {sortedHistory.map((hist, index) => {
           const isExpense =
             hist.type === "Expense" || hist.type === "Recurring Expense";
           const valueColor = isExpense ? "text-danger" : "text-success";

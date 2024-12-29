@@ -1,4 +1,5 @@
-import React, { FormEvent, useState } from "react";
+import React, { FormEvent, useState, useEffect } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
 import { Form, Button, Row, Col, Spinner } from "react-bootstrap";
 import { storage } from "./firebase";
 import { ref, uploadBytes } from "firebase/storage";
@@ -15,6 +16,7 @@ import { TypeField, TagField, NameField } from "./CommonFormFields";
 import CurrencyInput from "./CurrencyInput";
 
 import { Recurring } from "./types";
+import { FaArrowLeft } from "react-icons/fa";
 
 interface AddRecurringPageProps {
   recurringTags: string[];
@@ -29,6 +31,9 @@ function AddRecurringPage({
   addItem,
   loading,
 }: AddRecurringPageProps) {
+  const location = useLocation();
+  const navigate = useNavigate();
+  
   const [type, setType] = useState("Expense");
   const [name, setName] = useState("");
   const [tags, setTags] = useState<string[]>([]);
@@ -41,6 +46,14 @@ function AddRecurringPage({
 
   const editURLFragment = "https://budget-app-v3.web.app/edit-recurring?id=";
   const [submitting, setSubmitting] = useState(false);
+
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const prefillType = params.get("type");
+    if (prefillType && recurringTypes.includes(prefillType)) {
+      setType(prefillType);
+    }
+  }, [location.search, recurringTypes]);
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
@@ -94,6 +107,7 @@ function AddRecurringPage({
         setTags([]);
         setValue("");
         setImageFiles([]);
+        navigate("/recurring");
       } else {
         alert("Failed to add recurring.");
       }
@@ -111,6 +125,12 @@ function AddRecurringPage({
 
   return (
     <>
+      <div style={{ marginBottom: "20px" }}>
+        <Button variant="secondary" onClick={() => navigate("/recurring")}>
+          <FaArrowLeft /> Back
+        </Button>
+      </div>
+      
       <h2 className="mb-4">Add a Recurring Expense or Income</h2>
       <Form onSubmit={handleSubmit}>
         <Row>
