@@ -6,7 +6,6 @@ const FullPageSpinner: React.FC = () => {
     <div
       className="d-flex"
       style={{
-        height: "100vh",
         width: "100%",
         justifyContent: "center",
         alignItems: "center",

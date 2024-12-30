@@ -11,7 +11,7 @@ const HISTORY_RANGE = `${HISTORY_TABLE_NAME}!${HISTORY_FIRST_COLUMN}1:${HISTORY_
 
 const RECURRING_TABLE_NAME = "Recurring";
 const RECURRING_FIRST_COLUMN = "A";
-const RECURRING_LAST_COLUMN = "G";
+const RECURRING_LAST_COLUMN = "H";
 const RECURRING_RANGE = `${RECURRING_TABLE_NAME}!${RECURRING_FIRST_COLUMN}1:${RECURRING_LAST_COLUMN}`;
 
 const WEEKLY_GOAL_RANGE = "Goals!A2";
@@ -295,7 +295,7 @@ export const expenses = onRequest(
               .map((t: string) => t.trim())
               .filter(Boolean),
             value,
-            notes: row[5],
+            description: row[5],
             editURL: row[6] || "",
             id: row[8] || "",
             fiscalYearId: row[9],
@@ -317,21 +317,22 @@ export const expenses = onRequest(
         // Indices: A=0,B=1,C=2,D=3,E=4,F=5,G=6
 
         const recurringData = recurringRows.map((row, index) => {
-          const rawValue = row[2];
+          const rawValue = row[3];
           const value = rawValue
             ? parseFloat(rawValue.replace(/[^0-9.-]/g, ""))
             : 0;
 
           return {
             type: row[0],
-            tags: row[1]
+            category: row[1],
+            tags: row[2]
               .split(",")
               .map((t: string) => t.trim())
               .filter(Boolean),
             value,
-            name: row[3],
-            editURL: row[4] || "",
-            id: row[6] || "",
+            description: row[4],
+            editURL: row[5] || "",
+            id: row[7] || "",
             itemType: "recurring",
           };
         });
@@ -540,7 +541,7 @@ export const expenses = onRequest(
                   data.category, // C=category
                   data.tags.join(", "), // D=tags
                   data.value, // E=value
-                  data.notes || "", // F=notes
+                  data.description || "", // F=description
                   data.editURL, // G=editLink
                   hyperlinkFormula, // H=hyperlink
                   id, // I=id (no prefix, just the numeric string)
@@ -557,6 +558,7 @@ export const expenses = onRequest(
         } else if (data.itemType === "recurring") {
           if (
             !data.type ||
+            typeof data.category !== "string" ||
             !Array.isArray(data.tags) ||
             typeof data.value !== "number" ||
             !data.id ||
@@ -576,12 +578,13 @@ export const expenses = onRequest(
               values: [
                 [
                   data.type, // A=type
-                  data.tags.join(", "), // B=tags
-                  data.value, // C=value
-                  data.name || "", // D=name
-                  data.editURL, // E=editLink
-                  hyperlinkFormula, // F=hyperlink
-                  id, // G=id (no prefix, just the numeric string)
+                  data.category, // B=category
+                  data.tags.join(", "), // C=tags
+                  data.value, // D=value
+                  data.description || "", // E=description
+                  data.editURL, // F=editLink
+                  hyperlinkFormula, // G=hyperlink
+                  id, // H=id (no prefix, just the numeric string)
                 ],
               ],
             },
@@ -657,7 +660,7 @@ export const expenses = onRequest(
                     data.category,
                     tagsStr,
                     data.value,
-                    data.notes || "",
+                    data.description || "",
                     existingEditURL,
                     hyperlinkFormula,
                     existingId, // Preserve the same numeric ID
@@ -673,9 +676,10 @@ export const expenses = onRequest(
             if (
               !data.rowIndex ||
               !data.type ||
+              typeof data.category !== "string" ||
               !Array.isArray(data.tags) ||
               typeof data.value !== "number" ||
-              !data.name ||
+              !data.description ||
               !data.id
             ) {
               res
@@ -701,8 +705,8 @@ export const expenses = onRequest(
               return;
             }
 
-            existingId = existingRow[6]; // column G for id
-            const existingEditURL = existingRow[4]; // column E for editURL
+            existingId = existingRow[7]; // column H for id
+            const existingEditURL = existingRow[5]; // column F for editURL
             if (!existingId) {
               res
                 .status(500)
@@ -720,9 +724,10 @@ export const expenses = onRequest(
                 values: [
                   [
                     data.type,
+                    data.category,
                     tagsStr,
                     data.value,
-                    data.name,
+                    data.description,
                     existingEditURL,
                     hyperlinkFormula,
                     existingId, // Preserve the same numeric ID

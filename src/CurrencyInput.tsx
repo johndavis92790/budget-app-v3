@@ -52,6 +52,8 @@ const CurrencyInput: React.FC<CurrencyInputProps> = ({
       onChange={onChange}
       // Add "form-control" to get Bootstrap styling
       className="form-control"
+      inputMode="decimal" // Use inputMode="decimal" for numeric keyboard
+      type="text" // Keep the type as text for MaskedInput compatibility
       {...inputProps}
     />
   );

@@ -4,7 +4,7 @@ export interface History {
   category: string;
   tags: string[];
   value: number;
-  notes: string;
+  description: string;
   editURL: string;
   id: string;
   fiscalYearId?: string;
@@ -15,9 +15,10 @@ export interface History {
 
 export interface Recurring {
   type: string;
+  category: string;
   tags: string[];
   value: number;
-  name: string;
+  description: string;
   editURL: string;
   id: string;
   itemType: "recurring";

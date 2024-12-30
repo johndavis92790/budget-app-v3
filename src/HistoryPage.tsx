@@ -52,14 +52,24 @@ function HistoryPage({ history, loading }: HistoryPageProps) {
 
           return (
             <ListGroup.Item
-              key={hist.id}
+              key={hist.id + index}
               className={`py-3 ${backgroundColorClass}`}
               onClick={() => handleRowClick(hist)}
               style={{ cursor: "pointer" }}
             >
               <Row>
                 <Col xs={8}>
-                  <div style={{ fontSize: "1.1em" }}>{hist.category}</div>
+                  <div style={{ fontSize: "1em" }}>
+                    <Badge
+                      pill
+                      bg="info"
+                      className="me-1"
+                      style={{ fontSize: "1em" }}
+                    >
+                      {hist.category}
+                    </Badge>{" "}
+                    {hist.description}
+                  </div>
                   <div className="text-muted" style={{ fontSize: "0.9em" }}>
                     {hist.type}
                   </div>

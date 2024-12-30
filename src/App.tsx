@@ -169,7 +169,6 @@ function App() {
                 <AddHistoryPage
                   categories={categories}
                   nonRecurringTags={nonRecurringTags}
-                  nonRecurringTypes={nonRecurringTypes}
                   addItem={addItem}
                   loading={loading}
                   weeklyGoal={weeklyGoal}
@@ -184,6 +183,7 @@ function App() {
                 <AddRecurringPage
                   recurringTags={recurringTags}
                   recurringTypes={recurringTypes}
+                  categories={categories}
                   addItem={addItem}
                   loading={loading}
                 />
@@ -217,6 +217,7 @@ function App() {
               element={
                 <EditRecurringPage
                   recurringTypes={recurringTypes}
+                  categories={categories}
                   nonRecurringTags={nonRecurringTags}
                   onUpdateItem={onUpdateItem}
                   loading={loading}

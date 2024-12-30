@@ -7,16 +7,13 @@ import FullSizeImageModal from "./FullSizeImageModal";
 import FullPageSpinner from "./FullPageSpinner";
 import FileUploader from "./FileUploader"; // <-- from previous refactor
 
-// We'll import only DateField, TypeField, CategoryField, TagField, NotesField from CommonFormFields
 import {
   DateField,
-  TypeField,
   CategoryField,
   TagField,
-  NotesField,
+  DescriptionField,
 } from "./CommonFormFields";
 
-// Import your new typed CurrencyInput
 import CurrencyInput from "./CurrencyInput";
 
 import { History } from "./types";
@@ -24,7 +21,6 @@ import { History } from "./types";
 interface AddHistoryPageProps {
   categories: string[];
   nonRecurringTags: string[];
-  nonRecurringTypes: string[];
   addItem: (history: History) => Promise<boolean>;
   loading: boolean;
   weeklyGoal: number;
@@ -38,14 +34,12 @@ interface AddHistoryPageProps {
 function AddHistoryPage({
   categories,
   nonRecurringTags,
-  nonRecurringTypes,
   addItem,
   loading,
   weeklyGoal,
   monthlyGoal,
   onUpdateGoal,
 }: AddHistoryPageProps) {
-  // Form fields
   const [date, setDate] = useState(() => {
     const today = new Date();
     const yyyy = today.getFullYear();
@@ -54,24 +48,19 @@ function AddHistoryPage({
     return `${yyyy}-${mm}-${dd}`;
   });
 
-  const [type, setType] = useState("Expense");
   const [category, setCategory] = useState("");
   const [tags, setTags] = useState<string[]>([]);
-  // We'll store the input as a string, e.g. "$1,234.56"
   const [value, setValue] = useState("");
-  const [notes, setNotes] = useState("");
-
-  // FileUploader state
+  const [description, setDescription] = useState("");
   const [receiptFiles, setReceiptFiles] = useState<File[]>([]);
   const [selectedImageUrl, setSelectedImageUrl] = useState<string | null>(null);
-
-  const editURLFragment = "https://budget-app-v3.web.app/edit-history?id=";
   const [submitting, setSubmitting] = useState(false);
 
-  const handleSubmit = async (e: FormEvent) => {
-    e.preventDefault();
-    if (!date || !type || !category || tags.length === 0 || !value) {
-      alert("Date, Type, Category, at least one Tag, and Value are required.");
+  const editURLFragment = "https://budget-app-v3.web.app/edit-history?id=";
+
+  const handleSubmit = async (type: "Expense" | "Refund") => {
+    if (!date || !category || tags.length === 0 || !value) {
+      alert("Date, Category, at least one Tag, and Value are required.");
       return;
     }
 
@@ -79,7 +68,6 @@ function AddHistoryPage({
     try {
       const uniqueId = String(Date.now());
 
-      // Upload receipts if present
       if (receiptFiles.length > 0) {
         for (const file of receiptFiles) {
           const fileRef = ref(
@@ -92,8 +80,7 @@ function AddHistoryPage({
 
       const editURL = `${editURLFragment}${uniqueId}`;
 
-      // Convert the masked currency string (e.g. "$1,234.56") to float
-      const numericStr = value.replace(/[^0-9.-]/g, ""); // "1234.56"
+      const numericStr = value.replace(/[^0-9.-]/g, "");
       const numericValue = parseFloat(numericStr);
       if (isNaN(numericValue)) {
         alert("Invalid numeric value for 'Value'. Please check your input.");
@@ -101,14 +88,13 @@ function AddHistoryPage({
         return;
       }
 
-      // Construct the new History object
       const newHistory: History = {
         date,
         type,
         category,
         tags,
         value: numericValue,
-        notes,
+        description,
         editURL,
         id: uniqueId,
         itemType: "history",
@@ -120,26 +106,23 @@ function AddHistoryPage({
         return;
       }
 
-      // Deduct from or add to weekly/monthly goals if needed
-      if (type.toLowerCase().includes("expense")) {
+      if (type === "Expense") {
         await onUpdateGoal("weeklyGoal", weeklyGoal - numericValue);
         await onUpdateGoal("monthlyGoal", monthlyGoal - numericValue);
-      } else if (type.toLowerCase().includes("refund")) {
+      } else if (type === "Refund") {
         await onUpdateGoal("weeklyGoal", weeklyGoal + numericValue);
         await onUpdateGoal("monthlyGoal", monthlyGoal + numericValue);
       }
 
-      // Reset form
       const now = new Date();
       const yyyy = now.getFullYear();
       const mm = String(now.getMonth() + 1).padStart(2, "0");
       const dd = String(now.getDate()).padStart(2, "0");
       setDate(`${yyyy}-${mm}-${dd}`);
-      setType("Expense");
       setCategory("");
       setTags([]);
       setValue("");
-      setNotes("");
+      setDescription("");
       setReceiptFiles([]);
     } catch (err) {
       console.error("Error adding history:", err);
@@ -156,9 +139,9 @@ function AddHistoryPage({
   return (
     <>
       <h2 className="mb-4">Add an Expense or Refund</h2>
-      <Form onSubmit={handleSubmit}>
+      <Form>
         <Row>
-          <Col md={4}>
+          <Col xs={6}>
             <DateField
               value={date}
               onChange={setDate}
@@ -166,19 +149,7 @@ function AddHistoryPage({
               required
             />
           </Col>
-          <Col md={4}>
-            <TypeField
-              typeValue={type}
-              setTypeValue={setType}
-              options={nonRecurringTypes}
-              disabled={submitting}
-              required
-            />
-          </Col>
-        </Row>
-
-        <Row>
-          <Col md={6}>
+          <Col xs={6}>
             <CategoryField
               categoryValue={category}
               setCategoryValue={setCategory}
@@ -187,7 +158,10 @@ function AddHistoryPage({
               required
             />
           </Col>
-          <Col md={6}>
+        </Row>
+
+        <Row>
+          <Col xs={6}>
             <TagField
               tags={tags}
               setTags={setTags}
@@ -196,35 +170,30 @@ function AddHistoryPage({
               required
             />
           </Col>
-        </Row>
-
-        <Row>
-          <Col md={4}>
-            {/* Replace the old ValueField with typed CurrencyInput */}
+          <Col xs={6}>
             <Form.Group controlId="formValue" className="mb-3">
-              <Form.Label>Value</Form.Label>
+              <Form.Label>Amount</Form.Label>
               <CurrencyInput
-                value={value} // e.g. "$123.45" or partial typed
-                onChange={(e) => {
-                  // e.target.value might be "$1,234.56"
-                  setValue(e.target.value);
-                }}
+                value={value}
+                onChange={(e) => setValue(e.target.value)}
                 placeholder="$0.00"
                 disabled={submitting}
                 style={{ width: "100%" }}
               />
             </Form.Group>
           </Col>
-          <Col md={8}>
-            <NotesField
-              value={notes}
-              onChange={setNotes}
+        </Row>
+
+        <Row>
+          <Col>
+            <DescriptionField
+              value={description}
+              onChange={setDescription}
               disabled={submitting}
             />
           </Col>
         </Row>
 
-        {/* Reusable File Uploader */}
         <Row>
           <Col md={4}>
             <FileUploader
@@ -239,13 +208,33 @@ function AddHistoryPage({
           </Col>
         </Row>
 
-        <Button type="submit" variant="primary" disabled={submitting}>
-          {submitting ? (
-            <Spinner as="span" animation="border" size="sm" />
-          ) : (
-            "Add"
-          )}
-        </Button>
+        <div className="d-flex justify-content-around mt-3">
+          <Button
+            type="button"
+            variant="success"
+            onClick={() => handleSubmit("Refund")}
+            disabled={submitting}
+          >
+            {submitting ? (
+              <Spinner as="span" animation="border" size="sm" />
+            ) : (
+              "Refund"
+            )}
+          </Button>
+          <Button
+            type="button"
+            variant="danger"
+            onClick={() => handleSubmit("Expense")}
+            disabled={submitting}
+            className="me-3"
+          >
+            {submitting ? (
+              <Spinner as="span" animation="border" size="sm" />
+            ) : (
+              "Expense"
+            )}
+          </Button>
+        </div>
       </Form>
 
       <FullSizeImageModal

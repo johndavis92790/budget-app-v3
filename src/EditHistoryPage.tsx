@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { History } from "./types";
-import { Form, Button, Spinner } from "react-bootstrap";
+import { Form, Button, Spinner, Row, Col } from "react-bootstrap";
 import {
   getStorage,
   ref,
@@ -21,7 +21,7 @@ import {
   TypeField,
   CategoryField,
   TagField,
-  NotesField,
+  DescriptionField,
 } from "./CommonFormFields";
 
 // Import your new CurrencyInput from text-mask code
@@ -50,7 +50,7 @@ function EditHistoryPage({
   const [selectedHistory, setSelectedHistory] = useState<History | null>(null);
 
   // Existing receipts
-  const [existingReceiptItems, setExistingReceiptItems] = useState<
+  const [existingImageItems, setExistingImageItems] = useState<
     { url: string; fullPath: string }[]
   >([]);
   const [existingLoading, setExistingLoading] = useState(false);
@@ -60,7 +60,7 @@ function EditHistoryPage({
   );
 
   // New receipts
-  const [newReceiptFiles, setNewReceiptFiles] = useState<File[]>([]);
+  const [newImageFiles, setNewImageFiles] = useState<File[]>([]);
   const [selectedImageUrl, setSelectedImageUrl] = useState<string | null>(null);
 
   const [submitting, setSubmitting] = useState(false);
@@ -89,10 +89,10 @@ function EditHistoryPage({
   useEffect(() => {
     if (!selectedHistory || initialized) return;
 
-    const loadExistingReceipts = async () => {
-      setExistingReceiptItems([]);
+    const loadExistingImages = async () => {
+      setExistingImageItems([]);
       setRemovedExistingPaths([]);
-      setNewReceiptFiles([]);
+      setNewImageFiles([]);
 
       const id = selectedHistory.id;
       if (!id) {
@@ -113,7 +113,7 @@ function EditHistoryPage({
             return { url, fullPath: item.fullPath };
           }),
         );
-        setExistingReceiptItems(urls);
+        setExistingImageItems(urls);
       } catch (error: any) {
         console.error("Error loading existing receipts:", error);
         setExistingError("Error loading existing receipts.");
@@ -124,7 +124,7 @@ function EditHistoryPage({
       setInitialized(true);
     };
 
-    loadExistingReceipts();
+    loadExistingImages();
   }, [selectedHistory, initialized]);
 
   // Helper to change one field in selectedHistory
@@ -137,25 +137,25 @@ function EditHistoryPage({
   };
 
   // Handle file input
-  const handleNewReceiptChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleNewImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (!files) return;
     const newFiles = Array.from(files);
-    setNewReceiptFiles((prev) => [...prev, ...newFiles]);
+    setNewImageFiles((prev) => [...prev, ...newFiles]);
     e.target.value = "";
   };
 
   // Remove existing
-  const handleRemoveExistingReceipt = (fullPath: string) => {
+  const handleRemoveExistingImage = (fullPath: string) => {
     setRemovedExistingPaths((prev) => [...prev, fullPath]);
-    setExistingReceiptItems((prev) =>
+    setExistingImageItems((prev) =>
       prev.filter((item) => item.fullPath !== fullPath),
     );
   };
 
   // Remove new
-  const handleRemoveNewReceipt = (index: number) => {
-    setNewReceiptFiles((prev) => prev.filter((_, i) => i !== index));
+  const handleRemoveNewImage = (index: number) => {
+    setNewImageFiles((prev) => prev.filter((_, i) => i !== index));
   };
 
   // Save
@@ -176,8 +176,8 @@ function EditHistoryPage({
       }
 
       // 2) Upload new
-      if (id && newReceiptFiles.length > 0) {
-        for (const file of newReceiptFiles) {
+      if (id && newImageFiles.length > 0) {
+        for (const file of newImageFiles) {
           const fileRef = ref(storage, `receipts/${id}/${id}-${file.name}`);
           await uploadBytes(fileRef, file);
         }
@@ -212,76 +212,83 @@ function EditHistoryPage({
         </Button>
       </div>
 
-      <h2 className="mb-4">Edit History</h2>
+      <h2 className="mb-4">Edit {selectedHistory.type}</h2>
 
       <Form>
-        {/* Date */}
-        <DateField
-          value={selectedHistory.date}
-          onChange={(val) => handleFieldChange("date", val)}
-          disabled={submitting}
-        />
-        {/* Type */}
-        <TypeField
-          typeValue={selectedHistory.type}
-          setTypeValue={(val) => handleFieldChange("type", val)}
-          options={historyTypes}
-          disabled={submitting}
-        />
-        {/* Category */}
-        <CategoryField
-          categoryValue={selectedHistory.category}
-          setCategoryValue={(val) => handleFieldChange("category", val)}
-          categories={categories}
-          disabled={submitting}
-        />
-        {/* Tags */}
-        <TagField
-          tags={selectedHistory.tags}
-          setTags={(vals) => handleFieldChange("tags", vals)}
-          availableTags={nonRecurringTags}
-          disabled={submitting}
-        />
-        {/* Value using new CurrencyInput */}
-        <Form.Group controlId="formValue" className="mb-3">
-          <Form.Label>Value</Form.Label>
-          <CurrencyInput
-            // We'll pass the existing value as a string, e.g. "123.45" or "0"
-            // If your DB stored it as a number, do String(selectedHistory.value).
-            value={String(selectedHistory.value || 0)}
-            placeholder="$0.00"
-            style={{ width: "100%" }}
-            disabled={submitting}
-            // We do an onChange that reads the masked string (like "$1,234.56") from e.target.value
-            onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
-              // text-mask returns the masked string in e.target.value,
-              // e.g. "$1,234.56"
-              const maskedVal = e.target.value;
-              // Remove all non-digit chars except '.' or '-'
-              const numericStr = maskedVal.replace(/[^0-9.-]/g, "");
-              const parsed = parseFloat(numericStr);
-              // Fallback to 0 if invalid
-              const finalNum = isNaN(parsed) ? 0 : parsed;
-              // Store in your state
-              handleFieldChange("value", finalNum);
-            }}
-          />
-        </Form.Group>
-        {/* Notes */}
-        <NotesField
-          value={selectedHistory.notes}
-          onChange={(val) => handleFieldChange("notes", val)}
-          disabled={submitting}
-        />
+        <Row>
+          <Col xs={6}>
+            <DateField
+              value={selectedHistory.date}
+              onChange={(val) => handleFieldChange("date", val)}
+              disabled={submitting}
+            />
+          </Col>
+          <Col xs={6}>
+            <CategoryField
+              categoryValue={selectedHistory.category}
+              setCategoryValue={(val) => handleFieldChange("category", val)}
+              categories={categories}
+              disabled={submitting}
+              required
+            />
+          </Col>
+        </Row>
+
+        <Row>
+          <Col xs={6}>
+            <TagField
+              tags={selectedHistory.tags}
+              setTags={(vals) => handleFieldChange("tags", vals)}
+              availableTags={nonRecurringTags}
+              disabled={submitting}
+            />
+          </Col>
+          <Col xs={6}>
+            <Form.Group controlId="formValue" className="mb-3">
+              <Form.Label>Value</Form.Label>
+              <CurrencyInput
+                // We'll pass the existing value as a string, e.g. "123.45" or "0"
+                // If your DB stored it as a number, do String(selectedHistory.value).
+                value={String(selectedHistory.value || 0)}
+                placeholder="$0.00"
+                style={{ width: "100%" }}
+                disabled={submitting}
+                // We do an onChange that reads the masked string (like "$1,234.56") from e.target.value
+                onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
+                  // text-mask returns the masked string in e.target.value,
+                  // e.g. "$1,234.56"
+                  const maskedVal = e.target.value;
+                  // Remove all non-digit chars except '.' or '-'
+                  const numericStr = maskedVal.replace(/[^0-9.-]/g, "");
+                  const parsed = parseFloat(numericStr);
+                  // Fallback to 0 if invalid
+                  const finalNum = isNaN(parsed) ? 0 : parsed;
+                  // Store in your state
+                  handleFieldChange("value", finalNum);
+                }}
+              />
+            </Form.Group>
+          </Col>
+        </Row>
+
+        <Row>
+          <Col>
+            <DescriptionField
+              value={selectedHistory.description}
+              onChange={(val) => handleFieldChange("description", val)}
+              disabled={submitting}
+            />
+          </Col>
+        </Row>
       </Form>
 
       <hr />
-      <h5>Receipts</h5>
+      <h5>Images</h5>
       {existingLoading && <Spinner animation="border" />}
       {existingError && <p className="text-danger">{existingError}</p>}
 
-      {/* Existing receipts */}
-      {existingReceiptItems.length > 0 && (
+      {/* Existing images */}
+      {existingImageItems.length > 0 && (
         <div
           style={{
             display: "flex",
@@ -290,14 +297,14 @@ function EditHistoryPage({
             marginBottom: "10px",
           }}
         >
-          {existingReceiptItems.map((item, idx) => (
+          {existingImageItems.map((item, idx) => (
             <div
               key={idx}
               style={{ position: "relative", display: "inline-block" }}
             >
               <img
                 src={item.url}
-                alt="Receipt"
+                alt="Existing Receipt"
                 style={{
                   width: "100px",
                   height: "auto",
@@ -317,7 +324,7 @@ function EditHistoryPage({
                   borderRadius: "50%",
                   padding: "0.2rem",
                 }}
-                onClick={() => handleRemoveExistingReceipt(item.fullPath)}
+                onClick={() => handleRemoveExistingImage(item.fullPath)}
                 disabled={submitting}
               >
                 <FaTimes />
@@ -327,19 +334,19 @@ function EditHistoryPage({
         </div>
       )}
 
-      {/* New receipts */}
-      <Form.Group controlId="formNewReceipts" className="mb-3">
-        <Form.Label>Add More Receipts</Form.Label>
+      {/* New images */}
+      <Form.Group controlId="formNewImages" className="mb-3">
+        <Form.Label>Add More Images</Form.Label>
         <Form.Control
           type="file"
           accept="image/*;capture=camera"
           multiple
-          onChange={handleNewReceiptChange}
+          onChange={handleNewImageChange}
           disabled={submitting}
         />
       </Form.Group>
 
-      {newReceiptFiles.length > 0 && (
+      {newImageFiles.length > 0 && (
         <div
           style={{
             display: "flex",
@@ -348,7 +355,7 @@ function EditHistoryPage({
             marginBottom: "10px",
           }}
         >
-          {newReceiptFiles.map((file, index) => {
+          {newImageFiles.map((file, index) => {
             const url = URL.createObjectURL(file);
             return (
               <div
@@ -378,7 +385,7 @@ function EditHistoryPage({
                     borderRadius: "50%",
                     padding: "0.2rem",
                   }}
-                  onClick={() => handleRemoveNewReceipt(index)}
+                  onClick={() => handleRemoveNewImage(index)}
                   disabled={submitting}
                 >
                   <FaTimes />

@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { Recurring } from "./types";
-import { Form, Button, Spinner } from "react-bootstrap";
+import { Form, Button, Spinner, Row, Col } from "react-bootstrap";
 import {
   getStorage,
   ref,
@@ -16,11 +16,17 @@ import FullSizeImageModal from "./FullSizeImageModal";
 import FullPageSpinner from "./FullPageSpinner";
 
 // Reuse form fields from CommonFormFields
-import { NameField, TypeField, TagField } from "./CommonFormFields";
+import {
+  DescriptionField,
+  TypeField,
+  TagField,
+  CategoryField,
+} from "./CommonFormFields";
 import CurrencyInput from "./CurrencyInput";
 
 interface EditRecurringPageProps {
   recurringTypes: string[];
+  categories: string[];
   nonRecurringTags: string[];
   onUpdateItem: (updatedRecurring: Recurring) => Promise<void>;
   loading: boolean;
@@ -29,6 +35,7 @@ interface EditRecurringPageProps {
 
 function EditRecurringPage({
   recurringTypes,
+  categories,
   nonRecurringTags,
   onUpdateItem,
   loading,
@@ -210,56 +217,72 @@ function EditRecurringPage({
       <h2 className="mb-4">Edit Recurring</h2>
 
       <Form>
-        {/* 
-          Use your CommonFormFields for name, type, tags, value. 
-          You can also create a custom field for “NameField” if you want (which you did).
-        */}
-        <NameField
-          value={selectedRecurring.name}
-          onChange={(val) => handleFieldChange("name", val)}
-          disabled={submitting}
-        />
+        <Row>
+          <Col md={8}>
+            <DescriptionField
+              value={selectedRecurring.description}
+              onChange={(val) => handleFieldChange("description", val)}
+              disabled={submitting}
+            />
+          </Col>
+        </Row>
 
-        <TypeField
-          typeValue={selectedRecurring.type}
-          setTypeValue={(val) => handleFieldChange("type", val)}
-          options={recurringTypes}
-          disabled={submitting}
-        />
+        <Row>
+          <Col xs={6}>
+            <TypeField
+              typeValue={selectedRecurring.type}
+              setTypeValue={(val) => handleFieldChange("type", val)}
+              options={recurringTypes}
+              disabled={submitting}
+            />
+          </Col>
+          <Col xs={6}>
+            <CategoryField
+              categoryValue={selectedRecurring.category}
+              setCategoryValue={(val) => handleFieldChange("category", val)}
+              categories={categories}
+              disabled={submitting}
+              required
+            />
+          </Col>
+        </Row>
 
-        <TagField
-          tags={selectedRecurring.tags}
-          setTags={(vals) => handleFieldChange("tags", vals)}
-          availableTags={nonRecurringTags}
-          disabled={submitting}
-        />
-
-        {/* <ValueField
-          value={String(selectedRecurring.value)}
-          onChange={(val) => handleFieldChange("value", parseFloat(val))}
-          disabled={submitting}
-        /> */}
-        <CurrencyInput
-          // We'll pass the existing value as a string, e.g. "123.45" or "0"
-          // If your DB stored it as a number, do String(selectedHistory.value).
-          value={String(selectedRecurring.value || 0)}
-          placeholder="$0.00"
-          style={{ width: "100%" }}
-          disabled={submitting}
-          // We do an onChange that reads the masked string (like "$1,234.56") from e.target.value
-          onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
-            // text-mask returns the masked string in e.target.value,
-            // e.g. "$1,234.56"
-            const maskedVal = e.target.value;
-            // Remove all non-digit chars except '.' or '-'
-            const numericStr = maskedVal.replace(/[^0-9.-]/g, "");
-            const parsed = parseFloat(numericStr);
-            // Fallback to 0 if invalid
-            const finalNum = isNaN(parsed) ? 0 : parsed;
-            // Store in your state
-            handleFieldChange("value", finalNum);
-          }}
-        />
+        <Row>
+          <Col xs={6}>
+            <TagField
+              tags={selectedRecurring.tags}
+              setTags={(vals) => handleFieldChange("tags", vals)}
+              availableTags={nonRecurringTags}
+              disabled={submitting}
+            />
+          </Col>
+          <Col xs={6}>
+            <Form.Group controlId="formValue" className="mb-3">
+              <Form.Label>Amount</Form.Label>
+              <CurrencyInput
+                // We'll pass the existing value as a string, e.g. "123.45" or "0"
+                // If your DB stored it as a number, do String(selectedHistory.value).
+                value={String(selectedRecurring.value || 0)}
+                placeholder="$0.00"
+                style={{ width: "100%" }}
+                disabled={submitting}
+                // We do an onChange that reads the masked string (like "$1,234.56") from e.target.value
+                onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
+                  // text-mask returns the masked string in e.target.value,
+                  // e.g. "$1,234.56"
+                  const maskedVal = e.target.value;
+                  // Remove all non-digit chars except '.' or '-'
+                  const numericStr = maskedVal.replace(/[^0-9.-]/g, "");
+                  const parsed = parseFloat(numericStr);
+                  // Fallback to 0 if invalid
+                  const finalNum = isNaN(parsed) ? 0 : parsed;
+                  // Store in your state
+                  handleFieldChange("value", finalNum);
+                }}
+              />
+            </Form.Group>
+          </Col>
+        </Row>
       </Form>
 
       <hr />
@@ -284,7 +307,7 @@ function EditRecurringPage({
             >
               <img
                 src={item.url}
-                alt="Existing"
+                alt="Exisiting Receipt"
                 style={{
                   width: "100px",
                   height: "auto",
@@ -344,7 +367,7 @@ function EditRecurringPage({
               >
                 <img
                   src={url}
-                  alt="New Recurring"
+                  alt="New Receipt"
                   style={{
                     width: "100px",
                     height: "auto",

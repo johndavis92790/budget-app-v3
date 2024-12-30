@@ -3,6 +3,7 @@ import { Recurring } from "./types";
 import { ListGroup, Badge, Row, Col, Button } from "react-bootstrap";
 import FullPageSpinner from "./FullPageSpinner";
 import "./RecurringPage.css";
+import { FaPlus } from "react-icons/fa";
 
 interface RecurringPageProps {
   recurring: Recurring[];
@@ -58,7 +59,17 @@ function RecurringPage({ recurring, loading }: RecurringPageProps) {
             >
               <Row>
                 <Col xs={8}>
-                  <div style={{ fontSize: "1.1em" }}>{item.name}</div>
+                  <div style={{ fontSize: "1em" }}>
+                    <Badge
+                      pill
+                      bg="info"
+                      className="me-1"
+                      style={{ fontSize: "1em" }}
+                    >
+                      {item.category}
+                    </Badge>{" "}
+                    {item.description}
+                  </div>
                   <div className="text-muted" style={{ fontSize: "0.9em" }}>
                     {item.type}
                   </div>
@@ -88,13 +99,12 @@ function RecurringPage({ recurring, loading }: RecurringPageProps) {
           );
         })}
       </ListGroup>
-      <Button
-        variant="success"
-        className="mb-4"
-        onClick={() => handleAddRecurring("Income")}
-      >
-        Add Income
-      </Button>
+      <div className="d-flex justify-content-end mb-4">
+        <Button variant="success" onClick={() => handleAddRecurring("Income")}>
+          <FaPlus className="me-2" />
+          Add Income
+        </Button>
+      </div>
 
       {/* Expenses Section */}
       <h4 className="mb-3">Expenses</h4>
@@ -112,7 +122,17 @@ function RecurringPage({ recurring, loading }: RecurringPageProps) {
             >
               <Row>
                 <Col xs={8}>
-                  <div style={{ fontSize: "1.1em" }}>{item.name}</div>
+                  <div style={{ fontSize: "1em" }}>
+                    <Badge
+                      pill
+                      bg="info"
+                      className="me-1"
+                      style={{ fontSize: "1em" }}
+                    >
+                      {item.category}
+                    </Badge>{" "}
+                    {item.description}
+                  </div>
                   <div className="text-muted" style={{ fontSize: "0.9em" }}>
                     {item.type}
                   </div>
@@ -142,13 +162,12 @@ function RecurringPage({ recurring, loading }: RecurringPageProps) {
           );
         })}
       </ListGroup>
-      <Button
-        variant="danger"
-        className="mt-3"
-        onClick={() => handleAddRecurring("Expense")}
-      >
-        Add Expense
-      </Button>
+      <div className="d-flex justify-content-end mt-3">
+        <Button variant="danger" onClick={() => handleAddRecurring("Expense")}>
+          <FaPlus className="me-2" />
+          Add Expense
+        </Button>
+      </div>
     </div>
   );
 }

@@ -1,5 +1,6 @@
 import React from "react";
-import { Form } from "react-bootstrap";
+import { Form, InputGroup } from "react-bootstrap";
+import { FaCalendar } from "react-icons/fa";
 
 /**
  * Common props for all fields that handle 'value' + 'onChange'.
@@ -15,42 +16,30 @@ interface FieldProps {
 export function DateField({ value, onChange, disabled, required }: FieldProps) {
   return (
     <Form.Group controlId="formDate" className="mb-3">
-      <Form.Label>Date</Form.Label>
-      <Form.Control
-        type="date"
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        disabled={disabled}
-        required={required}
-      />
+      <InputGroup>
+        <Form.Control
+          type="date"
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          disabled={disabled}
+          required={required}
+        />
+        <InputGroup.Text>
+          <FaCalendar />
+        </InputGroup.Text>
+      </InputGroup>
     </Form.Group>
   );
 }
 
-/** ========== NameField ========== */
-export function NameField({ value, onChange, disabled, required }: FieldProps) {
+/** ========== DescriptionField ========== */
+export function DescriptionField({ value, onChange, disabled }: FieldProps) {
   return (
-    <Form.Group controlId="formName" className="mb-3">
-      <Form.Label>Name</Form.Label>
+    <Form.Group controlId="formDescription" className="mb-3">
       <Form.Control
         type="text"
         value={value}
-        onChange={(e) => onChange(e.target.value)}
-        disabled={disabled}
-        required={required}
-      />
-    </Form.Group>
-  );
-}
-
-/** ========== NotesField ========== */
-export function NotesField({ value, onChange, disabled }: FieldProps) {
-  return (
-    <Form.Group controlId="formNotes" className="mb-3">
-      <Form.Label>Notes</Form.Label>
-      <Form.Control
-        type="text"
-        value={value}
+        placeholder="Description"
         onChange={(e) => onChange(e.target.value)}
         disabled={disabled}
       />
@@ -74,11 +63,9 @@ export function TypeField({
   options,
   disabled,
   required,
-  label = "Type",
 }: TypeFieldProps) {
   return (
     <Form.Group controlId="formType" className="mb-3">
-      <Form.Label>{label}</Form.Label>
       <Form.Select
         value={typeValue}
         onChange={(e) => {
@@ -118,7 +105,6 @@ export function CategoryField({
 }: CategoryFieldProps) {
   return (
     <Form.Group controlId="formCategory" className="mb-3">
-      <Form.Label>Category</Form.Label>
       <Form.Select
         value={categoryValue}
         onChange={(e) => {

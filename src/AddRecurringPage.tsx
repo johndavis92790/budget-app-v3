@@ -8,9 +8,14 @@ import FullSizeImageModal from "./FullSizeImageModal";
 import FullPageSpinner from "./FullPageSpinner";
 import FileUploader from "./FileUploader";
 
-// We keep the TypeField, TagField, NameField from your common fields
+// We keep the TypeField, TagField, DescriptionField, CategoryField from your common fields
 // But remove any old "CurrencyInput" from there
-import { TypeField, TagField, NameField } from "./CommonFormFields";
+import {
+  TypeField,
+  TagField,
+  DescriptionField,
+  CategoryField,
+} from "./CommonFormFields";
 
 // Import your newly typed CurrencyInput
 import CurrencyInput from "./CurrencyInput";
@@ -21,6 +26,7 @@ import { FaArrowLeft } from "react-icons/fa";
 interface AddRecurringPageProps {
   recurringTags: string[];
   recurringTypes: string[];
+  categories: string[];
   addItem: (recurring: Recurring) => Promise<boolean>;
   loading: boolean;
 }
@@ -28,6 +34,7 @@ interface AddRecurringPageProps {
 function AddRecurringPage({
   recurringTags,
   recurringTypes,
+  categories,
   addItem,
   loading,
 }: AddRecurringPageProps) {
@@ -35,7 +42,8 @@ function AddRecurringPage({
   const navigate = useNavigate();
 
   const [type, setType] = useState("Expense");
-  const [name, setName] = useState("");
+  const [category, setCategory] = useState("");
+  const [description, setDescription] = useState("");
   const [tags, setTags] = useState<string[]>([]);
   // We'll store the typed string in local state, e.g. "$1,234.56"
   const [value, setValue] = useState("");
@@ -58,7 +66,7 @@ function AddRecurringPage({
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
 
-    if (!type || tags.length === 0 || !value) {
+    if (!type || !category || tags.length === 0 || !value) {
       alert("Type, at least one Tag, and Value are required.");
       return;
     }
@@ -91,7 +99,8 @@ function AddRecurringPage({
 
       const newRecurring: Recurring = {
         type,
-        name,
+        category,
+        description,
         tags,
         value: floatVal, // store float in DB
         editURL,
@@ -103,7 +112,8 @@ function AddRecurringPage({
       if (success) {
         // Reset form
         setType("Expense");
-        setName("");
+        setCategory("");
+        setDescription("");
         setTags([]);
         setValue("");
         setImageFiles([]);
@@ -134,7 +144,17 @@ function AddRecurringPage({
       <h2 className="mb-4">Add a Recurring Expense or Income</h2>
       <Form onSubmit={handleSubmit}>
         <Row>
-          <Col md={4}>
+          <Col md={8}>
+            <DescriptionField
+              value={description}
+              onChange={setDescription}
+              disabled={submitting}
+            />
+          </Col>
+        </Row>
+
+        <Row>
+          <Col xs={6}>
             <TypeField
               label="Type"
               typeValue={type}
@@ -144,14 +164,19 @@ function AddRecurringPage({
               required
             />
           </Col>
+          <Col xs={6}>
+            <CategoryField
+              categoryValue={category}
+              setCategoryValue={setCategory}
+              categories={categories}
+              disabled={submitting}
+              required
+            />
+          </Col>
         </Row>
 
-        <Col md={8}>
-          <NameField value={name} onChange={setName} disabled={submitting} />
-        </Col>
-
         <Row>
-          <Col md={6}>
+          <Col xs={6}>
             <TagField
               label="Tags"
               tags={tags}
@@ -161,12 +186,9 @@ function AddRecurringPage({
               required
             />
           </Col>
-        </Row>
-
-        <Row>
-          <Col md={4}>
+          <Col xs={6}>
             <Form.Group controlId="formValue" className="mb-3">
-              <Form.Label>Value</Form.Label>
+              <Form.Label>Amount</Form.Label>
               <CurrencyInput
                 value={value}
                 onChange={(e) => {
@@ -196,13 +218,15 @@ function AddRecurringPage({
           </Col>
         </Row>
 
-        <Button type="submit" variant="primary" disabled={submitting}>
-          {submitting ? (
-            <Spinner as="span" animation="border" size="sm" />
-          ) : (
-            "Add"
-          )}
-        </Button>
+        <div className="d-flex justify-content-end mt-3">
+          <Button type="submit" variant="primary" disabled={submitting}>
+            {submitting ? (
+              <Spinner as="span" animation="border" size="sm" />
+            ) : (
+              "Add"
+            )}
+          </Button>
+        </div>
       </Form>
 
       <FullSizeImageModal
