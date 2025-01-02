@@ -223,6 +223,7 @@ export function TagField({
       ))}
 
       <Button
+        className="mb-3"
         variant="outline-primary"
         onClick={handleAddNewTagField}
         disabled={disabled}

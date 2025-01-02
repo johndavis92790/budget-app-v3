@@ -1,9 +1,9 @@
 import { useEffect, useState } from "react";
-import { BrowserRouter as Router, Routes, Route, Link } from "react-router-dom";
+import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
+import { Container } from "react-bootstrap";
+
 import { FiscalWeek, History, Recurring } from "./types";
 import HistoryPage from "./HistoryPage";
-import { Navbar, Nav, Container } from "react-bootstrap";
-import { API_URL, mmddyyyyToYyyyMmDd } from "./helpers";
 import EditHistoryPage from "./EditHistoryPage";
 import AddRecurringPage from "./AddRecurringPage";
 import RecurringPage from "./RecurringPage";
@@ -12,6 +12,9 @@ import AddHistoryPage from "./AddHistoryPage";
 import HomePage from "./HomePage";
 import GoalsBanner from "./GoalsBanner";
 import FiscalCalendar from "./FiscalCalendar";
+
+import CustomNavBar from "./CustomNavBar"; // <-- Import our new Navbar
+import { API_URL, mmddyyyyToYyyyMmDd } from "./helpers";
 
 function App() {
   const [history, setHistory] = useState<History[]>([]);
@@ -26,6 +29,7 @@ function App() {
   );
   const [loading, setLoading] = useState<boolean>(true);
 
+  // Fetch the main data from your API
   const fetchData = async () => {
     setLoading(true);
     try {
@@ -35,21 +39,24 @@ function App() {
       }
       const data = await response.json();
       console.log(data);
+
       setHistory(
-        data.history.map((history: History, index: number) => ({
-          ...history,
-          value: Math.round(history.value * 100) / 100,
+        data.history.map((hist: History, index: number) => ({
+          ...hist,
+          value: Math.round(hist.value * 100) / 100,
           rowIndex: index + 2,
-          date: mmddyyyyToYyyyMmDd(history.date),
+          date: mmddyyyyToYyyyMmDd(hist.date),
         })),
       );
+
       setRecurring(
-        data.recurring.map((recurring: Recurring, index: number) => ({
-          ...recurring,
-          value: Math.round(recurring.value * 100) / 100,
+        data.recurring.map((rec: Recurring, index: number) => ({
+          ...rec,
+          value: Math.round(rec.value * 100) / 100,
           rowIndex: index + 2,
         })),
       );
+
       setCategories(data.categories || []);
       setNonRecurringTags(data.nonRecurringTags || []);
       setRecurringTags(data.recurringTags || []);
@@ -66,6 +73,7 @@ function App() {
     fetchData();
   }, []);
 
+  // Called when adding a new history or recurring item
   const addItem = async (newItem: History | Recurring) => {
     console.log("newItem", newItem);
     try {
@@ -89,6 +97,7 @@ function App() {
     }
   };
 
+  // Called when updating a history or recurring item
   const onUpdateItem = async (updatedItem: History | Recurring) => {
     try {
       console.log("updatedItem: ", updatedItem);
@@ -109,6 +118,7 @@ function App() {
     }
   };
 
+  // Updating goals
   const onUpdateGoal = async (
     itemType: "weeklyGoal" | "monthlyGoal",
     newValue: number,
@@ -119,14 +129,14 @@ function App() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ itemType, value: newValue }),
       });
-
-      // re-fetch data (which will update weeklyGoal and monthlyGoal)
+      // Re-fetch data (which updates weeklyGoal and monthlyGoal)
       await fetchData();
     } catch (err) {
       console.error("Error updating goal:", err);
     }
   };
 
+  // Called when deleting a history or recurring item
   const deleteItem = async (item: History | Recurring) => {
     console.log("item", item);
     try {
@@ -151,34 +161,16 @@ function App() {
   return (
     <div className="mb-5">
       <Router>
-        <Navbar bg="dark" variant="dark" expand="lg" className="mb-4">
-          <Container>
-            <Navbar.Brand as={Link} to="/">
-              Family Budget Tracker
-            </Navbar.Brand>
-            <Navbar.Toggle aria-controls="main-nav" />
-            <Navbar.Collapse id="main-nav">
-              <Nav className="me-auto">
-                <Nav.Link as={Link} to="/add-history">
-                  Add Expense/Refund
-                </Nav.Link>
-                <Nav.Link as={Link} to="/history">
-                  History
-                </Nav.Link>
-                <Nav.Link as={Link} to="/recurring">
-                  Recurring
-                </Nav.Link>
-              </Nav>
-            </Navbar.Collapse>
-          </Container>
-        </Navbar>
+        {/* Our new Navbar component */}
+        <CustomNavBar />
 
+        {/* Goals banner */}
         <GoalsBanner
           weeklyGoal={weeklyGoal}
           monthlyGoal={monthlyGoal}
-          loading={loading}
         />
 
+        {/* Main container with routes */}
         <Container>
           <Routes>
             <Route path="/" element={<HomePage loading={loading} />} />
@@ -246,6 +238,7 @@ function App() {
           </Routes>
         </Container>
 
+        {/* Fiscal calendar */}
         <FiscalCalendar fiscalWeeks={fiscalWeeks} history={history} />
       </Router>
     </div>

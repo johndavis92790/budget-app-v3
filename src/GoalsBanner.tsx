@@ -1,21 +1,51 @@
-import React from "react";
-import { Row, Col, Spinner } from "react-bootstrap";
+import { Row, Col } from "react-bootstrap";
+import FlipNumbers from "react-flip-numbers";
 
 interface GoalsBannerProps {
   weeklyGoal: number;
   monthlyGoal: number;
-  loading: boolean;
 }
 
-function formatCurrency(amount: number) {
-  return amount.toLocaleString("en-US", {
-    style: "currency",
-    currency: "USD",
-  });
-}
-
-function GoalsBanner({ weeklyGoal, monthlyGoal, loading }: GoalsBannerProps) {
+function GoalsBanner({ weeklyGoal, monthlyGoal }: GoalsBannerProps) {
   const borderRadius = "10px"; // Adjust based on your desired roundness
+
+  function getFlipValue(amount: number) {
+    return Math.abs(amount).toLocaleString("en-US", {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    });
+  }
+
+  function getStyles(amount: number) {
+    const isNegative = amount < 0;
+    return {
+      backgroundColor: isNegative ? "#f8d7da" : "#d4edda",
+      color: isNegative ? "#721c24" : "#155724",
+      borderColor: isNegative ? "#f5c2c7" : "#badbcc",
+    };
+  }
+
+  const weeklyStyles = getStyles(weeklyGoal);
+  const monthlyStyles = getStyles(monthlyGoal);
+
+  function renderGoalValue(amount: number, color: string) {
+    const isZero = amount === 0;
+    return (
+      <FlipNumbers
+        height={35}
+        width={20}
+        color={color}
+        background="transparent"
+        /** This triggers the flipping animation only if amount != 0 */
+        play={!isZero}
+        perspective={1000}
+        /** Increase duration to slow down the flipping animation: **/
+        duration={1.5} // e.g. 1.2 second flip duration
+        // delay={0.5}   // optional: 0.5s delay before the whole animation starts
+        numbers={getFlipValue(amount)}
+      />
+    );
+  }
 
   return (
     <div
@@ -27,49 +57,56 @@ function GoalsBanner({ weeklyGoal, monthlyGoal, loading }: GoalsBannerProps) {
         <Col
           className="text-center d-flex flex-column justify-content-center"
           style={{
-            backgroundColor: weeklyGoal < 0 ? "#f8d7da" : "#d4edda", // Red or green background
-            color: weeklyGoal < 0 ? "#721c24" : "#155724", // Red or green text
+            backgroundColor: weeklyStyles.backgroundColor,
+            color: weeklyStyles.color,
             padding: "20px",
-            borderLeft: `1px solid ${weeklyGoal < 0 ? "#f5c2c7" : "#badbcc"}`, // Matching border
-            borderTop: `1px solid ${weeklyGoal < 0 ? "#f5c2c7" : "#badbcc"}`, // Matching border
-            borderBottom: `1px solid ${weeklyGoal < 0 ? "#f5c2c7" : "#badbcc"}`, // Matching border
-            borderRight: "none", // Remove overlap with the adjacent border
-            borderRadius: `${borderRadius} 0 0 ${borderRadius}`, // Round left corners
+            borderLeft: `1px solid ${weeklyStyles.borderColor}`,
+            borderTop: `1px solid ${weeklyStyles.borderColor}`,
+            borderBottom: `1px solid ${weeklyStyles.borderColor}`,
+            borderRight: "none",
+            borderRadius: `${borderRadius} 0 0 ${borderRadius}`,
           }}
         >
           <h5>Weekly Spending Goal</h5>
-
-          {loading ? (
-            <p>
-              <Spinner as="span" animation="border" />
-            </p>
-          ) : (
-            <h1 className="fw-bold">{formatCurrency(weeklyGoal)}</h1>
-          )}
+          <h1
+            style={{
+              fontSize: "calc(1.375rem + 1.5vw)",
+              fontWeight: 700,
+            }}
+            className="d-flex justify-content-center align-items-center"
+          >
+            {weeklyGoal < 0 && <span style={{ marginRight: 4 }}>-</span>}
+            <span style={{ marginRight: 4 }}>$</span>
+            {renderGoalValue(weeklyGoal, weeklyStyles.color)}
+          </h1>
         </Col>
 
         {/* Monthly Goal */}
         <Col
           className="text-center d-flex flex-column justify-content-center"
           style={{
-            backgroundColor: monthlyGoal < 0 ? "#f8d7da" : "#d4edda", // Red or green background
-            color: monthlyGoal < 0 ? "#721c24" : "#155724", // Red or green text
+            backgroundColor: monthlyStyles.backgroundColor,
+            color: monthlyStyles.color,
             padding: "20px",
-            borderRight: `1px solid ${monthlyGoal < 0 ? "#f5c2c7" : "#badbcc"}`, // Matching border
-            borderTop: `1px solid ${monthlyGoal < 0 ? "#f5c2c7" : "#badbcc"}`, // Matching border
-            borderBottom: `1px solid ${monthlyGoal < 0 ? "#f5c2c7" : "#badbcc"}`, // Matching border
-            borderLeft: "none", // Remove overlap with the adjacent border
-            borderRadius: `0 ${borderRadius} ${borderRadius} 0`, // Round right corners
+            borderRight: `1px solid ${monthlyStyles.borderColor}`,
+            borderTop: `1px solid ${monthlyStyles.borderColor}`,
+            borderBottom: `1px solid ${monthlyStyles.borderColor}`,
+            borderLeft: "none",
+            borderRadius: `0 ${borderRadius} ${borderRadius} 0`,
           }}
         >
           <h5>Available Fiscal Monthly Funds</h5>
-          {loading ? (
-            <p>
-              <Spinner as="span" animation="border" />
-            </p>
-          ) : (
-            <h1 className="fw-bold">{formatCurrency(monthlyGoal)}</h1>
-          )}
+          <h1
+            style={{
+              fontSize: "calc(1.375rem + 1.5vw)",
+              fontWeight: 700,
+            }}
+            className="d-flex justify-content-center align-items-center"
+          >
+            {monthlyGoal < 0 && <span style={{ marginRight: 4 }}>-</span>}
+            <span style={{ marginRight: 4 }}>$</span>
+            {renderGoalValue(monthlyGoal, monthlyStyles.color)}
+          </h1>
         </Col>
       </Row>
     </div>
