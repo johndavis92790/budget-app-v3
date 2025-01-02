@@ -165,10 +165,7 @@ function App() {
         <CustomNavBar />
 
         {/* Goals banner */}
-        <GoalsBanner
-          weeklyGoal={weeklyGoal}
-          monthlyGoal={monthlyGoal}
-        />
+        <GoalsBanner weeklyGoal={weeklyGoal} monthlyGoal={monthlyGoal} />
 
         {/* Main container with routes */}
         <Container>

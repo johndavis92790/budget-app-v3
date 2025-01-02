@@ -2,8 +2,10 @@ import { onRequest } from "firebase-functions/v2/https";
 import { Request, Response } from "express";
 import { google } from "googleapis";
 
+// ---------------------- CONSTANTS & INTERFACES ----------------------
+
 const SPREADSHEET_ID = "1KROs_Swh-1zeQhLajtRw-E7DcYnJRMHEOXX5ECwTGSI";
-// const FRONTEND_URL = "https://budget-app-v3.web.app";
+
 const HISTORY_TABLE_NAME = "History";
 const HISTORY_FIRST_COLUMN = "A";
 const HISTORY_LAST_COLUMN = "L";
@@ -23,7 +25,6 @@ const FISCAL_WEEKS_RANGE = "Fiscal Weeks!A1:F";
 const FISCAL_MONTHS_RANGE = "Fiscal Months!A1:D";
 const FISCAL_YEARS_RANGE = "Fiscal Years!A1:D";
 
-// Interfaces
 interface FiscalYear {
   id: string;
   title: string;
@@ -55,252 +56,205 @@ interface IncomingObject {
   // ... other fields as needed
 }
 
-// Global variables to cache fiscal data
+// ---------------------- CACHED FISCAL DATA ----------------------
+
 let cachedFiscalYears: FiscalYear[] | null = null;
 let cachedFiscalMonths: FiscalMonth[] | null = null;
 let cachedFiscalWeeks: FiscalWeek[] | null = null;
 
-/**
- * Fetches and caches fiscal data if not already cached.
- *
- * @param {google.sheets_v4.Sheets} sheets - The Google Sheets API client.
- * @returns {Promise<void>}
- */
-async function fetchAndCacheFiscalData(sheets: any): Promise<void> {
-  if (cachedFiscalYears && cachedFiscalMonths && cachedFiscalWeeks) {
-    // Data already cached
-    return;
-  }
+// ---------------------- GENERAL HELPER FUNCTIONS ----------------------
 
-  // Fetch Fiscal Years
-  const fiscalYearRes = await sheets.spreadsheets.values.get({
+async function getSheetData(
+  sheets: any,
+  range: string,
+  removeHeader = true
+): Promise<any[]> {
+  const resp = await sheets.spreadsheets.values.get({
     spreadsheetId: SPREADSHEET_ID,
-    range: FISCAL_YEARS_RANGE,
+    range,
   });
+  const rows = resp.data.values || [];
+  return removeHeader ? rows.slice(1) : rows;
+}
 
-  const fiscalYearRows = fiscalYearRes.data.values || [];
-  fiscalYearRows.shift(); // Remove headers row
+function findRowIndexById(rows: any[], id: string, idColIndex: number): number {
+  return rows.findIndex((row) => row[idColIndex] === id);
+}
 
-  cachedFiscalYears = fiscalYearRows.map((row: any) => ({
+async function deleteRow(
+  sheets: any,
+  spreadsheetId: string,
+  sheetId: number,
+  rowIndex: number
+) {
+  await sheets.spreadsheets.batchUpdate({
+    spreadsheetId,
+    requestBody: {
+      requests: [
+        {
+          deleteDimension: {
+            range: {
+              sheetId,
+              dimension: "ROWS",
+              startIndex: rowIndex - 1,
+              endIndex: rowIndex,
+            },
+          },
+        },
+      ],
+    },
+  });
+}
+
+async function updateSingleCellGoal(
+  sheets: any,
+  range: string,
+  newGoalValue: number
+) {
+  // For both weeklyGoal & monthlyGoal
+  await sheets.spreadsheets.values.update({
+    spreadsheetId: SPREADSHEET_ID,
+    range,
+    valueInputOption: "USER_ENTERED",
+    requestBody: { values: [[newGoalValue]] },
+  });
+}
+
+async function appendDataToSheet(
+  sheets: any,
+  range: string,
+  rowValues: any[][]
+) {
+  await sheets.spreadsheets.values.append({
+    spreadsheetId: SPREADSHEET_ID,
+    range,
+    valueInputOption: "USER_ENTERED",
+    requestBody: { values: rowValues },
+  });
+}
+
+async function updateSheetRow(sheets: any, range: string, rowValues: any[][]) {
+  await sheets.spreadsheets.values.update({
+    spreadsheetId: SPREADSHEET_ID,
+    range,
+    valueInputOption: "USER_ENTERED",
+    requestBody: { values: rowValues },
+  });
+}
+
+function parseCellValue(cellVal: string | undefined): number {
+  if (!cellVal) return 0;
+  return parseFloat(cellVal.replace(/[^0-9.-]/g, "")) || 0;
+}
+
+function convertToMMDDYYYY(isoDateStr: string): string {
+  const [yyyy, mm, dd] = isoDateStr.split("-");
+  return `${parseInt(mm, 10)}/${parseInt(dd, 10)}/${yyyy}`;
+}
+
+function isExpenseType(type: string) {
+  return type === "Expense" || type === "Recurring Expense";
+}
+
+// ---------------------- FISCAL HELPERS ----------------------
+
+async function fetchAndCacheFiscalData(sheets: any): Promise<void> {
+  if (cachedFiscalYears && cachedFiscalMonths && cachedFiscalWeeks) return;
+
+  const [fyRows, fmRows, fwRows] = await Promise.all([
+    getSheetData(sheets, FISCAL_YEARS_RANGE),
+    getSheetData(sheets, FISCAL_MONTHS_RANGE),
+    getSheetData(sheets, FISCAL_WEEKS_RANGE),
+  ]);
+
+  cachedFiscalYears = fyRows.map((row) => ({
     id: row[0],
     title: row[1],
     start_date: row[2],
     end_date: row[3],
-    itemType: "fiscalYear",
+    itemType: "fiscalYear" as const,
   }));
 
-  // Fetch Fiscal Months
-  const fiscalMonthRes = await sheets.spreadsheets.values.get({
-    spreadsheetId: SPREADSHEET_ID,
-    range: FISCAL_MONTHS_RANGE,
-  });
-
-  const fiscalMonthRows = fiscalMonthRes.data.values || [];
-  fiscalMonthRows.shift(); // Remove headers row
-
-  cachedFiscalMonths = fiscalMonthRows.map((row: any) => ({
+  cachedFiscalMonths = fmRows.map((row) => ({
     id: row[0],
     start_date: row[1],
     end_date: row[2],
     year_title: row[3],
-    itemType: "fiscalMonth",
+    itemType: "fiscalMonth" as const,
   }));
 
-  // Fetch Fiscal Weeks
-  const fiscalWeekRes = await sheets.spreadsheets.values.get({
-    spreadsheetId: SPREADSHEET_ID,
-    range: FISCAL_WEEKS_RANGE,
-  });
-
-  const fiscalWeekRows = fiscalWeekRes.data.values || [];
-  fiscalWeekRows.shift(); // Remove headers row
-
-  cachedFiscalWeeks = fiscalWeekRows.map((row: any) => ({
+  cachedFiscalWeeks = fwRows.map((row) => ({
     id: row[0],
     number: row[1],
     start_date: row[2],
     end_date: row[3],
     year_title: row[4],
     month_id: row[5],
-    itemType: "fiscalWeek",
+    itemType: "fiscalWeek" as const,
   }));
 }
 
-/**
- * Determines if a given fiscal week ID matches the current date's fiscal week ID.
- *
- * @param {string} fiscalWeekId - The fiscal week ID to check.
- * @param {google.sheets_v4.Sheets} sheets - The Google Sheets API client.
- * @returns {Promise<boolean>} - True if the given fiscal week ID matches the current date's fiscal week ID.
- */
-async function isSameFiscalWeekById(
-  fiscalWeekId: string,
-  sheets: any
-): Promise<boolean> {
-  try {
-    // Fetch Fiscal Weeks data
-    const { data: { values: fiscalWeekRows = [] } = {} } =
-      await sheets.spreadsheets.values.get({
-        spreadsheetId: SPREADSHEET_ID,
-        range: FISCAL_WEEKS_RANGE,
-      });
-
-    if (fiscalWeekRows.length <= 1) {
-      throw new Error("No fiscal week data available.");
-    }
-
-    // Remove headers row
-    const dataRows = fiscalWeekRows.slice(1);
-
-    // Find the row matching the given fiscal week ID
-    const matchingRow = dataRows.find((row: any) => fiscalWeekId === row[0]);
-
-    if (!matchingRow) {
-      throw new Error("No matching fiscal week found for the provided ID.");
-    }
-
-    // Return true if the given fiscal week ID matches the found row's fiscal week ID
-    return fiscalWeekId === matchingRow[0];
-  } catch (error) {
-    console.error("Error in isSameFiscalWeekById:", error);
-    throw error;
-  }
-}
-
-/**
- * Determines if a given fiscal month ID matches the current date's fiscal month ID.
- *
- * @param {string} fiscalMonthId - The fiscal month ID to check.
- * @param {google.sheets_v4.Sheets} sheets - The Google Sheets API client.
- * @returns {Promise<boolean>} - True if the given fiscal month ID matches the current date's fiscal month ID.
- */
-async function isSameFiscalMonthById(
-  fiscalMonthId: string,
-  sheets: any
-): Promise<boolean> {
-  try {
-    // Fetch Fiscal Months data
-    const { data: { values: fiscalMonthRows = [] } = {} } =
-      await sheets.spreadsheets.values.get({
-        spreadsheetId: SPREADSHEET_ID,
-        range: FISCAL_MONTHS_RANGE,
-      });
-
-    if (fiscalMonthRows.length <= 1) {
-      throw new Error("No fiscal month data available.");
-    }
-
-    // Remove headers row
-    const dataRows = fiscalMonthRows.slice(1);
-
-    // Find the row matching the given fiscal month ID
-    const matchingRow = dataRows.find((row: any) => fiscalMonthId === row[0]);
-
-    if (!matchingRow) {
-      throw new Error("No matching fiscal month found for the provided ID.");
-    }
-
-    // Return true if the given fiscal month ID matches the found row's fiscal month ID
-    return fiscalMonthId === matchingRow[0];
-  } catch (error) {
-    console.error("Error in isSameFiscalMonthById:", error);
-    throw error;
-  }
-}
-
-/**
- * Calculates the associated fiscal year, month, and week IDs for a given date.
- *
- * @param {IncomingObject} item - The incoming object containing the date.
- * @param {FiscalYear[]} fiscalYears - Array of fiscal year data.
- * @param {FiscalMonth[]} fiscalMonths - Array of fiscal month data.
- * @param {FiscalWeek[]} fiscalWeeks - Array of fiscal week data.
- * @returns {{
- *   fiscalYearId: string;
- *   fiscalMonthId: string;
- *   fiscalWeekId: string;
- * } | null} - An object containing the fiscal IDs or null if not found.
- */
 function getFiscalIDs(
   item: IncomingObject,
   fiscalYears: FiscalYear[],
   fiscalMonths: FiscalMonth[],
   fiscalWeeks: FiscalWeek[]
-): {
-  fiscalYearId: string;
-  fiscalMonthId: string;
-  fiscalWeekId: string;
-} | null {
-  const { date: dateStr } = item;
-
-  // Helper function to parse date strings
-  const parseDate = (dateStr: string): Date | null => {
-    const date = new Date(dateStr);
-    return isNaN(date.getTime()) ? null : date;
-  };
-
-  const date = parseDate(dateStr);
-  if (!date) {
-    console.error(`Invalid date format: ${dateStr}`);
+) {
+  const date = new Date(item.date);
+  if (isNaN(date.getTime())) {
+    console.error(`Invalid date: ${item.date}`);
     return null;
   }
-
-  // Find Fiscal Year
-  const fiscalYear = fiscalYears.find((year) => {
+  const fy = fiscalYears.find((year) => {
     const start = new Date(year.start_date);
     const end = new Date(year.end_date);
     return date >= start && date <= end;
   });
-
-  if (!fiscalYear) {
-    console.error(`No Fiscal Year found for date: ${dateStr}`);
+  if (!fy) {
+    console.error("No Fiscal Year found for date:", item.date);
     return null;
   }
-
-  // Find Fiscal Month
-  const fiscalMonth = fiscalMonths.find((month) => {
-    if (month.year_title !== fiscalYear.title) return false;
+  const fm = fiscalMonths.find((month) => {
+    if (month.year_title !== fy.title) return false;
     const start = new Date(month.start_date);
     const end = new Date(month.end_date);
     return date >= start && date <= end;
   });
-
-  if (!fiscalMonth) {
-    console.error(
-      `No Fiscal Month found for date: ${dateStr} within Fiscal Year: ${fiscalYear.title}`
-    );
+  if (!fm) {
+    console.error("No Fiscal Month found for date:", item.date);
     return null;
   }
-
-  // Find Fiscal Week
-  const fiscalWeek = fiscalWeeks.find((week) => {
-    if (week.year_title !== fiscalYear.title) return false;
-    if (week.month_id !== fiscalMonth.id) return false;
+  const fw = fiscalWeeks.find((week) => {
+    if (week.year_title !== fy.title || week.month_id !== fm.id) return false;
     const start = new Date(week.start_date);
     const end = new Date(week.end_date);
     return date >= start && date <= end;
   });
-
-  if (!fiscalWeek) {
-    console.error(
-      `No Fiscal Week found for date: ${dateStr} within Fiscal Year: ${fiscalYear.title} and Fiscal Month ID: ${fiscalMonth.id}`
-    );
+  if (!fw) {
+    console.error("No Fiscal Week found for date:", item.date);
     return null;
   }
-
   return {
-    fiscalYearId: fiscalYear.id,
-    fiscalMonthId: fiscalMonth.id,
-    fiscalWeekId: fiscalWeek.id,
+    fiscalYearId: fy.id,
+    fiscalMonthId: fm.id,
+    fiscalWeekId: fw.id,
   };
 }
 
-/**
- * Converts an array of objects to an object indexed by the 'id' property.
- *
- * @param {any[]} arr - The array to convert.
- * @returns {Record<string, any>} - The resulting object.
- */
+async function isSameFiscalWeekById(fiscalWeekId: string, sheets: any) {
+  const allRows = await getSheetData(sheets, FISCAL_WEEKS_RANGE);
+  const found = allRows.find((row) => row[0] === fiscalWeekId);
+  if (!found) throw new Error("No matching fiscal week found.");
+  return true;
+}
+
+async function isSameFiscalMonthById(fiscalMonthId: string, sheets: any) {
+  const allRows = await getSheetData(sheets, FISCAL_MONTHS_RANGE);
+  const found = allRows.find((row) => row[0] === fiscalMonthId);
+  if (!found) throw new Error("No matching fiscal month found.");
+  return true;
+}
+
 function convertArrayToObjectById(arr: any[]): Record<string, any> {
   return arr.reduce(
     (obj, item) => {
@@ -311,6 +265,632 @@ function convertArrayToObjectById(arr: any[]): Record<string, any> {
     {} as Record<string, any>
   );
 }
+
+// ---------------------- TAGS HELPER ----------------------
+
+async function addMissingTags(
+  sheets: any,
+  tags: string[],
+  isRecurring: boolean
+) {
+  if (!tags || tags.length === 0) return;
+
+  const listsRows = await getSheetData(sheets, METADATA_RANGE, false);
+  const dataRows = listsRows.slice(1);
+  const colIndex = isRecurring ? 2 : 1;
+  const existingTags = dataRows
+    .map((row) => (row[colIndex] ? row[colIndex].trim() : ""))
+    .filter(Boolean);
+
+  const newTags = tags.filter((tag) => !existingTags.includes(tag));
+  if (newTags.length === 0) return;
+
+  const rowsToAppend = newTags.map((tag) =>
+    isRecurring ? ["", "", tag] : ["", tag, ""]
+  );
+  await appendDataToSheet(sheets, METADATA_RANGE, rowsToAppend);
+}
+
+// ---------------------- GOAL ADJUSTMENT HELPER ----------------------
+
+async function adjustGoalIfSameFiscalPeriod(
+  sheets: any,
+  oldValue: number,
+  newValue: number,
+  itemType: string,
+  fiscalWeekId: string | null,
+  fiscalMonthId: string | null
+) {
+  // If the item type indicates an Expense, we typically invert the difference for goals
+  // if it’s positive vs. negative. We replicate the step-by-step from your original code.
+  if (fiscalWeekId) {
+    try {
+      const sameWeek = await isSameFiscalWeekById(fiscalWeekId, sheets);
+      if (sameWeek) {
+        const wgData = await sheets.spreadsheets.values.get({
+          spreadsheetId: SPREADSHEET_ID,
+          range: WEEKLY_GOAL_RANGE,
+        });
+        const rawWG = wgData.data.values?.[0]?.[0] || "0";
+        let weeklyGoal = parseFloat(rawWG.replace(/[^0-9.-]/g, ""));
+
+        if (newValue > oldValue) {
+          const difference = newValue - oldValue;
+          weeklyGoal = isExpenseType(itemType)
+            ? weeklyGoal - difference
+            : weeklyGoal + difference;
+        } else if (newValue < oldValue) {
+          const difference = oldValue - newValue;
+          weeklyGoal = isExpenseType(itemType)
+            ? weeklyGoal + difference
+            : weeklyGoal - difference;
+        }
+        await updateSingleCellGoal(sheets, WEEKLY_GOAL_RANGE, weeklyGoal);
+      }
+    } catch (err) {
+      console.error("[adjustGoalIfSameFiscalPeriod-week] error:", err);
+    }
+  }
+
+  if (fiscalMonthId) {
+    try {
+      const sameMonth = await isSameFiscalMonthById(fiscalMonthId, sheets);
+      if (sameMonth) {
+        const mgData = await sheets.spreadsheets.values.get({
+          spreadsheetId: SPREADSHEET_ID,
+          range: MONTHLY_GOAL_RANGE,
+        });
+        const rawMG = mgData.data.values?.[0]?.[0] || "0";
+        let monthlyGoal = parseFloat(rawMG.replace(/[^0-9.-]/g, ""));
+
+        if (newValue > oldValue) {
+          const difference = newValue - oldValue;
+          monthlyGoal = isExpenseType(itemType)
+            ? monthlyGoal - difference
+            : monthlyGoal + difference;
+        } else if (newValue < oldValue) {
+          const difference = oldValue - newValue;
+          monthlyGoal = isExpenseType(itemType)
+            ? monthlyGoal + difference
+            : monthlyGoal - difference;
+        }
+        await updateSingleCellGoal(sheets, MONTHLY_GOAL_RANGE, monthlyGoal);
+      }
+    } catch (err) {
+      console.error("[adjustGoalIfSameFiscalPeriod-month] error:", err);
+    }
+  }
+}
+
+// ---------------------- MULTI-PURPOSE ITEM HELPERS ----------------------
+/**
+ * Insert either a "history" or "recurring" item into the correct range,
+ * making sure we:
+ * 1) Validate fields
+ * 2) Insert missing tags
+ * 3) Convert date to MM/DD/YYYY if "history" item
+ * 4) Append the row
+ */
+async function insertItem(
+  sheets: any,
+  data: any,
+  itemType: "history" | "recurring"
+) {
+  // itemType affects which range, which columns, and which tags column (isRecurring).
+  const isRecurring = itemType === "recurring";
+  const range = isRecurring ? RECURRING_RANGE : HISTORY_RANGE;
+
+  await addMissingTags(sheets, data.tags, isRecurring);
+
+  // For History only: we need the date in MM/DD/YYYY.
+  const dateFormatted = !isRecurring ? convertToMMDDYYYY(data.date) : "";
+  const hyperlinkFormula = `=HYPERLINK("${data.editURL}", "Edit")`;
+
+  // Build a row consistent with your original structure
+  if (isRecurring) {
+    // columns: type, category, tags, value, desc, editURL, hyperlink, id
+    await appendDataToSheet(sheets, range, [
+      [
+        data.type,
+        data.category,
+        data.tags.join(", "),
+        data.value,
+        data.description || "",
+        data.editURL,
+        hyperlinkFormula,
+        data.id,
+      ],
+    ]);
+  } else {
+    // columns: date, type, category, tags, value, desc, editURL, hyperlink, id, fy, fm, fw
+    await appendDataToSheet(sheets, range, [
+      [
+        dateFormatted,
+        data.type,
+        data.category,
+        data.tags.join(", "),
+        data.value,
+        data.description || "",
+        data.editURL,
+        hyperlinkFormula,
+        data.id,
+        data.fiscalYearId,
+        data.fiscalMonthId,
+        data.fiscalWeekId,
+      ],
+    ]);
+  }
+}
+
+/**
+ * Updates an existing "history" or "recurring" item in the correct row and columns.
+ */
+async function updateItem(
+  sheets: any,
+  data: any,
+  itemType: "history" | "recurring"
+) {
+  const isRecurring = itemType === "recurring";
+  const rangeBase = isRecurring ? RECURRING_TABLE_NAME : HISTORY_TABLE_NAME;
+  const firstCol = isRecurring ? RECURRING_FIRST_COLUMN : HISTORY_FIRST_COLUMN;
+  const lastCol = isRecurring ? RECURRING_LAST_COLUMN : HISTORY_LAST_COLUMN;
+  const rowIndex = data.rowIndex;
+  const rowRange = `${rangeBase}!${firstCol}${rowIndex}:${lastCol}${rowIndex}`;
+
+  const existingRes = await sheets.spreadsheets.values.get({
+    spreadsheetId: SPREADSHEET_ID,
+    range: rowRange,
+  });
+  const existingRow = existingRes.data.values?.[0];
+  if (!existingRow) {
+    throw new Error(`${itemType} item not found at rowIndex ${rowIndex}`);
+  }
+
+  // For history: existingId is in col 8, for recurring: col 7
+  const idColIndex = isRecurring ? 7 : 8;
+  const existingId = existingRow[idColIndex];
+  if (!existingId) {
+    throw new Error(`ID not found in the existing ${itemType} row.`);
+  }
+
+  // Insert new tags, if any
+  await addMissingTags(sheets, data.tags, isRecurring);
+
+  // Build our updated row
+  const hyperlinkFormula = `=HYPERLINK("${existingRow[isRecurring ? 5 : 6]}", "Edit")`;
+
+  if (isRecurring) {
+    // columns: type, category, tags, value, desc, editURL, hyperlink, id
+    const tagsStr = data.tags.join(", ");
+    await updateSheetRow(sheets, rowRange, [
+      [
+        data.type,
+        data.category,
+        tagsStr,
+        data.value,
+        data.description,
+        existingRow[5], // preserve existing editURL
+        hyperlinkFormula,
+        existingId,
+      ],
+    ]);
+  } else {
+    // columns: date, type, category, tags, value, desc, editURL, hyperlink, id
+    const dateFormatted = convertToMMDDYYYY(data.date);
+    const tagsStr = data.tags.join(", ");
+    await updateSheetRow(sheets, rowRange, [
+      [
+        dateFormatted,
+        data.type,
+        data.category,
+        tagsStr,
+        data.value,
+        data.description || "",
+        existingRow[6], // preserve existing editURL
+        hyperlinkFormula,
+        existingId,
+      ],
+    ]);
+  }
+
+  return existingRow; // so we can compare originalValue, etc.
+}
+
+/**
+ * Delete item from either the "history" or "recurring" table by ID.
+ */
+async function deleteItem(
+  sheets: any,
+  itemType: "history" | "recurring",
+  id: string
+) {
+  // Step 1) Fetch the correct sheet ID
+  const spreadsheetRes = await sheets.spreadsheets.get({
+    spreadsheetId: SPREADSHEET_ID,
+  });
+  const tableName =
+    itemType === "history" ? HISTORY_TABLE_NAME : RECURRING_TABLE_NAME;
+  const tableSheet = spreadsheetRes.data.sheets?.find(
+    (sh: any) => sh.properties?.title === tableName
+  );
+  if (!tableSheet || !tableSheet.properties?.sheetId) {
+    throw new Error(`Failed to retrieve sheetId for ${tableName}.`);
+  }
+
+  // Step 2) Fetch all rows, find the ID
+  const rangeAll = itemType === "history" ? HISTORY_RANGE : RECURRING_RANGE;
+  const rowsAll = await getSheetData(sheets, rangeAll, false);
+  rowsAll.shift(); // remove header
+  // ID col is 8 for history, 7 for recurring
+  const idColIndex = itemType === "history" ? 8 : 7;
+  const rowIndex = findRowIndexById(rowsAll, id, idColIndex);
+  if (rowIndex === -1) {
+    throw new Error(`${itemType} item with ID ${id} not found.`);
+  }
+  // Google Sheets is 1-based, plus we removed header => +2
+  const deleteRowIndex = rowIndex + 2;
+
+  await deleteRow(
+    sheets,
+    SPREADSHEET_ID,
+    tableSheet.properties.sheetId,
+    deleteRowIndex
+  );
+}
+
+// ---------------------- HANDLERS BY HTTP METHOD ----------------------
+
+async function handleGET(sheets: any, req: Request, res: Response) {
+  // 1) History
+  const historyRows = await getSheetData(sheets, HISTORY_RANGE);
+  const historyData = historyRows.map((row) => ({
+    date: row[0],
+    type: row[1],
+    category: row[2],
+    tags: row[3]
+      ?.split(",")
+      .map((t: string) => t.trim())
+      .filter(Boolean),
+    value: parseCellValue(row[4]),
+    description: row[5],
+    editURL: row[6] || "",
+    id: row[8] || "",
+    fiscalYearId: row[9],
+    fiscalMonthId: row[10],
+    fiscalWeekId: row[11],
+    itemType: "history",
+  }));
+
+  // 2) Recurring
+  const recurringRows = await getSheetData(sheets, RECURRING_RANGE);
+  const recurringData = recurringRows.map((row) => ({
+    type: row[0],
+    category: row[1],
+    tags: row[2]
+      ?.split(",")
+      .map((t: string) => t.trim())
+      .filter(Boolean),
+    value: parseCellValue(row[3]),
+    description: row[4],
+    editURL: row[5] || "",
+    id: row[7] || "",
+    itemType: "recurring",
+  }));
+
+  // 3) Categories & tags
+  const listsAll = await getSheetData(sheets, METADATA_RANGE, false);
+  const listsRows = listsAll.slice(1);
+  const categories = listsRows.map((row) => row[0]).filter(Boolean);
+  const nonRecurringTags = listsRows.map((row) => row[1]).filter(Boolean);
+  const recurringTags = listsRows.map((row) => row[2]).filter(Boolean);
+
+  // 4) Weekly & Monthly Goals
+  const [wgResp, mgResp] = await Promise.all([
+    sheets.spreadsheets.values.get({
+      spreadsheetId: SPREADSHEET_ID,
+      range: WEEKLY_GOAL_RANGE,
+    }),
+    sheets.spreadsheets.values.get({
+      spreadsheetId: SPREADSHEET_ID,
+      range: MONTHLY_GOAL_RANGE,
+    }),
+  ]);
+  const weeklyGoalRaw = wgResp.data.values?.[0]?.[0] || "0";
+  const monthlyGoalRaw = mgResp.data.values?.[0]?.[0] || "0";
+  const weeklyGoal = parseFloat(weeklyGoalRaw.replace(/[^0-9.-]/g, ""));
+  const monthlyGoal = parseFloat(monthlyGoalRaw.replace(/[^0-9.-]/g, ""));
+
+  // 5) Fiscal Data (Weeks, Months, Years)
+  // We already fetched them in fetchAndCacheFiscalData, but we also fetch them specifically
+  // for local usage. Or we can reuse the cached data directly.
+  let fiscalWeekData = (await getSheetData(sheets, FISCAL_WEEKS_RANGE)).map(
+    (row) => ({
+      id: row[0],
+      number: row[1],
+      start_date: row[2],
+      end_date: row[3],
+      year_title: row[4],
+      month_id: row[5],
+      itemType: "fiscalWeek",
+    })
+  );
+  let fiscalMonthData = (await getSheetData(sheets, FISCAL_MONTHS_RANGE)).map(
+    (row) => ({
+      id: row[0],
+      start_date: row[1],
+      end_date: row[2],
+      year_title: row[3],
+      itemType: "fiscalMonth",
+    })
+  );
+  let fiscalYearData = (await getSheetData(sheets, FISCAL_YEARS_RANGE)).map(
+    (row) => ({
+      id: row[0],
+      title: row[1],
+      start_date: row[2],
+      end_date: row[3],
+      itemType: "fiscalYear",
+    })
+  );
+
+  // Filter +/- 365 days
+  const parseDate = (d: string) => {
+    const dt = new Date(d);
+    return isNaN(dt.getTime()) ? null : dt;
+  };
+  const oneYearFromToday = new Date();
+  oneYearFromToday.setDate(oneYearFromToday.getDate() + 365);
+  const oneYearBeforeToday = new Date();
+  oneYearBeforeToday.setDate(oneYearBeforeToday.getDate() - 365);
+
+  const filterByStartDate = (data: any[]) =>
+    data.filter((item) => {
+      const startDate = parseDate(item.start_date);
+      return (
+        startDate &&
+        startDate >= oneYearBeforeToday &&
+        startDate <= oneYearFromToday
+      );
+    });
+
+  fiscalWeekData = filterByStartDate(fiscalWeekData);
+  fiscalMonthData = filterByStartDate(fiscalMonthData);
+  fiscalYearData = filterByStartDate(fiscalYearData);
+
+  const fiscalWeeksObj = convertArrayToObjectById(fiscalWeekData);
+  const fiscalMonthsObj = convertArrayToObjectById(fiscalMonthData);
+  const fiscalYearsObj = convertArrayToObjectById(fiscalYearData);
+
+  res.status(200).json({
+    history: historyData,
+    recurring: recurringData,
+    weeklyGoal,
+    monthlyGoal,
+    categories,
+    nonRecurringTags,
+    recurringTags,
+    fiscalWeeks: fiscalWeeksObj,
+    fiscalMonths: fiscalMonthsObj,
+    fiscalYears: fiscalYearsObj,
+  });
+}
+
+async function handlePOST(sheets: any, req: Request, res: Response) {
+  const data = req.body;
+  const itemType = data.itemType; // "history", "recurring", etc.
+
+  if (itemType === "history") {
+    if (
+      !data.date ||
+      !data.type ||
+      typeof data.category !== "string" ||
+      !Array.isArray(data.tags) ||
+      typeof data.value !== "number" ||
+      !data.id
+    ) {
+      res.status(400).json({ error: "Missing or invalid required fields" });
+      return;
+    }
+
+    // Ensure valid fiscal
+    const fiscalIDs = getFiscalIDs(
+      data,
+      cachedFiscalYears!,
+      cachedFiscalMonths!,
+      cachedFiscalWeeks!
+    );
+    if (!fiscalIDs) {
+      res
+        .status(400)
+        .json({ error: "Invalid date or no matching fiscal period." });
+      return;
+    }
+    // Merge them into data so insertItem can place them in columns
+    Object.assign(data, fiscalIDs);
+
+    // Insert the history item
+    await insertItem(sheets, data, "history");
+    res.status(200).json({ status: "success", id: data.id, fiscalIDs });
+    return;
+  }
+
+  if (itemType === "recurring") {
+    if (
+      !data.type ||
+      typeof data.category !== "string" ||
+      !Array.isArray(data.tags) ||
+      typeof data.value !== "number" ||
+      !data.id
+    ) {
+      res.status(400).json({ error: "Missing or invalid required fields" });
+      return;
+    }
+
+    await insertItem(sheets, data, "recurring");
+    res.status(200).json({ status: "success", id: data.id });
+    return;
+  }
+
+  res.status(400).json({ error: "Missing or invalid itemType" });
+}
+
+async function handlePUT(sheets: any, req: Request, res: Response) {
+  const data = req.body;
+
+  switch (data.itemType) {
+    case "history": {
+      if (
+        !data.rowIndex ||
+        !data.date ||
+        !data.type ||
+        typeof data.category !== "string" ||
+        !Array.isArray(data.tags) ||
+        typeof data.value !== "number" ||
+        !data.id
+      ) {
+        res.status(400).json({ error: "Missing or invalid required fields" });
+        return;
+      }
+
+      // 1) Update item
+      const existingRow = await updateItem(sheets, data, "history");
+
+      // 2) If value changed, adjust goals
+      const rawOriginalValue = existingRow[4];
+      const originalValue = parseCellValue(rawOriginalValue);
+      if (data.value !== originalValue) {
+        await adjustGoalIfSameFiscalPeriod(
+          sheets,
+          originalValue,
+          data.value,
+          data.type,
+          data.fiscalWeekId,
+          data.fiscalMonthId
+        );
+      }
+      break;
+    }
+
+    case "recurring": {
+      if (
+        !data.rowIndex ||
+        !data.type ||
+        typeof data.category !== "string" ||
+        !Array.isArray(data.tags) ||
+        typeof data.value !== "number" ||
+        !data.description ||
+        !data.id
+      ) {
+        res.status(400).json({ error: "Missing or invalid required fields" });
+        return;
+      }
+      await updateItem(sheets, data, "recurring");
+      break;
+    }
+
+    case "weeklyGoal": {
+      if (typeof data.value !== "number") {
+        res.status(400).json({ error: "Missing or invalid goal" });
+        return;
+      }
+      await updateSingleCellGoal(sheets, WEEKLY_GOAL_RANGE, data.value);
+      break;
+    }
+
+    case "monthlyGoal": {
+      if (typeof data.value !== "number") {
+        res.status(400).json({ error: "Missing or invalid goal" });
+        return;
+      }
+      await updateSingleCellGoal(sheets, MONTHLY_GOAL_RANGE, data.value);
+      break;
+    }
+
+    default:
+      res.status(400).json({ error: "Invalid or missing itemType" });
+      return;
+  }
+
+  if (data.itemType === "history" || data.itemType === "recurring") {
+    // We can retrieve the existing ID if we like, but we have it on `data.id`.
+    res.status(200).json({ status: "success", id: data.id });
+  } else {
+    res.status(200).json({ status: "success" });
+  }
+}
+
+async function handleDELETE(sheets: any, req: Request, res: Response) {
+  const data = req.body;
+  const id = data.id;
+  if (!id) {
+    res.status(400).json({ error: "Missing id field in request body." });
+    return;
+  }
+
+  try {
+    if (data.itemType === "history") {
+      // 1) Delete from the History table
+      await deleteItem(sheets, "history", id);
+
+      // 2) If numeric value was provided, do goal adjustments
+      if (typeof data.value !== "number") {
+        res.status(400).json({ error: "Missing or invalid value" });
+        return;
+      }
+      // same logic from your code
+      try {
+        const sameWeek = await isSameFiscalWeekById(data.fiscalWeekId, sheets);
+        if (sameWeek) {
+          const wgData = await sheets.spreadsheets.values.get({
+            spreadsheetId: SPREADSHEET_ID,
+            range: WEEKLY_GOAL_RANGE,
+          });
+          const rawWG = wgData.data.values?.[0]?.[0] || "0";
+          let weeklyGoal = parseFloat(rawWG.replace(/[^0-9.-]/g, ""));
+          weeklyGoal = isExpenseType(data.type)
+            ? weeklyGoal + data.value
+            : weeklyGoal - data.value;
+          await updateSingleCellGoal(sheets, WEEKLY_GOAL_RANGE, weeklyGoal);
+        }
+      } catch (err) {
+        console.error("Error adjusting weekly goal in DELETE:", err);
+      }
+
+      try {
+        const sameMonth = await isSameFiscalMonthById(
+          data.fiscalMonthId,
+          sheets
+        );
+        if (sameMonth) {
+          const mgData = await sheets.spreadsheets.values.get({
+            spreadsheetId: SPREADSHEET_ID,
+            range: MONTHLY_GOAL_RANGE,
+          });
+          const rawMG = mgData.data.values?.[0]?.[0] || "0";
+          let monthlyGoal = parseFloat(rawMG.replace(/[^0-9.-]/g, ""));
+          monthlyGoal = isExpenseType(data.type)
+            ? monthlyGoal + data.value
+            : monthlyGoal - data.value;
+          await updateSingleCellGoal(sheets, MONTHLY_GOAL_RANGE, monthlyGoal);
+        }
+      } catch (err) {
+        console.error("Error adjusting monthly goal in DELETE:", err);
+      }
+
+      res.status(200).json({ status: "success", id });
+    } else if (data.itemType === "recurring") {
+      await deleteItem(sheets, "recurring", id);
+      res.status(200).json({ status: "success", id });
+    } else {
+      res.status(400).json({ error: "Missing or invalid itemType" });
+    }
+  } catch (error) {
+    console.error("Error deleting item:", error);
+    res.status(500).json({ error: "Internal Server Error" });
+  }
+}
+
+// ---------------------- MAIN CLOUD FUNCTION ----------------------
 
 export const expenses = onRequest(
   {
@@ -346,980 +926,28 @@ export const expenses = onRequest(
     }
 
     try {
-      // Fetch and cache fiscal data
+      // Ensure we have our cached fiscal data
       await fetchAndCacheFiscalData(sheets);
 
-      //-------------------------GET----------------------------------------------------
-      if (req.method === "GET") {
-        // Get history
-        const historyRes = await sheets.spreadsheets.values.get({
-          spreadsheetId: SPREADSHEET_ID,
-          range: HISTORY_RANGE,
-        });
-
-        const historyRows = historyRes.data.values || [];
-        historyRows.shift(); // Remove headers row
-
-        // Indices in History: A=0,B=1,C=2,D=3,E=4,F=5,G=6,H=7,I=8,J=9,K=10,L=11
-        const historyData = historyRows.map((row) => {
-          const rawValue = row[4];
-          const value = rawValue
-            ? parseFloat(rawValue.replace(/[^0-9.-]/g, ""))
-            : 0;
-
-          return {
-            date: row[0],
-            type: row[1],
-            category: row[2],
-            tags: row[3]
-              .split(",")
-              .map((t: string) => t.trim())
-              .filter(Boolean),
-            value,
-            description: row[5],
-            editURL: row[6] || "",
-            id: row[8] || "",
-            fiscalYearId: row[9],
-            fiscalMonthId: row[10],
-            fiscalWeekId: row[11],
-            itemType: "history",
-          };
-        });
-
-        // Get recurring
-        const recurringRes = await sheets.spreadsheets.values.get({
-          spreadsheetId: SPREADSHEET_ID,
-          range: RECURRING_RANGE,
-        });
-
-        const recurringRows = recurringRes.data.values || [];
-        recurringRows.shift(); // Remove headers row
-
-        // Indices in Recurring: A=0,B=1,C=2,D=3,E=4,F=5,G=6,H=7
-        const recurringData = recurringRows.map((row) => {
-          const rawValue = row[3];
-          const value = rawValue
-            ? parseFloat(rawValue.replace(/[^0-9.-]/g, ""))
-            : 0;
-
-          return {
-            type: row[0],
-            category: row[1],
-            tags: row[2]
-              .split(",")
-              .map((t: string) => t.trim())
-              .filter(Boolean),
-            value,
-            description: row[4],
-            editURL: row[5] || "",
-            id: row[7] || "",
-            itemType: "recurring",
-          };
-        });
-
-        // Get categories & tags lists
-        const listsRes = await sheets.spreadsheets.values.get({
-          spreadsheetId: SPREADSHEET_ID,
-          range: METADATA_RANGE,
-        });
-
-        const listsRows = listsRes.data.values || [];
-        listsRows.shift(); // Remove headers
-        const categories = listsRows.map((row) => row[0]).filter(Boolean);
-        const nonRecurringTags = listsRows.map((row) => row[1]).filter(Boolean);
-        const recurringTags = listsRows.map((row) => row[2]).filter(Boolean);
-
-        // Get current weekly goal
-        const currentWeeklyGoalRes = await sheets.spreadsheets.values.get({
-          spreadsheetId: SPREADSHEET_ID,
-          range: WEEKLY_GOAL_RANGE,
-        });
-        const rawWeeklyGoal =
-          currentWeeklyGoalRes.data.values?.[0]?.[0] || null;
-        const cleanedWeeklyGoal = rawWeeklyGoal
-          ? rawWeeklyGoal.replace(/[^0-9.-]/g, "")
-          : "0";
-        const weeklyGoal = parseFloat(cleanedWeeklyGoal);
-
-        // Get current monthly goal
-        const currentMonthlyGoalRes = await sheets.spreadsheets.values.get({
-          spreadsheetId: SPREADSHEET_ID,
-          range: MONTHLY_GOAL_RANGE,
-        });
-        const rawMonthlyGoal =
-          currentMonthlyGoalRes.data.values?.[0]?.[0] || null;
-        const cleanedMonthlyGoal = rawMonthlyGoal
-          ? rawMonthlyGoal.replace(/[^0-9.-]/g, "")
-          : "0";
-        const monthlyGoal = parseFloat(cleanedMonthlyGoal);
-
-        // Get Fiscal Weeks
-        const fiscalWeekRes = await sheets.spreadsheets.values.get({
-          spreadsheetId: SPREADSHEET_ID,
-          range: FISCAL_WEEKS_RANGE,
-        });
-        const fiscalWeekRows = fiscalWeekRes.data.values || [];
-        fiscalWeekRows.shift(); // Remove headers row
-
-        let fiscalWeekData = fiscalWeekRows.map((row) => {
-          return {
-            id: row[0],
-            number: row[1],
-            start_date: row[2],
-            end_date: row[3],
-            year_title: row[4],
-            month_id: row[5],
-            itemType: "fiscalWeek",
-          };
-        });
-
-        // Get Fiscal Months
-        const fiscalMonthRes = await sheets.spreadsheets.values.get({
-          spreadsheetId: SPREADSHEET_ID,
-          range: FISCAL_MONTHS_RANGE,
-        });
-        const fiscalMonthRows = fiscalMonthRes.data.values || [];
-        fiscalMonthRows.shift(); // Remove headers row
-
-        let fiscalMonthData = fiscalMonthRows.map((row) => {
-          return {
-            id: row[0],
-            start_date: row[1],
-            end_date: row[2],
-            year_title: row[3],
-            itemType: "fiscalMonth",
-          };
-        });
-
-        // Get Fiscal Years
-        const fiscalYearRes = await sheets.spreadsheets.values.get({
-          spreadsheetId: SPREADSHEET_ID,
-          range: FISCAL_YEARS_RANGE,
-        });
-        const fiscalYearRows = fiscalYearRes.data.values || [];
-        fiscalYearRows.shift(); // Remove headers row
-
-        let fiscalYearData = fiscalYearRows.map((row) => {
-          return {
-            id: row[0],
-            title: row[1],
-            start_date: row[2],
-            end_date: row[3],
-            itemType: "fiscalYear",
-          };
-        });
-
-        // ----------------- Filtering Fiscal Data -----------------
-
-        // Helper function to parse date strings to Date objects
-        const parseDate = (dateStr: string): Date | null => {
-          const date = new Date(dateStr);
-          return isNaN(date.getTime()) ? null : date;
-        };
-
-        // Get today's date and the date 365 days from now
-        const oneYearFromToday = new Date();
-        oneYearFromToday.setDate(oneYearFromToday.getDate() + 365);
-
-        // Get today's date and the date 365 days before now
-        const oneYearBeforeToday = new Date();
-        oneYearBeforeToday.setDate(oneYearBeforeToday.getDate() + 365);
-
-        // Function to filter data based on start_date
-        const filterByStartDate = (data: any[]) => {
-          return data.filter((item) => {
-            const startDate = parseDate(item.start_date);
-            if (!startDate) return false; // Exclude if date is invalid
-            return (
-              startDate >= oneYearBeforeToday && startDate <= oneYearFromToday
-            );
-          });
-        };
-
-        // Apply filtering
-        fiscalWeekData = filterByStartDate(fiscalWeekData);
-        fiscalMonthData = filterByStartDate(fiscalMonthData);
-        fiscalYearData = filterByStartDate(fiscalYearData);
-
-        // ----------------- End of Filtering -----------------
-
-        // Convert Fiscal Data Arrays to Objects Indexed by ID
-        const fiscalYearsObj = convertArrayToObjectById(fiscalYearData);
-        const fiscalMonthsObj = convertArrayToObjectById(fiscalMonthData);
-        const fiscalWeeksObj = convertArrayToObjectById(fiscalWeekData);
-
-        res.status(200).json({
-          history: historyData,
-          recurring: recurringData,
-          weeklyGoal,
-          monthlyGoal,
-          categories,
-          nonRecurringTags,
-          recurringTags,
-          fiscalWeeks: fiscalWeeksObj,
-          fiscalMonths: fiscalMonthsObj,
-          fiscalYears: fiscalYearsObj,
-        });
-        return;
-
-        //-------------------------POST----------------------------------------------------
-      } else if (req.method === "POST") {
-        const data = req.body;
-        const id = data.id;
-        const hyperlinkFormula = `=HYPERLINK("${data.editURL}", "Edit")`;
-
-        if (data.itemType === "history") {
-          if (
-            !data.date ||
-            !data.type ||
-            typeof data.category !== "string" ||
-            !Array.isArray(data.tags) ||
-            typeof data.value !== "number" ||
-            !data.id ||
-            !data.itemType
-          ) {
-            res
-              .status(400)
-              .json({ error: "Missing or invalid required fields" });
-            return;
-          }
-
-          // 1) Calculate Fiscal IDs
-          const fiscalIDs = getFiscalIDs(
-            data,
-            cachedFiscalYears!,
-            cachedFiscalMonths!,
-            cachedFiscalWeeks!
-          );
-          if (!fiscalIDs) {
-            res
-              .status(400)
-              .json({ error: "Invalid date or fiscal period not found." });
-            return;
-          }
-
-          // 2) Check for new tags & insert into "Metadata" for non-recurring
-          //    (i.e., itemType === "history" => use column B)
-          await addMissingTags(
-            sheets,
-            data.tags, // the array of tags from the request
-            false // isRecurring=false
-          );
-
-          // 3) Append row to History
-          const dateFormatted = convertToMMDDYYYY(data.date);
-          await sheets.spreadsheets.values.append({
-            spreadsheetId: SPREADSHEET_ID,
-            range: HISTORY_RANGE,
-            valueInputOption: "USER_ENTERED",
-            requestBody: {
-              values: [
-                [
-                  dateFormatted,
-                  data.type,
-                  data.category,
-                  data.tags.join(", "),
-                  data.value,
-                  data.description || "",
-                  data.editURL,
-                  hyperlinkFormula,
-                  id,
-                  fiscalIDs.fiscalYearId,
-                  fiscalIDs.fiscalMonthId,
-                  fiscalIDs.fiscalWeekId,
-                ],
-              ],
-            },
-          });
-
-          res.status(200).json({ status: "success", id: id, fiscalIDs });
-          return;
-        } else if (data.itemType === "recurring") {
-          if (
-            !data.type ||
-            typeof data.category !== "string" ||
-            !Array.isArray(data.tags) ||
-            typeof data.value !== "number" ||
-            !data.id ||
-            !data.itemType
-          ) {
-            res
-              .status(400)
-              .json({ error: "Missing or invalid required fields" });
-            return;
-          }
-
-          // Check for new tags & insert into "Metadata" for recurring
-          // (itemType === "recurring" => use column C)
-          await addMissingTags(
-            sheets,
-            data.tags,
-            true // isRecurring=true
-          );
-
-          // Append to Recurring
-          await sheets.spreadsheets.values.append({
-            spreadsheetId: SPREADSHEET_ID,
-            range: RECURRING_RANGE,
-            valueInputOption: "USER_ENTERED",
-            requestBody: {
-              values: [
-                [
-                  data.type,
-                  data.category,
-                  data.tags.join(", "),
-                  data.value,
-                  data.description || "",
-                  data.editURL,
-                  hyperlinkFormula,
-                  id,
-                ],
-              ],
-            },
-          });
-
-          res.status(200).json({ status: "success", id: id });
-          return;
-        } else {
-          res.status(400).json({ error: "Missing or invalid itemType" });
-          return;
-        }
-
-        //-------------------------PUT----------------------------------------------------
-      } else if (req.method === "PUT") {
-        const data = req.body;
-        let existingId: string | undefined;
-
-        switch (data.itemType) {
-          case "history": {
-            const dateFormatted = convertToMMDDYYYY(data.date);
-
-            if (
-              !data.rowIndex ||
-              !data.date ||
-              !data.type ||
-              typeof data.category !== "string" ||
-              !Array.isArray(data.tags) ||
-              typeof data.value !== "number" ||
-              !data.id
-            ) {
-              res
-                .status(400)
-                .json({ error: "Missing or invalid required fields" });
-              return;
-            }
-
-            const tagsStr = data.tags.join(", ");
-            const rowIndex = data.rowIndex;
-
-            // Fetch existing row to get its ID
-            const rowRange = `${HISTORY_TABLE_NAME}!${HISTORY_FIRST_COLUMN}${rowIndex}:${HISTORY_LAST_COLUMN}${rowIndex}`;
-            const existingRowRes = await sheets.spreadsheets.values.get({
-              spreadsheetId: SPREADSHEET_ID,
-              range: rowRange,
-            });
-
-            const existingRow =
-              existingRowRes.data.values && existingRowRes.data.values[0];
-            if (!existingRow) {
-              res.status(404).json({ error: "History not found" });
-              return;
-            }
-
-            existingId = existingRow[8]; // column I for id
-            const existingEditURL = existingRow[6]; // column G for editURL
-            if (!existingId) {
-              res
-                .status(500)
-                .json({ error: "ID not found in the existing history row" });
-              return;
-            }
-
-            const hyperlinkFormula = `=HYPERLINK("${existingEditURL}", "Edit")`;
-
-            // Handle weeklyGoal/monthlyGoal adjustments if the value changed
-            const rawOriginalValue = existingRow[4];
-            const cleanedOriginalValue = rawOriginalValue
-              ? rawOriginalValue.replace(/[^0-9.-]/g, "")
-              : "0";
-            let originalValue = parseFloat(cleanedOriginalValue);
-
-            if (data.value !== originalValue) {
-              const isSamefiscalWeek = await isSameFiscalWeekById(
-                data.fiscalWeekId,
-                sheets
-              );
-              if (isSamefiscalWeek) {
-                const currentWeeklyGoalRes =
-                  await sheets.spreadsheets.values.get({
-                    spreadsheetId: SPREADSHEET_ID,
-                    range: WEEKLY_GOAL_RANGE,
-                  });
-                const rawWeeklyGoal =
-                  currentWeeklyGoalRes.data.values?.[0]?.[0] || null;
-                const cleanedWeeklyGoal = rawWeeklyGoal
-                  ? rawWeeklyGoal.replace(/[^0-9.-]/g, "")
-                  : "0";
-                let weeklyGoal = parseFloat(cleanedWeeklyGoal);
-
-                let difference = 0;
-                if (data.value > originalValue) {
-                  difference = data.value - originalValue;
-                  if (
-                    data.type === "Expense" ||
-                    data.type === "Recurring Expense"
-                  ) {
-                    weeklyGoal = weeklyGoal - difference;
-                  } else {
-                    weeklyGoal = weeklyGoal + difference;
-                  }
-                } else if (data.value < originalValue) {
-                  difference = originalValue - data.value;
-                  if (
-                    data.type === "Expense" ||
-                    data.type === "Recurring Expense"
-                  ) {
-                    weeklyGoal = weeklyGoal + difference;
-                  } else {
-                    weeklyGoal = weeklyGoal - difference;
-                  }
-                }
-
-                await sheets.spreadsheets.values.update({
-                  spreadsheetId: SPREADSHEET_ID,
-                  range: WEEKLY_GOAL_RANGE,
-                  valueInputOption: "USER_ENTERED",
-                  requestBody: {
-                    values: [[weeklyGoal]],
-                  },
-                });
-              }
-
-              const isSamefiscalMonth = await isSameFiscalMonthById(
-                data.fiscalMonthId,
-                sheets
-              );
-              if (isSamefiscalMonth) {
-                const currentMonthlyGoalRes =
-                  await sheets.spreadsheets.values.get({
-                    spreadsheetId: SPREADSHEET_ID,
-                    range: MONTHLY_GOAL_RANGE,
-                  });
-                const rawMonthlyGoal =
-                  currentMonthlyGoalRes.data.values?.[0]?.[0] || null;
-                const cleanedMonthlyGoal = rawMonthlyGoal
-                  ? rawMonthlyGoal.replace(/[^0-9.-]/g, "")
-                  : "0";
-                let monthlyGoal = parseFloat(cleanedMonthlyGoal);
-
-                let difference = 0;
-                if (data.value > originalValue) {
-                  difference = data.value - originalValue;
-                  if (
-                    data.type === "Expense" ||
-                    data.type === "Recurring Expense"
-                  ) {
-                    monthlyGoal = monthlyGoal - difference;
-                  } else {
-                    monthlyGoal = monthlyGoal + difference;
-                  }
-                } else if (data.value < originalValue) {
-                  difference = originalValue - data.value;
-                  if (
-                    data.type === "Expense" ||
-                    data.type === "Recurring Expense"
-                  ) {
-                    monthlyGoal = monthlyGoal + difference;
-                  } else {
-                    monthlyGoal = monthlyGoal - difference;
-                  }
-                }
-
-                await sheets.spreadsheets.values.update({
-                  spreadsheetId: SPREADSHEET_ID,
-                  range: MONTHLY_GOAL_RANGE,
-                  valueInputOption: "USER_ENTERED",
-                  requestBody: {
-                    values: [[monthlyGoal]],
-                  },
-                });
-              }
-            }
-
-            // Insert new tags (if any) into non-recurring (col B)
-            await addMissingTags(sheets, data.tags, false);
-
-            // Update the row
-            await sheets.spreadsheets.values.update({
-              spreadsheetId: SPREADSHEET_ID,
-              range: rowRange,
-              valueInputOption: "USER_ENTERED",
-              requestBody: {
-                values: [
-                  [
-                    dateFormatted,
-                    data.type,
-                    data.category,
-                    tagsStr,
-                    data.value,
-                    data.description || "",
-                    existingEditURL,
-                    hyperlinkFormula,
-                    existingId, // preserve same numeric ID
-                  ],
-                ],
-              },
-            });
-
-            break;
-          }
-
-          case "recurring": {
-            if (
-              !data.rowIndex ||
-              !data.type ||
-              typeof data.category !== "string" ||
-              !Array.isArray(data.tags) ||
-              typeof data.value !== "number" ||
-              !data.description ||
-              !data.id
-            ) {
-              res
-                .status(400)
-                .json({ error: "Missing or invalid required fields" });
-              return;
-            }
-
-            const tagsStr = data.tags.join(", ");
-            const rowIndex = data.rowIndex;
-
-            // Fetch existing row to get its ID
-            const rowRange = `${RECURRING_TABLE_NAME}!${RECURRING_FIRST_COLUMN}${rowIndex}:${RECURRING_LAST_COLUMN}${rowIndex}`;
-            const existingRowRes = await sheets.spreadsheets.values.get({
-              spreadsheetId: SPREADSHEET_ID,
-              range: rowRange,
-            });
-
-            const existingRow =
-              existingRowRes.data.values && existingRowRes.data.values[0];
-            if (!existingRow) {
-              res.status(404).json({ error: "Recurring not found" });
-              return;
-            }
-
-            existingId = existingRow[7]; // column H for id
-            const existingEditURL = existingRow[5]; // column F for editURL
-            if (!existingId) {
-              res
-                .status(500)
-                .json({ error: "ID not found in the existing recurring row" });
-              return;
-            }
-
-            const hyperlinkFormula = `=HYPERLINK("${existingEditURL}", "Edit")`;
-
-            // Insert new tags (if any) into recurring (col C)
-            await addMissingTags(sheets, data.tags, true);
-
-            // Update the row
-            await sheets.spreadsheets.values.update({
-              spreadsheetId: SPREADSHEET_ID,
-              range: rowRange,
-              valueInputOption: "USER_ENTERED",
-              requestBody: {
-                values: [
-                  [
-                    data.type,
-                    data.category,
-                    tagsStr,
-                    data.value,
-                    data.description,
-                    existingEditURL,
-                    hyperlinkFormula,
-                    existingId,
-                  ],
-                ],
-              },
-            });
-
-            break;
-          }
-
-          case "weeklyGoal": {
-            if (typeof data.value !== "number") {
-              res.status(400).json({ error: "Missing or invalid goal" });
-              return;
-            }
-            await sheets.spreadsheets.values.update({
-              spreadsheetId: SPREADSHEET_ID,
-              range: WEEKLY_GOAL_RANGE,
-              valueInputOption: "USER_ENTERED",
-              requestBody: {
-                values: [[data.value]],
-              },
-            });
-            break;
-          }
-
-          case "monthlyGoal": {
-            if (typeof data.value !== "number") {
-              res.status(400).json({ error: "Missing or invalid goal" });
-              return;
-            }
-            await sheets.spreadsheets.values.update({
-              spreadsheetId: SPREADSHEET_ID,
-              range: MONTHLY_GOAL_RANGE,
-              valueInputOption: "USER_ENTERED",
-              requestBody: {
-                values: [[data.value]],
-              },
-            });
-            break;
-          }
-
-          default: {
-            res.status(400).json({ error: "Invalid or missing itemType" });
-            return;
-          }
-        } // end switch
-
-        // If we updated a history or recurring item, we have an existingId.
-        // For weeklyGoal or monthlyGoal, we don't have an ID to return.
-        if (data.itemType === "history" || data.itemType === "recurring") {
-          res.status(200).json({ status: "success", id: existingId });
-        } else {
-          res.status(200).json({ status: "success" });
-        }
-        return;
-
-        //-------------------------DELETE----------------------------------------------------
-      } else if (req.method === "DELETE") {
-        const data = req.body;
-        console.log(data);
-        const id = data.id;
-
-        if (!id) {
-          res.status(400).json({ error: "Missing id field in request body." });
-          return;
-        }
-
-        if (data.itemType === "history") {
-          try {
-            // Get spreadsheet metadata to retrieve the sheetId
-            const spreadsheetRes = await sheets.spreadsheets.get({
-              spreadsheetId: SPREADSHEET_ID,
-            });
-
-            const sheet = spreadsheetRes.data.sheets?.find(
-              (sheet) => sheet.properties?.title === HISTORY_TABLE_NAME
-            );
-
-            if (!sheet || !sheet.properties?.sheetId) {
-              res.status(500).json({
-                error: "Failed to retrieve sheetId for History table.",
-              });
-              return;
-            }
-
-            const sheetId = sheet.properties.sheetId;
-
-            // Get all rows from the History table
-            const historyRes = await sheets.spreadsheets.values.get({
-              spreadsheetId: SPREADSHEET_ID,
-              range: HISTORY_RANGE,
-            });
-
-            const historyRows = historyRes.data.values || [];
-            historyRows.shift(); // Remove the header row
-
-            // Find the row index with the matching ID
-            const rowIndex = historyRows.findIndex((row) => {
-              return row[8] === id;
-            });
-
-            if (rowIndex === -1) {
-              res.status(404).json({
-                error: "History item with the specified ID not found.",
-              });
-              return;
-            }
-
-            // Google Sheets uses 1-based indexing; header row is row 1
-            const deleteRowIndex = rowIndex + 2;
-
-            // Delete the row
-            await sheets.spreadsheets.batchUpdate({
-              spreadsheetId: SPREADSHEET_ID,
-              requestBody: {
-                requests: [
-                  {
-                    deleteDimension: {
-                      range: {
-                        sheetId,
-                        dimension: "ROWS",
-                        startIndex: deleteRowIndex - 1,
-                        endIndex: deleteRowIndex,
-                      },
-                    },
-                  },
-                ],
-              },
-            });
-
-            // Adjust goals if it's in the same fiscal week or month
-            if (typeof data.value !== "number") {
-              res.status(400).json({ error: "Missing or invalid value" });
-              return;
-            }
-
-            const isSamefiscalWeek = await isSameFiscalWeekById(
-              data.fiscalWeekId,
-              sheets
-            );
-            if (isSamefiscalWeek) {
-              const currentWeeklyGoalRes = await sheets.spreadsheets.values.get(
-                {
-                  spreadsheetId: SPREADSHEET_ID,
-                  range: WEEKLY_GOAL_RANGE,
-                }
-              );
-              const rawWeeklyGoal =
-                currentWeeklyGoalRes.data.values?.[0]?.[0] || null;
-              const cleanedWeeklyGoal = rawWeeklyGoal
-                ? rawWeeklyGoal.replace(/[^0-9.-]/g, "")
-                : "0";
-              let weeklyGoal = parseFloat(cleanedWeeklyGoal);
-
-              if (
-                data.type === "Expense" ||
-                data.type === "Recurring Expense"
-              ) {
-                weeklyGoal = weeklyGoal + data.value;
-              } else {
-                weeklyGoal = weeklyGoal - data.value;
-              }
-
-              await sheets.spreadsheets.values.update({
-                spreadsheetId: SPREADSHEET_ID,
-                range: WEEKLY_GOAL_RANGE,
-                valueInputOption: "USER_ENTERED",
-                requestBody: {
-                  values: [[weeklyGoal]],
-                },
-              });
-            }
-
-            const isSamefiscalMonth = await isSameFiscalMonthById(
-              data.fiscalMonthId,
-              sheets
-            );
-            if (isSamefiscalMonth) {
-              const currentMonthlyGoalRes =
-                await sheets.spreadsheets.values.get({
-                  spreadsheetId: SPREADSHEET_ID,
-                  range: MONTHLY_GOAL_RANGE,
-                });
-              const rawMonthlyGoal =
-                currentMonthlyGoalRes.data.values?.[0]?.[0] || null;
-              const cleanedMonthlyGoal = rawMonthlyGoal
-                ? rawMonthlyGoal.replace(/[^0-9.-]/g, "")
-                : "0";
-              let monthlyGoal = parseFloat(cleanedMonthlyGoal);
-
-              if (
-                data.type === "Expense" ||
-                data.type === "Recurring Expense"
-              ) {
-                monthlyGoal = monthlyGoal + data.value;
-              } else {
-                monthlyGoal = monthlyGoal - data.value;
-              }
-
-              await sheets.spreadsheets.values.update({
-                spreadsheetId: SPREADSHEET_ID,
-                range: MONTHLY_GOAL_RANGE,
-                valueInputOption: "USER_ENTERED",
-                requestBody: {
-                  values: [[monthlyGoal]],
-                },
-              });
-            }
-
-            res.status(200).json({ status: "success", id });
-          } catch (error) {
-            console.error("Error deleting history item:", error);
-            res.status(500).json({ error: "Internal Server Error" });
-          }
-        } else if (data.itemType === "recurring") {
-          try {
-            // Get spreadsheet metadata to retrieve the sheetId
-            const spreadsheetRes = await sheets.spreadsheets.get({
-              spreadsheetId: SPREADSHEET_ID,
-            });
-
-            const sheet = spreadsheetRes.data.sheets?.find(
-              (sheet) => sheet.properties?.title === RECURRING_TABLE_NAME
-            );
-
-            if (!sheet || !sheet.properties?.sheetId) {
-              res.status(500).json({
-                error: "Failed to retrieve sheetId for Recurring table.",
-              });
-              return;
-            }
-
-            const sheetId = sheet.properties.sheetId;
-
-            // Get all rows from the Recurring table
-            const recurringRes = await sheets.spreadsheets.values.get({
-              spreadsheetId: SPREADSHEET_ID,
-              range: RECURRING_RANGE,
-            });
-
-            const recurringRows = recurringRes.data.values || [];
-            recurringRows.shift(); // Remove the header row
-
-            // Find the row index with the matching ID
-            const rowIndex = recurringRows.findIndex((row) => {
-              return row[7] === id;
-            });
-
-            if (rowIndex === -1) {
-              res.status(404).json({
-                error: "Recurring item with the specified ID not found.",
-              });
-              return;
-            }
-
-            // Google Sheets uses 1-based indexing, and the header row is row 1
-            const deleteRowIndex = rowIndex + 2; // Account for header row and 1-based index
-
-            // Delete the row
-            await sheets.spreadsheets.batchUpdate({
-              spreadsheetId: SPREADSHEET_ID,
-              requestBody: {
-                requests: [
-                  {
-                    deleteDimension: {
-                      range: {
-                        sheetId,
-                        dimension: "ROWS",
-                        startIndex: deleteRowIndex - 1,
-                        endIndex: deleteRowIndex,
-                      },
-                    },
-                  },
-                ],
-              },
-            });
-
-            res.status(200).json({ status: "success", id });
-          } catch (error) {
-            console.error("Error deleting recurring item:", error);
-            res.status(500).json({ error: "Internal Server Error" });
-          }
-        } else {
-          res.status(400).json({ error: "Missing or invalid itemType" });
-          return;
-        }
-      } else {
-        res.status(405).json({ error: "Method Not Allowed" });
-        return;
+      switch (req.method) {
+        case "GET":
+          await handleGET(sheets, req, res);
+          break;
+        case "POST":
+          await handlePOST(sheets, req, res);
+          break;
+        case "PUT":
+          await handlePUT(sheets, req, res);
+          break;
+        case "DELETE":
+          await handleDELETE(sheets, req, res);
+          break;
+        default:
+          res.status(405).json({ error: "Method Not Allowed" });
       }
     } catch (error) {
       console.error(error);
       res.status(500).json({ error: "Internal Server Error" });
-      return;
     }
   }
 );
-
-/**
- * Helper function to convert ISO date string to MM/DD/YYYY format.
- *
- * @param {string} isoDateStr - The ISO date string (YYYY-MM-DD).
- * @returns {string} - The formatted date string (MM/DD/YYYY).
- */
-function convertToMMDDYYYY(isoDateStr: string): string {
-  const [yyyy, mm, dd] = isoDateStr.split("-");
-  return `${parseInt(mm)}/${parseInt(dd)}/${yyyy}`;
-}
-
-/**
- * Appends any tags that don't exist yet into the 'Metadata' sheet. 
- * 
- * - For non-recurring => places the new tag in column B, leaving col A & C empty.
- * - For recurring    => places the new tag in column C, leaving col A & B empty.
- *
- * We do NOT rely on pre-blanked rows. Instead, we always .append new rows at the bottom.
- *
- * @param sheets       Authenticated Sheets client
- * @param tags         Array of tags to add
- * @param isRecurring  false => add tags in col B, true => col C
- */
-async function addMissingTags(
-  sheets: any, // or google.sheets_v4.Sheets if you have the type
-  tags: string[],
-  isRecurring: boolean
-): Promise<void> {
-  if (!tags || tags.length === 0) {
-    console.log("[addMissingTags] No tags provided. Exiting early.");
-    return;
-  }
-
-  // 1) Fetch current metadata (so we know which tags already exist)
-  const listsRes = await sheets.spreadsheets.values.get({
-    spreadsheetId: SPREADSHEET_ID,
-    range: METADATA_RANGE, // e.g. "Metadata!A:C"
-  });
-  const listsRows = listsRes.data.values || [];
-  // dataRows are everything except the header
-  const dataRows = listsRows.slice(1);
-
-  // 2) Determine the column we normally store tags in
-  //    (we only need this to figure out duplicates, not to place them in that column)
-  const colIndex = isRecurring ? 2 : 1;
-
-  // 3) Gather existing tags from that column
-  const existingTags = dataRows
-    .map((row: any) => {
-      // row might not be fully long if col is empty
-      const cellVal = row[colIndex] ? row[colIndex].trim() : "";
-      return cellVal;
-    })
-    .filter(Boolean);
-
-  // 4) Filter out duplicates
-  const newTags = tags.filter((tag) => !existingTags.includes(tag));
-
-  if (newTags.length === 0) {
-    return;
-  }
-
-  // 5) Build new rows for each tag, then .append them at the bottom
-  //    (We do not rely on blank rows.)
-  const rowsToAppend = newTags.map((tag) => {
-    if (isRecurring) {
-      // col A empty, col B empty, col C = new tag
-      return ["", "", tag];
-    } else {
-      // col A empty, col B = new tag, col C empty
-      return ["", tag, ""];
-    }
-  });
-
-  await sheets.spreadsheets.values.append({
-    spreadsheetId: SPREADSHEET_ID,
-    range: METADATA_RANGE, // e.g. "Metadata!A:C"
-    valueInputOption: "USER_ENTERED",
-    requestBody: {
-      // rowsToAppend is an array of arrays, so each becomes a new row
-      values: rowsToAppend,
-    },
-  });
-
-  console.log(
-    `[addMissingTags] Successfully appended ${rowsToAppend.length} row(s) for new tags:`,
-    newTags
-  );
-}
