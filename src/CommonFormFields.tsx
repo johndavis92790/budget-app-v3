@@ -1,6 +1,6 @@
 import React from "react";
-import { Form, InputGroup } from "react-bootstrap";
-import { FaCalendar } from "react-icons/fa";
+import { Button, Form, InputGroup } from "react-bootstrap";
+import { FaCalendar, FaTrash } from "react-icons/fa";
 
 /**
  * Common props for all fields that handle 'value' + 'onChange'.
@@ -128,9 +128,11 @@ export function CategoryField({
 }
 
 /** ========== TagField ========== */
-interface TagFieldProps {
+export interface TagFieldProps {
   tags: string[];
-  setTags: (vals: string[]) => void;
+  setTags: (newTags: string[]) => void;
+  newTags: string[]; // always required
+  setNewTags: (vals: string[]) => void;
   availableTags: string[];
   disabled?: boolean;
   required?: boolean;
@@ -144,8 +146,13 @@ export function TagField({
   disabled,
   required,
   label = "Tags",
+  newTags,
+  setNewTags,
 }: TagFieldProps) {
-  const handleChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+  // Existing tags (multi-select) change handler
+  const handleExistingTagsChange = (
+    e: React.ChangeEvent<HTMLSelectElement>,
+  ) => {
     const opts = e.target.options;
     const selected: string[] = [];
     for (let i = 0; i < opts.length; i++) {
@@ -153,25 +160,75 @@ export function TagField({
         selected.push(opts[i].value);
       }
     }
+    // We pass the final string[] to setTags
     setTags(selected);
   };
 
+  // Add a blank new tag
+  const handleAddNewTagField = () => {
+    setNewTags([...newTags, ""]);
+  };
+
+  // Update the text of one new tag
+  const handleNewTagChange = (idx: number, value: string) => {
+    const copy = [...newTags];
+    copy[idx] = value;
+    setNewTags(copy);
+  };
+
+  // Remove one new tag
+  const handleRemoveNewTag = (idx: number) => {
+    setNewTags(newTags.filter((_, i) => i !== idx));
+  };
+
   return (
-    <Form.Group controlId="formTags" className="mb-3">
-      <Form.Label>{label}</Form.Label>
-      <Form.Select
-        multiple
-        value={tags}
-        onChange={handleChange}
+    <div>
+      <Form.Group controlId="formTags" className="mb-3">
+        <Form.Label>{label}</Form.Label>
+        <Form.Select
+          multiple
+          value={tags}
+          onChange={handleExistingTagsChange}
+          disabled={disabled}
+          required={required}
+        >
+          {availableTags.map((tag, i) => (
+            <option key={i} value={tag}>
+              {tag}
+            </option>
+          ))}
+        </Form.Select>
+      </Form.Group>
+
+      {/* newly created custom tags */}
+      {newTags.map((tagValue, idx) => (
+        <InputGroup className="mb-2" key={idx}>
+          <Form.Control
+            type="text"
+            placeholder="Enter a new tag"
+            value={tagValue}
+            disabled={disabled}
+            onChange={(e) => handleNewTagChange(idx, e.target.value)}
+          />
+          <Button
+            variant="outline-secondary"
+            onClick={() => handleRemoveNewTag(idx)}
+            disabled={disabled}
+            className="d-flex align-items-center justify-content-center"
+            style={{ lineHeight: 1 }}
+          >
+            <FaTrash />
+          </Button>
+        </InputGroup>
+      ))}
+
+      <Button
+        variant="outline-primary"
+        onClick={handleAddNewTagField}
         disabled={disabled}
-        required={required}
       >
-        {availableTags.map((tag, idx) => (
-          <option key={idx} value={tag}>
-            {tag}
-          </option>
-        ))}
-      </Form.Select>
-    </Form.Group>
+        + Add New Tag
+      </Button>
+    </div>
   );
 }

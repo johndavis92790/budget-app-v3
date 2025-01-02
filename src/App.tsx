@@ -22,7 +22,7 @@ function App() {
   const [weeklyGoal, setWeeklyGoal] = useState<number>(0);
   const [monthlyGoal, setMonthlyGoal] = useState<number>(0);
   const [fiscalWeeks, setFiscalWeeks] = useState<Record<string, FiscalWeek>>(
-    {}
+    {},
   );
   const [loading, setLoading] = useState<boolean>(true);
 
@@ -41,14 +41,14 @@ function App() {
           value: Math.round(history.value * 100) / 100,
           rowIndex: index + 2,
           date: mmddyyyyToYyyyMmDd(history.date),
-        }))
+        })),
       );
       setRecurring(
         data.recurring.map((recurring: Recurring, index: number) => ({
           ...recurring,
           value: Math.round(recurring.value * 100) / 100,
           rowIndex: index + 2,
-        }))
+        })),
       );
       setCategories(data.categories || []);
       setNonRecurringTags(data.nonRecurringTags || []);
@@ -111,7 +111,7 @@ function App() {
 
   const onUpdateGoal = async (
     itemType: "weeklyGoal" | "monthlyGoal",
-    newValue: number
+    newValue: number,
   ) => {
     try {
       await fetch(API_URL, {

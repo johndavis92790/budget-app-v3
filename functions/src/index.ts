@@ -233,7 +233,7 @@ function getFiscalIDs(
 } | null {
   const { date: dateStr } = item;
 
-  // Helper function to parse date strings to Date objects
+  // Helper function to parse date strings
   const parseDate = (dateStr: string): Date | null => {
     const date = new Date(dateStr);
     return isNaN(date.getTime()) ? null : date;
@@ -257,7 +257,7 @@ function getFiscalIDs(
     return null;
   }
 
-  // Find Fiscal Month within the found Fiscal Year
+  // Find Fiscal Month
   const fiscalMonth = fiscalMonths.find((month) => {
     if (month.year_title !== fiscalYear.title) return false;
     const start = new Date(month.start_date);
@@ -272,7 +272,7 @@ function getFiscalIDs(
     return null;
   }
 
-  // Find Fiscal Week within the found Fiscal Month and Fiscal Year
+  // Find Fiscal Week
   const fiscalWeek = fiscalWeeks.find((week) => {
     if (week.year_title !== fiscalYear.title) return false;
     if (week.month_id !== fiscalMonth.id) return false;
@@ -360,9 +360,8 @@ export const expenses = onRequest(
         const historyRows = historyRes.data.values || [];
         historyRows.shift(); // Remove headers row
 
-        // Indices: A=0,B=1,C=2,D=3,E=4,F=5,G=6,H=7,I=8,J=9,K=10,L=11
-
-        const historyData = historyRows.map((row, index) => {
+        // Indices in History: A=0,B=1,C=2,D=3,E=4,F=5,G=6,H=7,I=8,J=9,K=10,L=11
+        const historyData = historyRows.map((row) => {
           const rawValue = row[4];
           const value = rawValue
             ? parseFloat(rawValue.replace(/[^0-9.-]/g, ""))
@@ -396,9 +395,8 @@ export const expenses = onRequest(
         const recurringRows = recurringRes.data.values || [];
         recurringRows.shift(); // Remove headers row
 
-        // Indices: A=0,B=1,C=2,D=3,E=4,F=5,G=6
-
-        const recurringData = recurringRows.map((row, index) => {
+        // Indices in Recurring: A=0,B=1,C=2,D=3,E=4,F=5,G=6,H=7
+        const recurringData = recurringRows.map((row) => {
           const rawValue = row[3];
           const value = rawValue
             ? parseFloat(rawValue.replace(/[^0-9.-]/g, ""))
@@ -460,11 +458,10 @@ export const expenses = onRequest(
           spreadsheetId: SPREADSHEET_ID,
           range: FISCAL_WEEKS_RANGE,
         });
-
         const fiscalWeekRows = fiscalWeekRes.data.values || [];
         fiscalWeekRows.shift(); // Remove headers row
 
-        let fiscalWeekData = fiscalWeekRows.map((row, index) => {
+        let fiscalWeekData = fiscalWeekRows.map((row) => {
           return {
             id: row[0],
             number: row[1],
@@ -481,11 +478,10 @@ export const expenses = onRequest(
           spreadsheetId: SPREADSHEET_ID,
           range: FISCAL_MONTHS_RANGE,
         });
-
         const fiscalMonthRows = fiscalMonthRes.data.values || [];
         fiscalMonthRows.shift(); // Remove headers row
 
-        let fiscalMonthData = fiscalMonthRows.map((row, index) => {
+        let fiscalMonthData = fiscalMonthRows.map((row) => {
           return {
             id: row[0],
             start_date: row[1],
@@ -500,11 +496,10 @@ export const expenses = onRequest(
           spreadsheetId: SPREADSHEET_ID,
           range: FISCAL_YEARS_RANGE,
         });
-
         const fiscalYearRows = fiscalYearRes.data.values || [];
         fiscalYearRows.shift(); // Remove headers row
 
-        let fiscalYearData = fiscalYearRows.map((row, index) => {
+        let fiscalYearData = fiscalYearRows.map((row) => {
           return {
             id: row[0],
             title: row[1],
@@ -561,16 +556,16 @@ export const expenses = onRequest(
           categories,
           nonRecurringTags,
           recurringTags,
-          fiscalWeeks: fiscalWeeksObj, // Updated to object
-          fiscalMonths: fiscalMonthsObj, // Updated to object
-          fiscalYears: fiscalYearsObj, // Updated to object
+          fiscalWeeks: fiscalWeeksObj,
+          fiscalMonths: fiscalMonthsObj,
+          fiscalYears: fiscalYearsObj,
         });
         return;
+
         //-------------------------POST----------------------------------------------------
       } else if (req.method === "POST") {
         const data = req.body;
-
-        const id = data.id; // This is the numeric ID from the frontend
+        const id = data.id;
         const hyperlinkFormula = `=HYPERLINK("${data.editURL}", "Edit")`;
 
         if (data.itemType === "history") {
@@ -589,14 +584,13 @@ export const expenses = onRequest(
             return;
           }
 
-          // Calculate Fiscal IDs
+          // 1) Calculate Fiscal IDs
           const fiscalIDs = getFiscalIDs(
             data,
             cachedFiscalYears!,
             cachedFiscalMonths!,
             cachedFiscalWeeks!
           );
-
           if (!fiscalIDs) {
             res
               .status(400)
@@ -604,8 +598,16 @@ export const expenses = onRequest(
             return;
           }
 
-          const dateFormatted = convertToMMDDYYYY(data.date);
+          // 2) Check for new tags & insert into "Metadata" for non-recurring
+          //    (i.e., itemType === "history" => use column B)
+          await addMissingTags(
+            sheets,
+            data.tags, // the array of tags from the request
+            false // isRecurring=false
+          );
 
+          // 3) Append row to History
+          const dateFormatted = convertToMMDDYYYY(data.date);
           await sheets.spreadsheets.values.append({
             spreadsheetId: SPREADSHEET_ID,
             range: HISTORY_RANGE,
@@ -613,18 +615,18 @@ export const expenses = onRequest(
             requestBody: {
               values: [
                 [
-                  dateFormatted, // A=date
-                  data.type, // B=type
-                  data.category, // C=category
-                  data.tags.join(", "), // D=tags
-                  data.value, // E=value
-                  data.description || "", // F=description
-                  data.editURL, // G=editLink
-                  hyperlinkFormula, // H=hyperlink
-                  id, // I=id (no prefix, just the numeric string)
-                  fiscalIDs.fiscalYearId, // J=fiscalYearId
-                  fiscalIDs.fiscalMonthId, // K=fiscalMonthId
-                  fiscalIDs.fiscalWeekId, // L=fiscalWeekId
+                  dateFormatted,
+                  data.type,
+                  data.category,
+                  data.tags.join(", "),
+                  data.value,
+                  data.description || "",
+                  data.editURL,
+                  hyperlinkFormula,
+                  id,
+                  fiscalIDs.fiscalYearId,
+                  fiscalIDs.fiscalMonthId,
+                  fiscalIDs.fiscalWeekId,
                 ],
               ],
             },
@@ -647,6 +649,15 @@ export const expenses = onRequest(
             return;
           }
 
+          // Check for new tags & insert into "Metadata" for recurring
+          // (itemType === "recurring" => use column C)
+          await addMissingTags(
+            sheets,
+            data.tags,
+            true // isRecurring=true
+          );
+
+          // Append to Recurring
           await sheets.spreadsheets.values.append({
             spreadsheetId: SPREADSHEET_ID,
             range: RECURRING_RANGE,
@@ -654,14 +665,14 @@ export const expenses = onRequest(
             requestBody: {
               values: [
                 [
-                  data.type, // A=type
-                  data.category, // B=category
-                  data.tags.join(", "), // C=tags
-                  data.value, // D=value
-                  data.description || "", // E=description
-                  data.editURL, // F=editLink
-                  hyperlinkFormula, // G=hyperlink
-                  id, // H=id (no prefix, just the numeric string)
+                  data.type,
+                  data.category,
+                  data.tags.join(", "),
+                  data.value,
+                  data.description || "",
+                  data.editURL,
+                  hyperlinkFormula,
+                  id,
                 ],
               ],
             },
@@ -673,10 +684,11 @@ export const expenses = onRequest(
           res.status(400).json({ error: "Missing or invalid itemType" });
           return;
         }
+
         //-------------------------PUT----------------------------------------------------
       } else if (req.method === "PUT") {
         const data = req.body;
-        let existingId: string | undefined; // We'll only set this if itemType is history or recurring
+        let existingId: string | undefined;
 
         switch (data.itemType) {
           case "history": {
@@ -725,6 +737,7 @@ export const expenses = onRequest(
 
             const hyperlinkFormula = `=HYPERLINK("${existingEditURL}", "Edit")`;
 
+            // Handle weeklyGoal/monthlyGoal adjustments if the value changed
             const rawOriginalValue = existingRow[4];
             const cleanedOriginalValue = rawOriginalValue
               ? rawOriginalValue.replace(/[^0-9.-]/g, "")
@@ -781,12 +794,12 @@ export const expenses = onRequest(
                   },
                 });
               }
+
               const isSamefiscalMonth = await isSameFiscalMonthById(
                 data.fiscalMonthId,
                 sheets
               );
               if (isSamefiscalMonth) {
-                // Get and update current monthly goal
                 const currentMonthlyGoalRes =
                   await sheets.spreadsheets.values.get({
                     spreadsheetId: SPREADSHEET_ID,
@@ -806,9 +819,9 @@ export const expenses = onRequest(
                     data.type === "Expense" ||
                     data.type === "Recurring Expense"
                   ) {
-                    monthlyGoal = monthlyGoal - difference
+                    monthlyGoal = monthlyGoal - difference;
                   } else {
-                    monthlyGoal = monthlyGoal + difference
+                    monthlyGoal = monthlyGoal + difference;
                   }
                 } else if (data.value < originalValue) {
                   difference = originalValue - data.value;
@@ -833,6 +846,10 @@ export const expenses = onRequest(
               }
             }
 
+            // Insert new tags (if any) into non-recurring (col B)
+            await addMissingTags(sheets, data.tags, false);
+
+            // Update the row
             await sheets.spreadsheets.values.update({
               spreadsheetId: SPREADSHEET_ID,
               range: rowRange,
@@ -848,13 +865,13 @@ export const expenses = onRequest(
                     data.description || "",
                     existingEditURL,
                     hyperlinkFormula,
-                    existingId, // Preserve the same numeric ID
+                    existingId, // preserve same numeric ID
                   ],
                 ],
               },
             });
 
-            break; // end case "history"
+            break;
           }
 
           case "recurring": {
@@ -901,6 +918,10 @@ export const expenses = onRequest(
 
             const hyperlinkFormula = `=HYPERLINK("${existingEditURL}", "Edit")`;
 
+            // Insert new tags (if any) into recurring (col C)
+            await addMissingTags(sheets, data.tags, true);
+
+            // Update the row
             await sheets.spreadsheets.values.update({
               spreadsheetId: SPREADSHEET_ID,
               range: rowRange,
@@ -915,13 +936,13 @@ export const expenses = onRequest(
                     data.description,
                     existingEditURL,
                     hyperlinkFormula,
-                    existingId, // Preserve the same numeric ID
+                    existingId,
                   ],
                 ],
               },
             });
 
-            break; // end case "recurring"
+            break;
           }
 
           case "weeklyGoal": {
@@ -937,7 +958,7 @@ export const expenses = onRequest(
                 values: [[data.value]],
               },
             });
-            break; // end case "weeklyGoal"
+            break;
           }
 
           case "monthlyGoal": {
@@ -953,7 +974,7 @@ export const expenses = onRequest(
                 values: [[data.value]],
               },
             });
-            break; // end case "monthlyGoal"
+            break;
           }
 
           default: {
@@ -970,6 +991,7 @@ export const expenses = onRequest(
           res.status(200).json({ status: "success" });
         }
         return;
+
         //-------------------------DELETE----------------------------------------------------
       } else if (req.method === "DELETE") {
         const data = req.body;
@@ -1008,9 +1030,9 @@ export const expenses = onRequest(
             });
 
             const historyRows = historyRes.data.values || [];
-            historyRows.shift(); // Remove the header row without assigning it to a variable
+            historyRows.shift(); // Remove the header row
 
-            // Find the row index of the row with the matching ID
+            // Find the row index with the matching ID
             const rowIndex = historyRows.findIndex((row) => {
               return row[8] === id;
             });
@@ -1022,8 +1044,8 @@ export const expenses = onRequest(
               return;
             }
 
-            // Google Sheets uses 1-based indexing, and the header row is row 1
-            const deleteRowIndex = rowIndex + 2; // Account for header row and 1-based index
+            // Google Sheets uses 1-based indexing; header row is row 1
+            const deleteRowIndex = rowIndex + 2;
 
             // Delete the row
             await sheets.spreadsheets.batchUpdate({
@@ -1033,10 +1055,10 @@ export const expenses = onRequest(
                   {
                     deleteDimension: {
                       range: {
-                        sheetId, // Pass the valid sheetId
+                        sheetId,
                         dimension: "ROWS",
-                        startIndex: deleteRowIndex - 1, // Convert back to 0-based index
-                        endIndex: deleteRowIndex, // Only delete one row
+                        startIndex: deleteRowIndex - 1,
+                        endIndex: deleteRowIndex,
                       },
                     },
                   },
@@ -1044,6 +1066,7 @@ export const expenses = onRequest(
               },
             });
 
+            // Adjust goals if it's in the same fiscal week or month
             if (typeof data.value !== "number") {
               res.status(400).json({ error: "Missing or invalid value" });
               return;
@@ -1053,9 +1076,7 @@ export const expenses = onRequest(
               data.fiscalWeekId,
               sheets
             );
-
             if (isSamefiscalWeek) {
-              // Get and update current weekly goal
               const currentWeeklyGoalRes = await sheets.spreadsheets.values.get(
                 {
                   spreadsheetId: SPREADSHEET_ID,
@@ -1092,9 +1113,7 @@ export const expenses = onRequest(
               data.fiscalMonthId,
               sheets
             );
-
             if (isSamefiscalMonth) {
-              // Get and update current monthly goal
               const currentMonthlyGoalRes =
                 await sheets.spreadsheets.values.get({
                   spreadsheetId: SPREADSHEET_ID,
@@ -1158,9 +1177,9 @@ export const expenses = onRequest(
             });
 
             const recurringRows = recurringRes.data.values || [];
-            recurringRows.shift(); // Remove the header row without assigning it to a variable
+            recurringRows.shift(); // Remove the header row
 
-            // Find the row index of the row with the matching ID
+            // Find the row index with the matching ID
             const rowIndex = recurringRows.findIndex((row) => {
               return row[7] === id;
             });
@@ -1183,10 +1202,10 @@ export const expenses = onRequest(
                   {
                     deleteDimension: {
                       range: {
-                        sheetId, // Pass the valid sheetId
+                        sheetId,
                         dimension: "ROWS",
-                        startIndex: deleteRowIndex - 1, // Convert back to 0-based index
-                        endIndex: deleteRowIndex, // Only delete one row
+                        startIndex: deleteRowIndex - 1,
+                        endIndex: deleteRowIndex,
                       },
                     },
                   },
@@ -1224,4 +1243,83 @@ export const expenses = onRequest(
 function convertToMMDDYYYY(isoDateStr: string): string {
   const [yyyy, mm, dd] = isoDateStr.split("-");
   return `${parseInt(mm)}/${parseInt(dd)}/${yyyy}`;
+}
+
+/**
+ * Appends any tags that don't exist yet into the 'Metadata' sheet. 
+ * 
+ * - For non-recurring => places the new tag in column B, leaving col A & C empty.
+ * - For recurring    => places the new tag in column C, leaving col A & B empty.
+ *
+ * We do NOT rely on pre-blanked rows. Instead, we always .append new rows at the bottom.
+ *
+ * @param sheets       Authenticated Sheets client
+ * @param tags         Array of tags to add
+ * @param isRecurring  false => add tags in col B, true => col C
+ */
+async function addMissingTags(
+  sheets: any, // or google.sheets_v4.Sheets if you have the type
+  tags: string[],
+  isRecurring: boolean
+): Promise<void> {
+  if (!tags || tags.length === 0) {
+    console.log("[addMissingTags] No tags provided. Exiting early.");
+    return;
+  }
+
+  // 1) Fetch current metadata (so we know which tags already exist)
+  const listsRes = await sheets.spreadsheets.values.get({
+    spreadsheetId: SPREADSHEET_ID,
+    range: METADATA_RANGE, // e.g. "Metadata!A:C"
+  });
+  const listsRows = listsRes.data.values || [];
+  // dataRows are everything except the header
+  const dataRows = listsRows.slice(1);
+
+  // 2) Determine the column we normally store tags in
+  //    (we only need this to figure out duplicates, not to place them in that column)
+  const colIndex = isRecurring ? 2 : 1;
+
+  // 3) Gather existing tags from that column
+  const existingTags = dataRows
+    .map((row: any) => {
+      // row might not be fully long if col is empty
+      const cellVal = row[colIndex] ? row[colIndex].trim() : "";
+      return cellVal;
+    })
+    .filter(Boolean);
+
+  // 4) Filter out duplicates
+  const newTags = tags.filter((tag) => !existingTags.includes(tag));
+
+  if (newTags.length === 0) {
+    return;
+  }
+
+  // 5) Build new rows for each tag, then .append them at the bottom
+  //    (We do not rely on blank rows.)
+  const rowsToAppend = newTags.map((tag) => {
+    if (isRecurring) {
+      // col A empty, col B empty, col C = new tag
+      return ["", "", tag];
+    } else {
+      // col A empty, col B = new tag, col C empty
+      return ["", tag, ""];
+    }
+  });
+
+  await sheets.spreadsheets.values.append({
+    spreadsheetId: SPREADSHEET_ID,
+    range: METADATA_RANGE, // e.g. "Metadata!A:C"
+    valueInputOption: "USER_ENTERED",
+    requestBody: {
+      // rowsToAppend is an array of arrays, so each becomes a new row
+      values: rowsToAppend,
+    },
+  });
+
+  console.log(
+    `[addMissingTags] Successfully appended ${rowsToAppend.length} row(s) for new tags:`,
+    newTags
+  );
 }

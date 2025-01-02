@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { History, Recurring } from "./types";
 import { Form, Button, Spinner, Row, Col } from "react-bootstrap";
@@ -15,7 +15,6 @@ import { FaTimes, FaArrowLeft } from "react-icons/fa";
 import FullSizeImageModal from "./FullSizeImageModal";
 import FullPageSpinner from "./FullPageSpinner";
 
-// Import your other common form fields
 import {
   DateField,
   CategoryField,
@@ -23,7 +22,6 @@ import {
   DescriptionField,
 } from "./CommonFormFields";
 
-// Import your new CurrencyInput from text-mask code
 import CurrencyInput from "./CurrencyInput";
 
 interface EditHistoryPageProps {
@@ -49,7 +47,10 @@ function EditHistoryPage({
   const [selectedHistory, setSelectedHistory] = useState<History | null>(null);
   const [updatedHistory, setUpdatedHistory] = useState<History | null>(null);
 
-  // Existing receipts
+  // We'll keep local states for tags & newTags
+  const [tags, setTags] = useState<string[]>([]);
+  const [newTags, setNewTags] = useState<string[]>([]);
+
   const [existingImageItems, setExistingImageItems] = useState<
     { url: string; fullPath: string }[]
   >([]);
@@ -59,7 +60,6 @@ function EditHistoryPage({
     [],
   );
 
-  // New receipts
   const [newImageFiles, setNewImageFiles] = useState<File[]>([]);
   const [selectedImageUrl, setSelectedImageUrl] = useState<string | null>(null);
 
@@ -71,7 +71,8 @@ function EditHistoryPage({
   const queryParams = new URLSearchParams(location.search);
   const idParam = queryParams.get("id");
 
-  // 1) Once data loaded, find the matching history item
+  // 1) Once data is loaded, find the matching history item
+  //    and initialize tags from it
   useEffect(() => {
     if (loading) return;
     if (!idParam) {
@@ -85,9 +86,13 @@ function EditHistoryPage({
     }
     setSelectedHistory(foundHistory);
     setUpdatedHistory(foundHistory);
+
+    // Initialize tags from existing item
+    setTags(foundHistory.tags || []);
+    setNewTags([]);
   }, [loading, idParam, history, navigate]);
 
-  // 2) Load existing receipts
+  // 2) Load existing receipts if we haven't yet
   useEffect(() => {
     if (!updatedHistory || initialized) return;
 
@@ -129,7 +134,7 @@ function EditHistoryPage({
     loadExistingImages();
   }, [updatedHistory, initialized]);
 
-  // Helper to change one field in updatedHistory
+  // Helper to set a field on updatedHistory
   const handleFieldChange = (
     field: keyof History,
     value: string | number | string[],
@@ -138,12 +143,11 @@ function EditHistoryPage({
     setUpdatedHistory({ ...updatedHistory, [field]: value });
   };
 
-  // Handle file input
+  // File input
   const handleNewImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (!files) return;
-    const newFiles = Array.from(files);
-    setNewImageFiles((prev) => [...prev, ...newFiles]);
+    setNewImageFiles((prev) => [...prev, ...Array.from(files)]);
     e.target.value = "";
   };
 
@@ -160,16 +164,31 @@ function EditHistoryPage({
     setNewImageFiles((prev) => prev.filter((_, i) => i !== index));
   };
 
-  // Save
+  // ------------- Tag setters for the new approach -------------
+  function handleExistingTagsUpdate(newArray: string[]) {
+    setTags(newArray);
+  }
+  function handleNewTagsUpdate(newArray: string[]) {
+    setNewTags(newArray);
+  }
+
+  // 3) Save
   const handleSave = async () => {
     if (!updatedHistory) return;
-    setSubmitting(true);
 
+    setSubmitting(true);
     try {
+      // Combine existing + new
+      const finalTags = [
+        ...tags,
+        ...newTags.map((t) => t.trim()).filter(Boolean),
+      ];
+      updatedHistory.tags = finalTags;
+
       const id = updatedHistory.id;
       const storage = getStorage();
 
-      // 1) Delete removed receipts
+      // Delete removed receipts
       for (const path of removedExistingPaths) {
         const fileRef = ref(storage, path);
         await deleteObject(fileRef).catch((err) =>
@@ -177,7 +196,7 @@ function EditHistoryPage({
         );
       }
 
-      // 2) Upload new
+      // Upload new receipts
       if (id && newImageFiles.length > 0) {
         for (const file of newImageFiles) {
           const fileRef = ref(storage, `receipts/${id}/${id}-${file.name}`);
@@ -185,11 +204,9 @@ function EditHistoryPage({
         }
       }
 
-      // 3) Update
-      console.log("Saving updated history:", updatedHistory);
+      // Call parent's onUpdateItem
       await onUpdateItem(updatedHistory);
 
-      // 4) Navigate
       navigate("/history");
     } catch (error) {
       console.error("Error saving history:", error);
@@ -258,35 +275,29 @@ function EditHistoryPage({
 
         <Row>
           <Col xs={6}>
+            {/* TagField that can do both existing + new */}
             <TagField
-              tags={updatedHistory.tags}
-              setTags={(vals) => handleFieldChange("tags", vals)}
+              tags={tags}
+              setTags={handleExistingTagsUpdate}
               availableTags={nonRecurringTags}
               disabled={submitting}
+              newTags={newTags}
+              setNewTags={handleNewTagsUpdate}
             />
           </Col>
           <Col xs={6}>
             <Form.Group controlId="formValue" className="mb-3">
               <Form.Label>Value</Form.Label>
               <CurrencyInput
-                // We'll pass the existing value as a string, e.g. "123.45" or "0"
-                // If your DB stored it as a number, do String(updatedHistory.value).
                 value={String(updatedHistory.value || 0)}
                 placeholder="$0.00"
                 style={{ width: "100%" }}
                 disabled={submitting}
-                // We do an onChange that reads the masked string (like "$1,234.56") from e.target.value
-                onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
-                  // text-mask returns the masked string in e.target.value,
-                  // e.g. "$1,234.56"
+                onChange={(e) => {
                   const maskedVal = e.target.value;
-                  // Remove all non-digit chars except '.' or '-'
                   const numericStr = maskedVal.replace(/[^0-9.-]/g, "");
                   const parsed = parseFloat(numericStr);
-                  // Fallback to 0 if invalid
-                  const finalNum = isNaN(parsed) ? 0 : parsed;
-                  // Store in your state
-                  handleFieldChange("value", finalNum);
+                  handleFieldChange("value", isNaN(parsed) ? 0 : parsed);
                 }}
               />
             </Form.Group>

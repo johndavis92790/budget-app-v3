@@ -1,11 +1,10 @@
-import React from "react";
+import React, { useCallback } from "react";
 import { Form, Button } from "react-bootstrap";
 import { FaTimes } from "react-icons/fa";
 
 interface FileUploaderProps {
   files: File[];
   onChange: (files: File[]) => void;
-  selectedImageUrl: string | null;
   onSelectImage: (url: string | null) => void;
   disabled?: boolean;
   label?: string; // e.g. "Receipts" or "Images"
@@ -13,7 +12,81 @@ interface FileUploaderProps {
 }
 
 /**
- * A reusable file uploader with previews + remove buttons.
+ * Compresses a single image File by drawing it to an offscreen <canvas>.
+ *
+ * @param file The original File.
+ * @param maxWidth The max width (in px) to downscale to. Height is scaled proportionally.
+ * @param quality A number between 0 and 1, controlling JPEG/WebP quality (not used by PNG).
+ * @returns A new File representing the compressed image.
+ */
+async function compressImageFile(
+  file: File,
+  maxWidth = 1200,
+  quality = 0.8,
+): Promise<File> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = (loadEvent) => {
+      const img = new Image();
+      img.onload = () => {
+        // Create an offscreen canvas
+        const canvas = document.createElement("canvas");
+        let width = img.width;
+        let height = img.height;
+
+        // Scale down if width is larger than maxWidth
+        if (width > maxWidth) {
+          height = Math.round((height / width) * maxWidth);
+          width = maxWidth;
+        }
+
+        canvas.width = width;
+        canvas.height = height;
+
+        const ctx = canvas.getContext("2d");
+        if (!ctx) {
+          reject(new Error("Could not get 2D context from canvas."));
+          return;
+        }
+
+        // Draw the image into the canvas
+        ctx.drawImage(img, 0, 0, width, height);
+
+        // Convert canvas back to Blob
+        canvas.toBlob(
+          (blob) => {
+            if (!blob) {
+              reject(new Error("Canvas toBlob() gave null blob."));
+              return;
+            }
+
+            // Create a new File from the Blob
+            const compressedFile = new File([blob], file.name, {
+              type: file.type,
+              lastModified: Date.now(),
+            });
+
+            resolve(compressedFile);
+          },
+          file.type,
+          quality,
+        );
+      };
+
+      if (typeof loadEvent.target?.result === "string") {
+        img.src = loadEvent.target.result; // dataURL from FileReader
+      } else {
+        reject(new Error("FileReader result was not a string."));
+      }
+    };
+
+    reader.onerror = (err) => reject(err);
+    reader.readAsDataURL(file);
+  });
+}
+
+/**
+ * A reusable file uploader that compresses images before adding them to `files`.
  *
  * Usage:
  *   <FileUploader
@@ -23,27 +96,47 @@ interface FileUploaderProps {
  *     onSelectImage={setSelectedImageUrl}
  *     disabled={submitting}
  *     label="Receipts"
- *     helpText="Take a photo for each receipt. ..."
+ *     helpText="Take a photo for each receipt..."
  *   />
  */
 function FileUploader({
   files,
   onChange,
-  selectedImageUrl,
   onSelectImage,
   disabled = false,
   label = "Files",
   helpText,
 }: FileUploaderProps) {
   // When user picks new files from the file input
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const pickedFiles = e.target.files;
-    if (!pickedFiles || pickedFiles.length === 0) return;
+  const handleFileChange = useCallback(
+    async (e: React.ChangeEvent<HTMLInputElement>) => {
+      const pickedFiles = e.target.files;
+      if (!pickedFiles || pickedFiles.length === 0) return;
 
-    const newFiles = Array.from(pickedFiles);
-    onChange([...files, ...newFiles]);
-    e.target.value = "";
-  };
+      // Convert each newly picked File into a compressed File
+      const newCompressedFiles: File[] = [];
+      for (const originalFile of Array.from(pickedFiles)) {
+        try {
+          const compressedFile = await compressImageFile(
+            originalFile,
+            1200, // maxWidth
+            0.8, // quality
+          );
+          newCompressedFiles.push(compressedFile);
+        } catch (error) {
+          console.error("Error compressing file:", originalFile.name, error);
+          // If compression failed, fallback to original file
+          newCompressedFiles.push(originalFile);
+        }
+      }
+
+      onChange([...files, ...newCompressedFiles]);
+
+      // Reset file input's value so user can pick the same file again if needed
+      e.target.value = "";
+    },
+    [files, onChange],
+  );
 
   // Remove a file from our array
   const handleRemoveFile = (index: number) => {

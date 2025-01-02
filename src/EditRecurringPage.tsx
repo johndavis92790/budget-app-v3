@@ -15,7 +15,6 @@ import { FaTimes, FaArrowLeft } from "react-icons/fa";
 import FullSizeImageModal from "./FullSizeImageModal";
 import FullPageSpinner from "./FullPageSpinner";
 
-// Reuse form fields from CommonFormFields
 import {
   DescriptionField,
   TypeField,
@@ -45,6 +44,7 @@ function EditRecurringPage({
   const navigate = useNavigate();
   const recurringTypes = ["Expense", "Income"];
 
+  // We track which item we’re editing
   const [selectedRecurring, setSelectedRecurring] = useState<Recurring | null>(
     null,
   );
@@ -52,12 +52,13 @@ function EditRecurringPage({
     null,
   );
 
+  // We'll keep two states for tags
+  const [tags, setTags] = useState<string[]>([]);
+  const [newTags, setNewTags] = useState<string[]>([]);
+
   // Existing images
   const [existingImageItems, setExistingImageItems] = useState<
-    {
-      url: string;
-      fullPath: string;
-    }[]
+    { url: string; fullPath: string }[]
   >([]);
   const [existingLoading, setExistingLoading] = useState(false);
   const [existingError, setExistingError] = useState<string | null>(null);
@@ -73,11 +74,11 @@ function EditRecurringPage({
   const [deleting, setDeleting] = useState(false);
   const [initialized, setInitialized] = useState(false);
 
-  // Query param for ?id=
+  // Grab ?id= from the URL
   const queryParams = new URLSearchParams(location.search);
   const idParam = queryParams.get("id");
 
-  // Find the matching recurring item
+  // 1) Once loaded, find the matching recurring + init tags
   useEffect(() => {
     if (loading) return;
     if (!idParam) {
@@ -92,9 +93,13 @@ function EditRecurringPage({
     }
     setSelectedRecurring(foundRecurring);
     setUpdatedRecurring(foundRecurring);
+
+    // Initialize tags from existing item
+    setTags(foundRecurring.tags || []);
+    setNewTags([]);
   }, [loading, idParam, recurring, navigate]);
 
-  // Load existing images once
+  // 2) Load existing images
   useEffect(() => {
     if (!updatedRecurring || initialized) return;
 
@@ -145,6 +150,14 @@ function EditRecurringPage({
     setUpdatedRecurring({ ...updatedRecurring, [field]: value });
   };
 
+  // ------------- Tag setters for new approach -------------
+  function handleExistingTagsUpdate(newArray: string[]) {
+    setTags(newArray);
+  }
+  function handleNewTagsUpdate(newArray: string[]) {
+    setNewTags(newArray);
+  }
+
   // For new images
   const handleNewImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
@@ -167,11 +180,19 @@ function EditRecurringPage({
     setNewImageFiles((prev) => prev.filter((_, i) => i !== index));
   };
 
+  // 3) Save
   const handleSave = async () => {
     if (!updatedRecurring) return;
 
     setSubmitting(true);
     try {
+      // Combine existing + new
+      const finalTags = [
+        ...tags,
+        ...newTags.map((t) => t.trim()).filter(Boolean),
+      ];
+      updatedRecurring.tags = finalTags;
+
       const id = updatedRecurring.id;
       const storage = getStorage();
 
@@ -192,7 +213,6 @@ function EditRecurringPage({
       }
 
       // 3) Update the item
-      console.log(updatedRecurring);
       await onUpdateItem(updatedRecurring);
 
       // 4) Go back
@@ -276,34 +296,27 @@ function EditRecurringPage({
         <Row>
           <Col xs={6}>
             <TagField
-              tags={updatedRecurring.tags}
-              setTags={(vals) => handleFieldChange("tags", vals)}
+              tags={tags}
+              setTags={handleExistingTagsUpdate}
               availableTags={nonRecurringTags}
               disabled={submitting}
+              newTags={newTags}
+              setNewTags={handleNewTagsUpdate}
             />
           </Col>
           <Col xs={6}>
             <Form.Group controlId="formValue" className="mb-3">
               <Form.Label>Amount</Form.Label>
               <CurrencyInput
-                // We'll pass the existing value as a string, e.g. "123.45" or "0"
-                // If your DB stored it as a number, do String(selectedHistory.value).
                 value={String(updatedRecurring.value || 0)}
                 placeholder="$0.00"
                 style={{ width: "100%" }}
                 disabled={submitting}
-                // We do an onChange that reads the masked string (like "$1,234.56") from e.target.value
-                onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
-                  // text-mask returns the masked string in e.target.value,
-                  // e.g. "$1,234.56"
+                onChange={(e) => {
                   const maskedVal = e.target.value;
-                  // Remove all non-digit chars except '.' or '-'
                   const numericStr = maskedVal.replace(/[^0-9.-]/g, "");
-                  const parsed = parseFloat(numericStr);
-                  // Fallback to 0 if invalid
-                  const finalNum = isNaN(parsed) ? 0 : parsed;
-                  // Store in your state
-                  handleFieldChange("value", finalNum);
+                  const finalNum = parseFloat(numericStr);
+                  handleFieldChange("value", isNaN(finalNum) ? 0 : finalNum);
                 }}
               />
             </Form.Group>
@@ -333,7 +346,7 @@ function EditRecurringPage({
             >
               <img
                 src={item.url}
-                alt="Exisiting Receipt"
+                alt="Existing Receipt"
                 style={{
                   width: "100px",
                   height: "auto",
@@ -459,7 +472,6 @@ function EditRecurringPage({
         </Button>
       </div>
 
-      {/* Full-size preview modal */}
       <FullSizeImageModal
         show={selectedImageUrl !== null}
         imageUrl={selectedImageUrl}

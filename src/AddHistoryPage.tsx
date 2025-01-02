@@ -10,12 +10,11 @@ import FileUploader from "./FileUploader"; // <-- from previous refactor
 import {
   DateField,
   CategoryField,
-  TagField,
   DescriptionField,
+  TagField,
 } from "./CommonFormFields";
 
 import CurrencyInput from "./CurrencyInput";
-
 import { History } from "./types";
 
 interface AddHistoryPageProps {
@@ -40,6 +39,7 @@ function AddHistoryPage({
   monthlyGoal,
   onUpdateGoal,
 }: AddHistoryPageProps) {
+  // ----------------- Basic form states -----------------
   const [date, setDate] = useState(() => {
     const today = new Date();
     const yyyy = today.getFullYear();
@@ -49,7 +49,12 @@ function AddHistoryPage({
   });
 
   const [category, setCategory] = useState("");
-  const [tags, setTags] = useState<string[]>([]);
+
+  // ------------- Two states for tags -------------
+  const [tags, setTags] = useState<string[]>([]); // chosen from multi-select
+  const [newTags, setNewTags] = useState<string[]>([]); // brand-new typed tags
+
+  // ------------- Other fields -------------
   const [value, setValue] = useState("");
   const [description, setDescription] = useState("");
   const [receiptFiles, setReceiptFiles] = useState<File[]>([]);
@@ -58,8 +63,15 @@ function AddHistoryPage({
 
   const editURLFragment = "https://budget-app-v3.web.app/edit-history?id=";
 
+  // ------------- Helper: handle existing + new tags on submit -------------
   const handleSubmit = async (type: "Expense" | "Refund") => {
-    if (!date || !category || tags.length === 0 || !value) {
+    // Combine existing + new tags
+    const finalTags = [
+      ...tags,
+      ...newTags.map((t) => t.trim()).filter(Boolean),
+    ];
+
+    if (!date || !category || finalTags.length === 0 || !value) {
       alert("Date, Category, at least one Tag, and Value are required.");
       return;
     }
@@ -68,6 +80,7 @@ function AddHistoryPage({
     try {
       const uniqueId = String(Date.now());
 
+      // Upload receipts if any
       if (receiptFiles.length > 0) {
         for (const file of receiptFiles) {
           const fileRef = ref(
@@ -83,7 +96,7 @@ function AddHistoryPage({
       const numericStr = value.replace(/[^0-9.-]/g, "");
       const numericValue = parseFloat(numericStr);
       if (isNaN(numericValue)) {
-        alert("Invalid numeric value for 'Value'. Please check your input.");
+        alert("Invalid numeric value for 'Value'.");
         setSubmitting(false);
         return;
       }
@@ -92,7 +105,7 @@ function AddHistoryPage({
         date,
         type,
         category,
-        tags,
+        tags: finalTags, // <--- combine existing + new
         value: numericValue,
         description,
         editURL,
@@ -106,6 +119,7 @@ function AddHistoryPage({
         return;
       }
 
+      // Adjust weekly/monthly goals
       if (type === "Expense") {
         await onUpdateGoal("weeklyGoal", weeklyGoal - numericValue);
         await onUpdateGoal("monthlyGoal", monthlyGoal - numericValue);
@@ -114,13 +128,16 @@ function AddHistoryPage({
         await onUpdateGoal("monthlyGoal", monthlyGoal + numericValue);
       }
 
+      // Reset form fields
       const now = new Date();
       const yyyy = now.getFullYear();
       const mm = String(now.getMonth() + 1).padStart(2, "0");
       const dd = String(now.getDate()).padStart(2, "0");
       setDate(`${yyyy}-${mm}-${dd}`);
+
       setCategory("");
       setTags([]);
+      setNewTags([]);
       setValue("");
       setDescription("");
       setReceiptFiles([]);
@@ -134,6 +151,14 @@ function AddHistoryPage({
 
   if (loading && categories.length === 0 && nonRecurringTags.length === 0) {
     return <FullPageSpinner />;
+  }
+
+  // Tag setter helpers (rather than passing React setState directly):
+  function handleExistingTagsUpdate(newArray: string[]) {
+    setTags(newArray);
+  }
+  function handleNewTagsUpdate(newArray: string[]) {
+    setNewTags(newArray);
   }
 
   return (
@@ -164,10 +189,12 @@ function AddHistoryPage({
           <Col xs={6}>
             <TagField
               tags={tags}
-              setTags={setTags}
+              setTags={handleExistingTagsUpdate}
               availableTags={nonRecurringTags}
               disabled={submitting}
               required
+              newTags={newTags}
+              setNewTags={handleNewTagsUpdate}
             />
           </Col>
           <Col xs={6}>
@@ -201,7 +228,6 @@ function AddHistoryPage({
               helpText="Take a photo for each receipt. To add more, tap again."
               files={receiptFiles}
               onChange={setReceiptFiles}
-              selectedImageUrl={selectedImageUrl}
               onSelectImage={setSelectedImageUrl}
               disabled={submitting}
             />
@@ -226,7 +252,6 @@ function AddHistoryPage({
             variant="danger"
             onClick={() => handleSubmit("Expense")}
             disabled={submitting}
-            className="me-3"
           >
             {submitting ? (
               <Spinner as="span" animation="border" size="sm" />

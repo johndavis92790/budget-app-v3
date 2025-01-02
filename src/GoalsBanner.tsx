@@ -55,7 +55,9 @@ function GoalsBanner({ weeklyGoal, monthlyGoal, loading }: GoalsBannerProps) {
             backgroundColor: monthlyGoal < 0 ? "#f8d7da" : "#d4edda", // Red or green background
             color: monthlyGoal < 0 ? "#721c24" : "#155724", // Red or green text
             padding: "20px",
-            border: `1px solid ${monthlyGoal < 0 ? "#f5c2c7" : "#badbcc"}`, // Matching border
+            borderRight: `1px solid ${monthlyGoal < 0 ? "#f5c2c7" : "#badbcc"}`, // Matching border
+            borderTop: `1px solid ${monthlyGoal < 0 ? "#f5c2c7" : "#badbcc"}`, // Matching border
+            borderBottom: `1px solid ${monthlyGoal < 0 ? "#f5c2c7" : "#badbcc"}`, // Matching border
             borderLeft: "none", // Remove overlap with the adjacent border
             borderRadius: `0 ${borderRadius} ${borderRadius} 0`, // Round right corners
           }}
