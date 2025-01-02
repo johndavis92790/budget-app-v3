@@ -25,26 +25,30 @@ import {
 import CurrencyInput from "./CurrencyInput";
 
 interface EditRecurringPageProps {
-  recurringTypes: string[];
   categories: string[];
   nonRecurringTags: string[];
   onUpdateItem: (updatedRecurring: Recurring) => Promise<void>;
+  deleteItem: (item: Recurring) => Promise<void>;
   loading: boolean;
   recurring: Recurring[];
 }
 
 function EditRecurringPage({
-  recurringTypes,
   categories,
   nonRecurringTags,
   onUpdateItem,
+  deleteItem,
   loading,
   recurring,
 }: EditRecurringPageProps) {
   const location = useLocation();
   const navigate = useNavigate();
+  const recurringTypes = ["Expense", "Income"];
 
   const [selectedRecurring, setSelectedRecurring] = useState<Recurring | null>(
+    null,
+  );
+  const [updatedRecurring, setUpdatedRecurring] = useState<Recurring | null>(
     null,
   );
 
@@ -66,6 +70,7 @@ function EditRecurringPage({
   const [selectedImageUrl, setSelectedImageUrl] = useState<string | null>(null);
 
   const [submitting, setSubmitting] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const [initialized, setInitialized] = useState(false);
 
   // Query param for ?id=
@@ -86,18 +91,19 @@ function EditRecurringPage({
       return;
     }
     setSelectedRecurring(foundRecurring);
+    setUpdatedRecurring(foundRecurring);
   }, [loading, idParam, recurring, navigate]);
 
   // Load existing images once
   useEffect(() => {
-    if (!selectedRecurring || initialized) return;
+    if (!updatedRecurring || initialized) return;
 
     const loadExistingImages = async () => {
       setExistingImageItems([]);
       setRemovedExistingPaths([]);
       setNewImageFiles([]);
 
-      const id = selectedRecurring.id;
+      const id = updatedRecurring.id;
       if (!id) {
         setInitialized(true);
         return;
@@ -128,15 +134,15 @@ function EditRecurringPage({
     };
 
     loadExistingImages();
-  }, [selectedRecurring, initialized]);
+  }, [updatedRecurring, initialized]);
 
   // Helper for changing a single field
   const handleFieldChange = (
     field: keyof Recurring,
     value: string | number | string[],
   ) => {
-    if (!selectedRecurring) return;
-    setSelectedRecurring({ ...selectedRecurring, [field]: value });
+    if (!updatedRecurring) return;
+    setUpdatedRecurring({ ...updatedRecurring, [field]: value });
   };
 
   // For new images
@@ -162,11 +168,11 @@ function EditRecurringPage({
   };
 
   const handleSave = async () => {
-    if (!selectedRecurring) return;
+    if (!updatedRecurring) return;
 
     setSubmitting(true);
     try {
-      const id = selectedRecurring.id;
+      const id = updatedRecurring.id;
       const storage = getStorage();
 
       // 1) Delete removed images
@@ -186,8 +192,8 @@ function EditRecurringPage({
       }
 
       // 3) Update the item
-      console.log(selectedRecurring);
-      await onUpdateItem(selectedRecurring);
+      console.log(updatedRecurring);
+      await onUpdateItem(updatedRecurring);
 
       // 4) Go back
       navigate("/recurring");
@@ -199,10 +205,30 @@ function EditRecurringPage({
     }
   };
 
+  const handleDelete = async () => {
+    if (!selectedRecurring) return;
+
+    const confirmDelete = window.confirm(
+      `Are you sure you want to delete this recurring item?`,
+    );
+    if (!confirmDelete) return;
+
+    setDeleting(true);
+    try {
+      await deleteItem(selectedRecurring);
+      navigate("/recurring");
+    } catch (error) {
+      console.error("Error deleting recurring item:", error);
+      alert("An error occurred while deleting the recurring item.");
+    } finally {
+      setDeleting(false);
+    }
+  };
+
   if (loading) {
     return <FullPageSpinner />;
   }
-  if (!selectedRecurring) {
+  if (!updatedRecurring) {
     return <p>Loading recurring data or no recurring found...</p>;
   }
 
@@ -220,7 +246,7 @@ function EditRecurringPage({
         <Row>
           <Col md={8}>
             <DescriptionField
-              value={selectedRecurring.description}
+              value={updatedRecurring.description}
               onChange={(val) => handleFieldChange("description", val)}
               disabled={submitting}
             />
@@ -230,7 +256,7 @@ function EditRecurringPage({
         <Row>
           <Col xs={6}>
             <TypeField
-              typeValue={selectedRecurring.type}
+              typeValue={updatedRecurring.type}
               setTypeValue={(val) => handleFieldChange("type", val)}
               options={recurringTypes}
               disabled={submitting}
@@ -238,7 +264,7 @@ function EditRecurringPage({
           </Col>
           <Col xs={6}>
             <CategoryField
-              categoryValue={selectedRecurring.category}
+              categoryValue={updatedRecurring.category}
               setCategoryValue={(val) => handleFieldChange("category", val)}
               categories={categories}
               disabled={submitting}
@@ -250,7 +276,7 @@ function EditRecurringPage({
         <Row>
           <Col xs={6}>
             <TagField
-              tags={selectedRecurring.tags}
+              tags={updatedRecurring.tags}
               setTags={(vals) => handleFieldChange("tags", vals)}
               availableTags={nonRecurringTags}
               disabled={submitting}
@@ -262,7 +288,7 @@ function EditRecurringPage({
               <CurrencyInput
                 // We'll pass the existing value as a string, e.g. "123.45" or "0"
                 // If your DB stored it as a number, do String(selectedHistory.value).
-                value={String(selectedRecurring.value || 0)}
+                value={String(updatedRecurring.value || 0)}
                 placeholder="$0.00"
                 style={{ width: "100%" }}
                 disabled={submitting}
@@ -401,16 +427,28 @@ function EditRecurringPage({
 
       <div className="d-flex justify-content-end">
         <Button
+          variant="danger"
+          onClick={handleDelete}
+          disabled={!updatedRecurring || deleting}
+        >
+          {deleting ? (
+            <Spinner as="span" animation="border" size="sm" />
+          ) : (
+            "Delete"
+          )}
+        </Button>
+        <Button
           variant="secondary"
           onClick={() => navigate("/recurring")}
           disabled={submitting}
+          style={{ marginLeft: "10px" }}
         >
           Cancel
         </Button>
         <Button
           variant="primary"
           onClick={handleSave}
-          disabled={!selectedRecurring || submitting}
+          disabled={!updatedRecurring || submitting}
           style={{ marginLeft: "10px" }}
         >
           {submitting ? (

@@ -1,6 +1,14 @@
 import { Button } from "react-bootstrap";
+import FullPageSpinner from "./FullPageSpinner";
 
-function HomePage() {
+interface HomePageProps {
+  loading: boolean;
+}
+
+function HomePage({ loading }: HomePageProps) {
+  if (loading) {
+    return <FullPageSpinner />;
+  }
   return (
     <div className="d-grid gap-2">
       <Button size="lg" href="/add-history">

@@ -1,9 +1,10 @@
 import React from "react";
-import { Row, Col } from "react-bootstrap";
+import { Row, Col, Spinner } from "react-bootstrap";
 
 interface GoalsBannerProps {
   weeklyGoal: number;
   monthlyGoal: number;
+  loading: boolean;
 }
 
 function formatCurrency(amount: number) {
@@ -13,7 +14,7 @@ function formatCurrency(amount: number) {
   });
 }
 
-function GoalsBanner({ weeklyGoal, monthlyGoal }: GoalsBannerProps) {
+function GoalsBanner({ weeklyGoal, monthlyGoal, loading }: GoalsBannerProps) {
   const borderRadius = "10px"; // Adjust based on your desired roundness
 
   return (
@@ -29,13 +30,22 @@ function GoalsBanner({ weeklyGoal, monthlyGoal }: GoalsBannerProps) {
             backgroundColor: weeklyGoal < 0 ? "#f8d7da" : "#d4edda", // Red or green background
             color: weeklyGoal < 0 ? "#721c24" : "#155724", // Red or green text
             padding: "20px",
-            border: `1px solid ${weeklyGoal < 0 ? "#f5c2c7" : "#badbcc"}`, // Matching border
+            borderLeft: `1px solid ${weeklyGoal < 0 ? "#f5c2c7" : "#badbcc"}`, // Matching border
+            borderTop: `1px solid ${weeklyGoal < 0 ? "#f5c2c7" : "#badbcc"}`, // Matching border
+            borderBottom: `1px solid ${weeklyGoal < 0 ? "#f5c2c7" : "#badbcc"}`, // Matching border
             borderRight: "none", // Remove overlap with the adjacent border
             borderRadius: `${borderRadius} 0 0 ${borderRadius}`, // Round left corners
           }}
         >
           <h5>Weekly Spending Goal</h5>
-          <h1 className="fw-bold">{formatCurrency(weeklyGoal)}</h1>
+
+          {loading ? (
+            <p>
+              <Spinner as="span" animation="border" />
+            </p>
+          ) : (
+            <h1 className="fw-bold">{formatCurrency(weeklyGoal)}</h1>
+          )}
         </Col>
 
         {/* Monthly Goal */}
@@ -51,7 +61,13 @@ function GoalsBanner({ weeklyGoal, monthlyGoal }: GoalsBannerProps) {
           }}
         >
           <h5>Available Fiscal Monthly Funds</h5>
-          <h1 className="fw-bold">{formatCurrency(monthlyGoal)}</h1>
+          {loading ? (
+            <p>
+              <Spinner as="span" animation="border" />
+            </p>
+          ) : (
+            <h1 className="fw-bold">{formatCurrency(monthlyGoal)}</h1>
+          )}
         </Col>
       </Row>
     </div>

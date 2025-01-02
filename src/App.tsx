@@ -19,13 +19,10 @@ function App() {
   const [categories, setCategories] = useState<string[]>([]);
   const [nonRecurringTags, setNonRecurringTags] = useState<string[]>([]);
   const [recurringTags, setRecurringTags] = useState<string[]>([]);
-  const [nonRecurringTypes, setNonRecurringTypes] = useState<string[]>([]);
-  const [recurringTypes, setRecurringTypes] = useState<string[]>([]);
-  const [historyTypes, setHistoryTypes] = useState<string[]>([]);
   const [weeklyGoal, setWeeklyGoal] = useState<number>(0);
   const [monthlyGoal, setMonthlyGoal] = useState<number>(0);
   const [fiscalWeeks, setFiscalWeeks] = useState<Record<string, FiscalWeek>>(
-    {},
+    {}
   );
   const [loading, setLoading] = useState<boolean>(true);
 
@@ -44,21 +41,18 @@ function App() {
           value: Math.round(history.value * 100) / 100,
           rowIndex: index + 2,
           date: mmddyyyyToYyyyMmDd(history.date),
-        })),
+        }))
       );
       setRecurring(
         data.recurring.map((recurring: Recurring, index: number) => ({
           ...recurring,
           value: Math.round(recurring.value * 100) / 100,
           rowIndex: index + 2,
-        })),
+        }))
       );
       setCategories(data.categories || []);
       setNonRecurringTags(data.nonRecurringTags || []);
       setRecurringTags(data.recurringTags || []);
-      setNonRecurringTypes(data.nonRecurringTypes || []);
-      setRecurringTypes(data.recurringTypes || []);
-      setHistoryTypes(data.historyTypes || []);
       setWeeklyGoal(data.weeklyGoal);
       setMonthlyGoal(data.monthlyGoal);
       setFiscalWeeks(data.fiscalWeeks || {});
@@ -117,7 +111,7 @@ function App() {
 
   const onUpdateGoal = async (
     itemType: "weeklyGoal" | "monthlyGoal",
-    newValue: number,
+    newValue: number
   ) => {
     try {
       await fetch(API_URL, {
@@ -130,6 +124,27 @@ function App() {
       await fetchData();
     } catch (err) {
       console.error("Error updating goal:", err);
+    }
+  };
+
+  const deleteItem = async (item: History | Recurring) => {
+    console.log("item", item);
+    try {
+      const response = await fetch(`${API_URL}`, {
+        method: "DELETE",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(item),
+      });
+
+      if (!response.ok) {
+        throw new Error(`Error deleting item: ${response.statusText}`);
+      }
+      await fetchData();
+    } catch (error) {
+      console.error(`Error deleting ${item.itemType} item:`, error);
+      alert(`An error occurred while deleting the ${item.itemType} item.`);
     }
   };
 
@@ -158,11 +173,15 @@ function App() {
           </Container>
         </Navbar>
 
-        <GoalsBanner weeklyGoal={weeklyGoal} monthlyGoal={monthlyGoal} />
+        <GoalsBanner
+          weeklyGoal={weeklyGoal}
+          monthlyGoal={monthlyGoal}
+          loading={loading}
+        />
 
         <Container>
           <Routes>
-            <Route path="/" element={<HomePage />} />
+            <Route path="/" element={<HomePage loading={loading} />} />
             <Route
               path="/add-history"
               element={
@@ -182,7 +201,6 @@ function App() {
               element={
                 <AddRecurringPage
                   recurringTags={recurringTags}
-                  recurringTypes={recurringTypes}
                   categories={categories}
                   addItem={addItem}
                   loading={loading}
@@ -203,10 +221,10 @@ function App() {
               path="/edit-history"
               element={
                 <EditHistoryPage
-                  historyTypes={historyTypes}
                   categories={categories}
                   nonRecurringTags={nonRecurringTags}
                   onUpdateItem={onUpdateItem}
+                  deleteItem={deleteItem}
                   loading={loading}
                   history={history}
                 />
@@ -216,10 +234,10 @@ function App() {
               path="/edit-recurring"
               element={
                 <EditRecurringPage
-                  recurringTypes={recurringTypes}
                   categories={categories}
                   nonRecurringTags={nonRecurringTags}
                   onUpdateItem={onUpdateItem}
+                  deleteItem={deleteItem}
                   loading={loading}
                   recurring={recurring}
                 />

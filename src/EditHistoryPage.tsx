@@ -1,6 +1,6 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import { History } from "./types";
+import { History, Recurring } from "./types";
 import { Form, Button, Spinner, Row, Col } from "react-bootstrap";
 import {
   getStorage,
@@ -18,7 +18,6 @@ import FullPageSpinner from "./FullPageSpinner";
 // Import your other common form fields
 import {
   DateField,
-  TypeField,
   CategoryField,
   TagField,
   DescriptionField,
@@ -28,19 +27,19 @@ import {
 import CurrencyInput from "./CurrencyInput";
 
 interface EditHistoryPageProps {
-  historyTypes: string[];
   categories: string[];
   nonRecurringTags: string[];
   onUpdateItem: (updatedHistory: History) => Promise<void>;
+  deleteItem: (item: History | Recurring) => Promise<void>;
   loading: boolean;
   history: History[];
 }
 
 function EditHistoryPage({
-  historyTypes,
   categories,
   nonRecurringTags,
   onUpdateItem,
+  deleteItem,
   loading,
   history,
 }: EditHistoryPageProps) {
@@ -48,6 +47,7 @@ function EditHistoryPage({
   const navigate = useNavigate();
 
   const [selectedHistory, setSelectedHistory] = useState<History | null>(null);
+  const [updatedHistory, setUpdatedHistory] = useState<History | null>(null);
 
   // Existing receipts
   const [existingImageItems, setExistingImageItems] = useState<
@@ -64,6 +64,7 @@ function EditHistoryPage({
   const [selectedImageUrl, setSelectedImageUrl] = useState<string | null>(null);
 
   const [submitting, setSubmitting] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const [initialized, setInitialized] = useState(false);
 
   // Grab ?id= from the URL
@@ -83,18 +84,19 @@ function EditHistoryPage({
       return;
     }
     setSelectedHistory(foundHistory);
+    setUpdatedHistory(foundHistory);
   }, [loading, idParam, history, navigate]);
 
   // 2) Load existing receipts
   useEffect(() => {
-    if (!selectedHistory || initialized) return;
+    if (!updatedHistory || initialized) return;
 
     const loadExistingImages = async () => {
       setExistingImageItems([]);
       setRemovedExistingPaths([]);
       setNewImageFiles([]);
 
-      const id = selectedHistory.id;
+      const id = updatedHistory.id;
       if (!id) {
         setInitialized(true);
         return;
@@ -125,15 +127,15 @@ function EditHistoryPage({
     };
 
     loadExistingImages();
-  }, [selectedHistory, initialized]);
+  }, [updatedHistory, initialized]);
 
-  // Helper to change one field in selectedHistory
+  // Helper to change one field in updatedHistory
   const handleFieldChange = (
     field: keyof History,
     value: string | number | string[],
   ) => {
-    if (!selectedHistory) return;
-    setSelectedHistory({ ...selectedHistory, [field]: value });
+    if (!updatedHistory) return;
+    setUpdatedHistory({ ...updatedHistory, [field]: value });
   };
 
   // Handle file input
@@ -160,11 +162,11 @@ function EditHistoryPage({
 
   // Save
   const handleSave = async () => {
-    if (!selectedHistory) return;
+    if (!updatedHistory) return;
     setSubmitting(true);
 
     try {
-      const id = selectedHistory.id;
+      const id = updatedHistory.id;
       const storage = getStorage();
 
       // 1) Delete removed receipts
@@ -184,8 +186,8 @@ function EditHistoryPage({
       }
 
       // 3) Update
-      console.log("Saving updated history:", selectedHistory);
-      await onUpdateItem(selectedHistory);
+      console.log("Saving updated history:", updatedHistory);
+      await onUpdateItem(updatedHistory);
 
       // 4) Navigate
       navigate("/history");
@@ -197,10 +199,30 @@ function EditHistoryPage({
     }
   };
 
+  const handleDelete = async () => {
+    if (!selectedHistory) return;
+
+    const confirmDelete = window.confirm(
+      `Are you sure you want to delete this history item?`,
+    );
+    if (!confirmDelete) return;
+
+    setDeleting(true);
+    try {
+      await deleteItem(selectedHistory);
+      navigate("/history");
+    } catch (error) {
+      console.error("Error deleting history item:", error);
+      alert("An error occurred while deleting the history item.");
+    } finally {
+      setDeleting(false);
+    }
+  };
+
   if (loading) {
     return <FullPageSpinner />;
   }
-  if (!selectedHistory) {
+  if (!updatedHistory) {
     return <p>Loading history data or no history found...</p>;
   }
 
@@ -212,20 +234,20 @@ function EditHistoryPage({
         </Button>
       </div>
 
-      <h2 className="mb-4">Edit {selectedHistory.type}</h2>
+      <h2 className="mb-4">Edit {updatedHistory.type} History</h2>
 
       <Form>
         <Row>
           <Col xs={6}>
             <DateField
-              value={selectedHistory.date}
+              value={updatedHistory.date}
               onChange={(val) => handleFieldChange("date", val)}
               disabled={submitting}
             />
           </Col>
           <Col xs={6}>
             <CategoryField
-              categoryValue={selectedHistory.category}
+              categoryValue={updatedHistory.category}
               setCategoryValue={(val) => handleFieldChange("category", val)}
               categories={categories}
               disabled={submitting}
@@ -237,7 +259,7 @@ function EditHistoryPage({
         <Row>
           <Col xs={6}>
             <TagField
-              tags={selectedHistory.tags}
+              tags={updatedHistory.tags}
               setTags={(vals) => handleFieldChange("tags", vals)}
               availableTags={nonRecurringTags}
               disabled={submitting}
@@ -248,8 +270,8 @@ function EditHistoryPage({
               <Form.Label>Value</Form.Label>
               <CurrencyInput
                 // We'll pass the existing value as a string, e.g. "123.45" or "0"
-                // If your DB stored it as a number, do String(selectedHistory.value).
-                value={String(selectedHistory.value || 0)}
+                // If your DB stored it as a number, do String(updatedHistory.value).
+                value={String(updatedHistory.value || 0)}
                 placeholder="$0.00"
                 style={{ width: "100%" }}
                 disabled={submitting}
@@ -274,7 +296,7 @@ function EditHistoryPage({
         <Row>
           <Col>
             <DescriptionField
-              value={selectedHistory.description}
+              value={updatedHistory.description}
               onChange={(val) => handleFieldChange("description", val)}
               disabled={submitting}
             />
@@ -398,16 +420,28 @@ function EditHistoryPage({
 
       <div className="d-flex justify-content-end">
         <Button
+          variant="danger"
+          onClick={handleDelete}
+          disabled={!updatedHistory || deleting}
+        >
+          {deleting ? (
+            <Spinner as="span" animation="border" size="sm" />
+          ) : (
+            "Delete"
+          )}
+        </Button>
+        <Button
           variant="secondary"
           onClick={() => navigate("/history")}
           disabled={submitting}
+          style={{ marginLeft: "10px" }}
         >
           Cancel
         </Button>
         <Button
           variant="primary"
           onClick={handleSave}
-          disabled={!selectedHistory || submitting}
+          disabled={!updatedHistory || submitting}
           style={{ marginLeft: "10px" }}
         >
           {submitting ? (

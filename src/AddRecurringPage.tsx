@@ -25,7 +25,6 @@ import { FaArrowLeft } from "react-icons/fa";
 
 interface AddRecurringPageProps {
   recurringTags: string[];
-  recurringTypes: string[];
   categories: string[];
   addItem: (recurring: Recurring) => Promise<boolean>;
   loading: boolean;
@@ -33,13 +32,13 @@ interface AddRecurringPageProps {
 
 function AddRecurringPage({
   recurringTags,
-  recurringTypes,
   categories,
   addItem,
   loading,
 }: AddRecurringPageProps) {
   const location = useLocation();
   const navigate = useNavigate();
+  const recurringTypes = ["Expense", "Income"];
 
   const [type, setType] = useState("Expense");
   const [category, setCategory] = useState("");
@@ -58,10 +57,10 @@ function AddRecurringPage({
   useEffect(() => {
     const params = new URLSearchParams(location.search);
     const prefillType = params.get("type");
-    if (prefillType && recurringTypes.includes(prefillType)) {
+    if (prefillType) {
       setType(prefillType);
     }
-  }, [location.search, recurringTypes]);
+  }, [location.search]);
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
