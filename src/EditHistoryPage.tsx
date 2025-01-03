@@ -1,18 +1,10 @@
-import { useEffect, useState } from "react";
+// src/EditHistoryPage.tsx
+import { useEffect, useState, useCallback } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { History, Recurring } from "./types";
-import { Form, Button, Spinner, Row, Col } from "react-bootstrap";
-import {
-  getStorage,
-  ref,
-  listAll,
-  getDownloadURL,
-  deleteObject,
-  uploadBytes,
-} from "firebase/storage";
-import { FaTimes, FaArrowLeft } from "react-icons/fa";
+import { Form, Button, Spinner, Row, Col, Alert } from "react-bootstrap";
+import { FaArrowLeft } from "react-icons/fa";
 
-import FullSizeImageModal from "./FullSizeImageModal";
 import FullPageSpinner from "./FullPageSpinner";
 
 import {
@@ -23,6 +15,18 @@ import {
 } from "./CommonFormFields";
 
 import CurrencyInput from "./CurrencyInput";
+import UnifiedFileManager from "./UnifiedFileManager";
+
+// Import Firebase Storage functions and the initialized storage instance
+import {
+  ref,
+  uploadBytes,
+  getDownloadURL,
+  deleteObject,
+  listAll,
+} from "firebase/storage";
+import { storage } from "./firebase";
+import FullSizeImageModal from "./FullSizeImageModal";
 
 interface EditHistoryPageProps {
   categories: string[];
@@ -47,32 +51,24 @@ function EditHistoryPage({
   const [selectedHistory, setSelectedHistory] = useState<History | null>(null);
   const [updatedHistory, setUpdatedHistory] = useState<History | null>(null);
 
-  // We'll keep local states for tags & newTags
   const [tags, setTags] = useState<string[]>([]);
   const [newTags, setNewTags] = useState<string[]>([]);
 
-  const [existingImageItems, setExistingImageItems] = useState<
-    { url: string; fullPath: string }[]
-  >([]);
-  const [existingLoading, setExistingLoading] = useState(false);
-  const [existingError, setExistingError] = useState<string | null>(null);
-  const [removedExistingPaths, setRemovedExistingPaths] = useState<string[]>(
-    [],
-  );
-
-  const [newImageFiles, setNewImageFiles] = useState<File[]>([]);
-  const [selectedImageUrl, setSelectedImageUrl] = useState<string | null>(null);
-
   const [submitting, setSubmitting] = useState(false);
   const [deleting, setDeleting] = useState(false);
-  const [initialized, setInitialized] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  // Grab ?id= from the URL
+  // Image management states
+  const [newFiles, setNewFiles] = useState<File[]>([]); // New images to upload
+  const [removedPaths, setRemovedPaths] = useState<string[]>([]); // Existing images to remove
+
+  // State for displaying selected image in modal
+  const [selectedImageUrl, setSelectedImageUrl] = useState<string | null>(null);
+
   const queryParams = new URLSearchParams(location.search);
   const idParam = queryParams.get("id");
 
-  // 1) Once data is loaded, find the matching history item
-  //    and initialize tags from it
+  // Load the history item and initialize state
   useEffect(() => {
     if (loading) return;
     if (!idParam) {
@@ -87,154 +83,108 @@ function EditHistoryPage({
     setSelectedHistory(foundHistory);
     setUpdatedHistory(foundHistory);
 
-    // Initialize tags from existing item
     setTags(foundHistory.tags || []);
     setNewTags([]);
   }, [loading, idParam, history, navigate]);
 
-  // 2) Load existing receipts if we haven't yet
-  useEffect(() => {
-    if (!updatedHistory || initialized) return;
+  const handleFieldChange = useCallback(
+    (field: keyof History, value: string | number | string[]) => {
+      if (!updatedHistory) return;
+      setUpdatedHistory({ ...updatedHistory, [field]: value });
+    },
+    [updatedHistory]
+  );
 
-    const loadExistingImages = async () => {
-      setExistingImageItems([]);
-      setRemovedExistingPaths([]);
-      setNewImageFiles([]);
-
-      const id = updatedHistory.id;
-      if (!id) {
-        setInitialized(true);
-        return;
-      }
-
-      setExistingLoading(true);
-      setExistingError(null);
-
-      const storage = getStorage();
-      const folderRef = ref(storage, `receipts/${id}`);
-      try {
-        const res = await listAll(folderRef);
-        const urls = await Promise.all(
-          res.items.map(async (item) => {
-            const url = await getDownloadURL(item);
-            return { url, fullPath: item.fullPath };
-          }),
-        );
-        setExistingImageItems(urls);
-      } catch (error: any) {
-        console.error("Error loading existing receipts:", error);
-        setExistingError("Error loading existing receipts.");
-      } finally {
-        setExistingLoading(false);
-      }
-
-      setInitialized(true);
-    };
-
-    loadExistingImages();
-  }, [updatedHistory, initialized]);
-
-  // Helper to set a field on updatedHistory
-  const handleFieldChange = (
-    field: keyof History,
-    value: string | number | string[],
-  ) => {
-    if (!updatedHistory) return;
-    setUpdatedHistory({ ...updatedHistory, [field]: value });
-  };
-
-  // File input
-  const handleNewImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = e.target.files;
-    if (!files) return;
-    setNewImageFiles((prev) => [...prev, ...Array.from(files)]);
-    e.target.value = "";
-  };
-
-  // Remove existing
-  const handleRemoveExistingImage = (fullPath: string) => {
-    setRemovedExistingPaths((prev) => [...prev, fullPath]);
-    setExistingImageItems((prev) =>
-      prev.filter((item) => item.fullPath !== fullPath),
-    );
-  };
-
-  // Remove new
-  const handleRemoveNewImage = (index: number) => {
-    setNewImageFiles((prev) => prev.filter((_, i) => i !== index));
-  };
-
-  // ------------- Tag setters for the new approach -------------
-  function handleExistingTagsUpdate(newArray: string[]) {
-    setTags(newArray);
-  }
-  function handleNewTagsUpdate(newArray: string[]) {
-    setNewTags(newArray);
-  }
-
-  // 3) Save
-  const handleSave = async () => {
+  const handleSave = useCallback(async () => {
     if (!updatedHistory) return;
 
     setSubmitting(true);
+    setError(null);
     try {
-      // Combine existing + new
+      // Combine existing + new tags
       const finalTags = [
         ...tags,
         ...newTags.map((t) => t.trim()).filter(Boolean),
       ];
       updatedHistory.tags = finalTags;
 
-      const id = updatedHistory.id;
-      const storage = getStorage();
-
-      // Delete removed receipts
-      for (const path of removedExistingPaths) {
-        const fileRef = ref(storage, path);
-        await deleteObject(fileRef).catch((err) =>
-          console.error("Error deleting:", err),
+      // Upload new images
+      const uploadedUrls: string[] = [];
+      for (const file of newFiles) {
+        const fileRef = ref(
+          storage,
+          `images/${updatedHistory.id}/${file.name}`
         );
+        await uploadBytes(fileRef, file);
+        const downloadURL = await getDownloadURL(fileRef);
+        uploadedUrls.push(downloadURL);
       }
 
-      // Upload new receipts
-      if (id && newImageFiles.length > 0) {
-        for (const file of newImageFiles) {
-          const fileRef = ref(storage, `receipts/${id}/${id}-${file.name}`);
-          await uploadBytes(fileRef, file);
-        }
+      // Delete removed images
+      for (const path of removedPaths) {
+        const fileRef = ref(storage, path);
+        await deleteObject(fileRef);
       }
 
-      // Call parent's onUpdateItem
+      // Optionally, you can store uploadedUrls in the history object if needed
+      // e.g., updatedHistory.imageUrls = uploadedUrls;
+
       await onUpdateItem(updatedHistory);
-
       navigate("/history");
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error saving history:", error);
-      alert("An error occurred while saving the history.");
+      setError("An error occurred while saving the history.");
     } finally {
       setSubmitting(false);
     }
-  };
+  }, [updatedHistory, tags, newTags, newFiles, removedPaths, onUpdateItem, navigate]);
 
-  const handleDelete = async () => {
+  const handleDelete = useCallback(async () => {
     if (!selectedHistory) return;
 
     const confirmDelete = window.confirm(
-      `Are you sure you want to delete this history item?`,
+      "Are you sure you want to delete this history item?"
     );
     if (!confirmDelete) return;
 
     setDeleting(true);
+    setError(null);
     try {
+      // Optionally, delete all images associated with this history
+      if (selectedHistory.id) {
+        const folderRef = ref(storage, `images/${selectedHistory.id}`);
+        const res = await listAll(folderRef);
+        for (const itemRef of res.items) {
+          await deleteObject(itemRef);
+        }
+      }
+
       await deleteItem(selectedHistory);
       navigate("/history");
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error deleting history item:", error);
-      alert("An error occurred while deleting the history item.");
+      setError("An error occurred while deleting the history item.");
     } finally {
       setDeleting(false);
     }
-  };
+  }, [selectedHistory, deleteItem, navigate]);
+
+  // --- Callback Handlers ---
+  const handleSetError = useCallback((err: string | null) => {
+    setError(err);
+  }, []);
+
+  const handleSelectImage = useCallback((url: string | null) => {
+    setSelectedImageUrl(url);
+  }, []);
+
+  const handleNewFilesChange = useCallback((files: File[]) => {
+    setNewFiles(files);
+  }, []);
+
+  const handleRemovedPathsChange = useCallback((paths: string[]) => {
+    setRemovedPaths(paths);
+  }, []);
 
   if (loading) {
     return <FullPageSpinner />;
@@ -252,6 +202,7 @@ function EditHistoryPage({
       </div>
 
       <h2 className="mb-4">Edit {updatedHistory.type} History</h2>
+      {error && <Alert variant="danger">{error}</Alert>}
 
       <Form>
         <Row>
@@ -275,14 +226,13 @@ function EditHistoryPage({
 
         <Row>
           <Col xs={6}>
-            {/* TagField that can do both existing + new */}
             <TagField
               tags={tags}
-              setTags={handleExistingTagsUpdate}
+              setTags={setTags}
               availableTags={nonRecurringTags}
               disabled={submitting}
               newTags={newTags}
-              setNewTags={handleNewTagsUpdate}
+              setNewTags={setNewTags}
             />
           </Col>
           <Col xs={6}>
@@ -317,123 +267,21 @@ function EditHistoryPage({
 
       <hr />
       <h5>Images</h5>
-      {existingLoading && <Spinner animation="border" />}
-      {existingError && <p className="text-danger">{existingError}</p>}
-
-      {/* Existing images */}
-      {existingImageItems.length > 0 && (
-        <div
-          style={{
-            display: "flex",
-            flexWrap: "wrap",
-            gap: "10px",
-            marginBottom: "10px",
-          }}
-        >
-          {existingImageItems.map((item, idx) => (
-            <div
-              key={idx}
-              style={{ position: "relative", display: "inline-block" }}
-            >
-              <img
-                src={item.url}
-                alt="Existing Receipt"
-                style={{
-                  width: "100px",
-                  height: "auto",
-                  borderRadius: "4px",
-                  cursor: "pointer",
-                }}
-                onClick={() => setSelectedImageUrl(item.url)}
-              />
-              <Button
-                variant="light"
-                size="sm"
-                style={{
-                  position: "absolute",
-                  top: "0",
-                  right: "0",
-                  transform: "translate(50%, -50%)",
-                  borderRadius: "50%",
-                  padding: "0.2rem",
-                }}
-                onClick={() => handleRemoveExistingImage(item.fullPath)}
-                disabled={submitting}
-              >
-                <FaTimes />
-              </Button>
-            </div>
-          ))}
-        </div>
-      )}
-
-      {/* New images */}
-      <Form.Group controlId="formNewImages" className="mb-3">
-        <Form.Label>Add More Images</Form.Label>
-        <Form.Control
-          type="file"
-          accept="image/*;capture=camera"
-          multiple
-          onChange={handleNewImageChange}
-          disabled={submitting}
-        />
-      </Form.Group>
-
-      {newImageFiles.length > 0 && (
-        <div
-          style={{
-            display: "flex",
-            flexWrap: "wrap",
-            gap: "10px",
-            marginBottom: "10px",
-          }}
-        >
-          {newImageFiles.map((file, index) => {
-            const url = URL.createObjectURL(file);
-            return (
-              <div
-                key={index}
-                style={{ position: "relative", display: "inline-block" }}
-              >
-                <img
-                  src={url}
-                  alt="New Receipt"
-                  style={{
-                    width: "100px",
-                    height: "auto",
-                    borderRadius: "4px",
-                    cursor: "pointer",
-                  }}
-                  onClick={() => setSelectedImageUrl(url)}
-                  onLoad={() => URL.revokeObjectURL(url)}
-                />
-                <Button
-                  variant="light"
-                  size="sm"
-                  style={{
-                    position: "absolute",
-                    top: "0",
-                    right: "0",
-                    transform: "translate(50%, -50%)",
-                    borderRadius: "50%",
-                    padding: "0.2rem",
-                  }}
-                  onClick={() => handleRemoveNewImage(index)}
-                  disabled={submitting}
-                >
-                  <FaTimes />
-                </Button>
-              </div>
-            );
-          })}
-        </div>
-      )}
+      <UnifiedFileManager
+        id={updatedHistory.id}
+        folderName="images"
+        disabled={submitting}
+        onSetError={handleSetError}
+        onSelectImage={handleSelectImage}
+        onNewFilesChange={handleNewFilesChange}
+        onRemovedPathsChange={handleRemovedPathsChange}
+      />
 
       <div className="d-flex justify-content-end">
         <Button
           variant="danger"
           onClick={handleDelete}
-          disabled={!updatedHistory || deleting}
+          disabled={!updatedHistory || deleting || submitting}
         >
           {deleting ? (
             <Spinner as="span" animation="border" size="sm" />
@@ -463,6 +311,7 @@ function EditHistoryPage({
         </Button>
       </div>
 
+      {/* Modal to display full-size images */}
       <FullSizeImageModal
         show={selectedImageUrl !== null}
         imageUrl={selectedImageUrl}

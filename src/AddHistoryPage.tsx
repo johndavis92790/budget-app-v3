@@ -1,11 +1,11 @@
+// src/AddHistoryPage.tsx
 import { useState } from "react";
-import { Form, Button, Row, Col, Spinner } from "react-bootstrap";
+import { Form, Button, Row, Col, Spinner, Alert } from "react-bootstrap";
 import { storage } from "./firebase";
-import { ref, uploadBytes } from "firebase/storage";
+import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 
 import FullSizeImageModal from "./FullSizeImageModal";
 import FullPageSpinner from "./FullPageSpinner";
-import FileUploader from "./FileUploader"; // <-- from previous refactor
 
 import {
   DateField,
@@ -16,6 +16,8 @@ import {
 
 import CurrencyInput from "./CurrencyInput";
 import { History } from "./types";
+import UnifiedFileManager from "./UnifiedFileManager";
+import { useNavigate } from "react-router-dom";
 
 interface AddHistoryPageProps {
   categories: string[];
@@ -39,6 +41,7 @@ function AddHistoryPage({
   monthlyGoal,
   onUpdateGoal,
 }: AddHistoryPageProps) {
+  const navigate = useNavigate();
   // ----------------- Basic form states -----------------
   const [date, setDate] = useState(() => {
     const today = new Date();
@@ -51,17 +54,21 @@ function AddHistoryPage({
   const [category, setCategory] = useState("");
 
   // ------------- Two states for tags -------------
-  const [tags, setTags] = useState<string[]>([]); // chosen from multi-select
-  const [newTags, setNewTags] = useState<string[]>([]); // brand-new typed tags
+  const [tags, setTags] = useState<string[]>([]);
+  const [newTags, setNewTags] = useState<string[]>([]);
 
   // ------------- Other fields -------------
   const [value, setValue] = useState("");
   const [description, setDescription] = useState("");
-  const [receiptFiles, setReceiptFiles] = useState<File[]>([]);
   const [selectedImageUrl, setSelectedImageUrl] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
+  // Unique ID for "Edit" link once we create it
   const editURLFragment = "https://budget-app-v3.web.app/edit-history?id=";
+
+  // ------------- Image Management States -------------
+  const [newFiles, setNewFiles] = useState<File[]>([]); // Files to upload
 
   // ------------- Helper: handle existing + new tags on submit -------------
   const handleSubmit = async (type: "Expense" | "Refund") => {
@@ -72,31 +79,34 @@ function AddHistoryPage({
     ];
 
     if (!date || !category || finalTags.length === 0 || !value) {
-      alert("Date, Category, at least one Tag, and Value are required.");
+      setError("Date, Category, at least one Tag, and Value are required.");
       return;
     }
 
     setSubmitting(true);
+    setError(null);
     try {
+      // Generate unique ID for the new history item
       const uniqueId = String(Date.now());
 
-      // Upload receipts if any
-      if (receiptFiles.length > 0) {
-        for (const file of receiptFiles) {
-          const fileRef = ref(
-            storage,
-            `receipts/${uniqueId}/${uniqueId}-${file.name}`,
-          );
-          await uploadBytes(fileRef, file);
-        }
+      // Upload images to Firebase Storage under 'images/{id}/'
+      const storageRef = ref(storage, `images/${uniqueId}`);
+      const uploadedUrls: string[] = [];
+
+      for (const file of newFiles) {
+        const fileRef = ref(storage, `${storageRef}/${file.name}`);
+        await uploadBytes(fileRef, file);
+        const downloadURL = await getDownloadURL(fileRef);
+        uploadedUrls.push(downloadURL);
       }
 
       const editURL = `${editURLFragment}${uniqueId}`;
 
+      // Validate numeric
       const numericStr = value.replace(/[^0-9.-]/g, "");
       const numericValue = parseFloat(numericStr);
       if (isNaN(numericValue)) {
-        alert("Invalid numeric value for 'Value'.");
+        setError("Invalid numeric value for 'Value'.");
         setSubmitting(false);
         return;
       }
@@ -105,7 +115,7 @@ function AddHistoryPage({
         date,
         type,
         category,
-        tags: finalTags, // <--- combine existing + new
+        tags: finalTags,
         value: numericValue,
         description,
         editURL,
@@ -113,9 +123,10 @@ function AddHistoryPage({
         itemType: "history",
       };
 
+      // Send to your backend
       const success = await addItem(newHistory);
       if (!success) {
-        alert("Failed to add history.");
+        setError("Failed to add history.");
         return;
       }
 
@@ -130,20 +141,22 @@ function AddHistoryPage({
 
       // Reset form fields
       const now = new Date();
-      const yyyy = now.getFullYear();
-      const mm = String(now.getMonth() + 1).padStart(2, "0");
-      const dd = String(now.getDate()).padStart(2, "0");
-      setDate(`${yyyy}-${mm}-${dd}`);
+      const yyyyNew = now.getFullYear();
+      const mmNew = String(now.getMonth() + 1).padStart(2, "0");
+      const ddNew = String(now.getDate()).padStart(2, "0");
+      setDate(`${yyyyNew}-${mmNew}-${ddNew}`);
 
       setCategory("");
       setTags([]);
       setNewTags([]);
       setValue("");
       setDescription("");
-      setReceiptFiles([]);
+      setNewFiles([]);
+      
+      navigate("/history");
     } catch (err) {
       console.error("Error adding history:", err);
-      alert("An error occurred while adding the history.");
+      setError("An error occurred while adding the history.");
     } finally {
       setSubmitting(false);
     }
@@ -153,7 +166,6 @@ function AddHistoryPage({
     return <FullPageSpinner />;
   }
 
-  // Tag setter helpers (rather than passing React setState directly):
   function handleExistingTagsUpdate(newArray: string[]) {
     setTags(newArray);
   }
@@ -164,6 +176,7 @@ function AddHistoryPage({
   return (
     <>
       <h2 className="mb-4">Add an Expense or Refund</h2>
+      {error && <Alert variant="danger">{error}</Alert>}
       <Form>
         <Row>
           <Col xs={6}>
@@ -221,15 +234,16 @@ function AddHistoryPage({
           </Col>
         </Row>
 
+        {/* UnifiedFileManager to let user pick/compress images */}
         <Row>
           <Col md={4}>
-            <FileUploader
-              label="Receipts"
-              helpText="Take a photo for each receipt. To add more, tap again."
-              files={receiptFiles}
-              onChange={setReceiptFiles}
-              onSelectImage={setSelectedImageUrl}
+            <UnifiedFileManager
+              label="Images"
+              helpText="Take a photo for each image. To add more, tap again."
               disabled={submitting}
+              onSelectImage={(url) => setSelectedImageUrl(url)}
+              onNewFilesChange={(files) => setNewFiles(files)}
+              // In Add mode, no existing files to remove
             />
           </Col>
         </Row>

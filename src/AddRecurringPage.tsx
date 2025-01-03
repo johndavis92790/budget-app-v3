@@ -1,12 +1,12 @@
+// src/AddRecurringPage.tsx
 import React, { FormEvent, useState, useEffect } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import { Form, Button, Row, Col, Spinner } from "react-bootstrap";
+import { Form, Button, Row, Col, Spinner, Alert } from "react-bootstrap";
 import { storage } from "./firebase";
-import { ref, uploadBytes } from "firebase/storage";
+import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 
 import FullSizeImageModal from "./FullSizeImageModal";
 import FullPageSpinner from "./FullPageSpinner";
-import FileUploader from "./FileUploader";
 
 import {
   TypeField,
@@ -16,9 +16,9 @@ import {
 } from "./CommonFormFields";
 
 import CurrencyInput from "./CurrencyInput";
-
 import { Recurring } from "./types";
 import { FaArrowLeft } from "react-icons/fa";
+import UnifiedFileManager from "./UnifiedFileManager";
 
 interface AddRecurringPageProps {
   recurringTags: string[];
@@ -47,10 +47,9 @@ function AddRecurringPage({
 
   const [value, setValue] = useState("");
 
-  const [imageFiles, setImageFiles] = useState<File[]>([]);
   const [selectedImageUrl, setSelectedImageUrl] = useState<string | null>(null);
-
   const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     const params = new URLSearchParams(location.search);
@@ -62,40 +61,47 @@ function AddRecurringPage({
 
   const editURLFragment = "https://budget-app-v3.web.app/edit-recurring?id=";
 
+  // ------------- Image Management States -------------
+  const [newFiles, setNewFiles] = useState<File[]>([]); // Files to upload
+
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
 
-    // Combine existing + new
+    // Combine existing + new tags
     const finalTags = [
       ...tags,
       ...newTags.map((t) => t.trim()).filter(Boolean),
     ];
 
     if (!type || !category || finalTags.length === 0 || !value) {
-      alert("Type, at least one Tag, and Value are required.");
+      setError("Type, at least one Tag, and Value are required.");
       return;
     }
 
     setSubmitting(true);
+    setError(null);
     try {
+      // Generate unique ID for the new recurring item
       const uniqueId = String(Date.now());
 
-      if (imageFiles.length > 0) {
-        for (const file of imageFiles) {
-          const fileRef = ref(
-            storage,
-            `images/${uniqueId}/${uniqueId}-${file.name}`,
-          );
-          await uploadBytes(fileRef, file);
-        }
+      // Upload images to Firebase Storage under 'images/{id}/'
+      const storageRef = ref(storage, `images/${uniqueId}`);
+      const uploadedUrls: string[] = [];
+
+      for (const file of newFiles) {
+        const fileRef = ref(storage, `${storageRef}/${file.name}`);
+        await uploadBytes(fileRef, file);
+        const downloadURL = await getDownloadURL(fileRef);
+        uploadedUrls.push(downloadURL);
       }
 
       const editURL = `${editURLFragment}${uniqueId}`;
 
+      // Validate numeric
       const numericStr = value.replace(/[^0-9.-]/g, "");
-      const floatVal = parseFloat(numericStr);
-      if (isNaN(floatVal)) {
-        alert("Invalid numeric value in the 'Value' field.");
+      const numericValue = parseFloat(numericStr);
+      if (isNaN(numericValue)) {
+        setError("Invalid numeric value for 'Amount'.");
         setSubmitting(false);
         return;
       }
@@ -105,37 +111,37 @@ function AddRecurringPage({
         category,
         description,
         tags: finalTags,
-        value: floatVal,
+        value: numericValue,
         editURL,
         id: uniqueId,
         itemType: "recurring",
       };
 
+      // Send to your backend
       const success = await addItem(newRecurring);
       if (!success) {
-        alert("Failed to add recurring.");
+        setError("Failed to add recurring.");
         return;
       }
 
-      // Reset
+      // Reset form fields
       setType("Expense");
       setCategory("");
       setDescription("");
       setTags([]);
       setNewTags([]);
       setValue("");
-      setImageFiles([]);
+      setNewFiles([]);
 
       navigate("/recurring");
-    } catch (error) {
-      console.error("Error adding recurring:", error);
-      alert("An error occurred while adding the recurring.");
+    } catch (err) {
+      console.error("Error adding recurring:", err);
+      setError("An error occurred while adding the recurring.");
     } finally {
       setSubmitting(false);
     }
   };
 
-  // Tag setter helpers
   function handleExistingTagsUpdate(newArray: string[]) {
     setTags(newArray);
   }
@@ -156,6 +162,7 @@ function AddRecurringPage({
       </div>
 
       <h2 className="mb-4">Add a Recurring Expense or Income</h2>
+      {error && <Alert variant="danger">{error}</Alert>}
       <Form onSubmit={handleSubmit}>
         <Row>
           <Col md={8}>
@@ -202,7 +209,6 @@ function AddRecurringPage({
               required
             />
           </Col>
-
           <Col xs={6}>
             <Form.Group controlId="formValue" className="mb-3">
               <Form.Label>Amount</Form.Label>
@@ -217,15 +223,16 @@ function AddRecurringPage({
           </Col>
         </Row>
 
+        {/* UnifiedFileManager for picking images */}
         <Row>
           <Col md={4}>
-            <FileUploader
+            <UnifiedFileManager
               label="Images"
               helpText="Take a photo for each image. To add more, tap again."
-              files={imageFiles}
-              onChange={setImageFiles}
-              onSelectImage={setSelectedImageUrl}
               disabled={submitting}
+              onSelectImage={(url) => setSelectedImageUrl(url)}
+              onNewFilesChange={(files) => setNewFiles(files)}
+              // In Add mode, no existing files to remove
             />
           </Col>
         </Row>
