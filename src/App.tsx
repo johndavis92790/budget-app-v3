@@ -4,10 +4,7 @@ import { Container } from "react-bootstrap";
 
 import { FiscalWeek, History, Recurring } from "./types";
 import HistoryPage from "./HistoryPage";
-import EditHistoryPage from "./EditHistoryPage";
-import AddRecurringPage from "./AddRecurringPage";
 import RecurringPage from "./RecurringPage";
-import EditRecurringPage from "./EditRecurringPage";
 import AddHistoryPage from "./AddHistoryPage";
 import HomePage from "./HomePage";
 import GoalsBanner from "./GoalsBanner";
@@ -186,49 +183,29 @@ function App() {
               }
             />
             <Route
-              path="/add-recurring"
+              path="/history"
               element={
-                <AddRecurringPage
-                  recurringTags={recurringTags}
+                <HistoryPage
                   categories={categories}
-                  addItem={addItem}
+                  nonRecurringTags={nonRecurringTags}
+                  history={history}
                   loading={loading}
+                  onUpdateItem={onUpdateItem}
+                  deleteItem={deleteItem}
                 />
               }
-            />
-            <Route
-              path="/history"
-              element={<HistoryPage history={history} loading={loading} />}
             />
             <Route
               path="/recurring"
               element={
-                <RecurringPage recurring={recurring} loading={loading} />
-              }
-            />
-            <Route
-              path="/edit-history"
-              element={
-                <EditHistoryPage
-                  categories={categories}
-                  nonRecurringTags={nonRecurringTags}
-                  onUpdateItem={onUpdateItem}
-                  deleteItem={deleteItem}
-                  loading={loading}
-                  history={history}
-                />
-              }
-            />
-            <Route
-              path="/edit-recurring"
-              element={
-                <EditRecurringPage
-                  categories={categories}
-                  nonRecurringTags={nonRecurringTags}
-                  onUpdateItem={onUpdateItem}
-                  deleteItem={deleteItem}
-                  loading={loading}
+                <RecurringPage
                   recurring={recurring}
+                  loading={loading}
+                  categories={categories}
+                  recurringTags={recurringTags}
+                  addItem={addItem}
+                  onUpdateItem={onUpdateItem}
+                  deleteItem={deleteItem}
                 />
               }
             />

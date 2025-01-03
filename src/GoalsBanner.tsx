@@ -32,8 +32,8 @@ function GoalsBanner({ weeklyGoal, monthlyGoal }: GoalsBannerProps) {
     const isZero = amount === 0;
     return (
       <FlipNumbers
-        height={35}
-        width={20}
+        height={32}
+        width={17}
         color={color}
         background="transparent"
         /** This triggers the flipping animation only if amount != 0 */
@@ -59,7 +59,7 @@ function GoalsBanner({ weeklyGoal, monthlyGoal }: GoalsBannerProps) {
           style={{
             backgroundColor: weeklyStyles.backgroundColor,
             color: weeklyStyles.color,
-            padding: "20px",
+            padding: "16px",
             borderLeft: `1px solid ${weeklyStyles.borderColor}`,
             borderTop: `1px solid ${weeklyStyles.borderColor}`,
             borderBottom: `1px solid ${weeklyStyles.borderColor}`,
@@ -75,8 +75,8 @@ function GoalsBanner({ weeklyGoal, monthlyGoal }: GoalsBannerProps) {
             }}
             className="d-flex justify-content-center align-items-center"
           >
-            {weeklyGoal < 0 && <span style={{ marginRight: 4 }}>-</span>}
-            <span style={{ marginRight: 4 }}>$</span>
+            {weeklyGoal < 0 && <span style={{ marginRight: 0 }}>-</span>}
+            <span style={{ marginRight: 1 }}>$</span>
             {renderGoalValue(weeklyGoal, weeklyStyles.color)}
           </h1>
         </Col>
@@ -87,7 +87,7 @@ function GoalsBanner({ weeklyGoal, monthlyGoal }: GoalsBannerProps) {
           style={{
             backgroundColor: monthlyStyles.backgroundColor,
             color: monthlyStyles.color,
-            padding: "20px",
+            padding: "16px",
             borderRight: `1px solid ${monthlyStyles.borderColor}`,
             borderTop: `1px solid ${monthlyStyles.borderColor}`,
             borderBottom: `1px solid ${monthlyStyles.borderColor}`,
@@ -103,8 +103,8 @@ function GoalsBanner({ weeklyGoal, monthlyGoal }: GoalsBannerProps) {
             }}
             className="d-flex justify-content-center align-items-center"
           >
-            {monthlyGoal < 0 && <span style={{ marginRight: 4 }}>-</span>}
-            <span style={{ marginRight: 4 }}>$</span>
+            {monthlyGoal < 0 && <span style={{ marginRight: 0 }}>-</span>}
+            <span style={{ marginRight: 1 }}>$</span>
             {renderGoalValue(monthlyGoal, monthlyStyles.color)}
           </h1>
         </Col>

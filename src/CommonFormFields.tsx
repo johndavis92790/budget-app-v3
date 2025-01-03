@@ -50,7 +50,7 @@ export function DescriptionField({ value, onChange, disabled }: FieldProps) {
 /** ========== TypeField ========== */
 interface TypeFieldProps {
   typeValue: string;
-  setTypeValue: (val: string) => void;
+  setTypeValue?: (val: string) => void;
   options: string[]; // e.g. nonRecurringTypes or recurringTypes
   disabled?: boolean;
   required?: boolean;
@@ -70,7 +70,7 @@ export function TypeField({
         value={typeValue}
         onChange={(e) => {
           const selected = e.target.value;
-          if (options.includes(selected)) {
+          if (options.includes(selected) && setTypeValue) {
             setTypeValue(selected);
           }
         }}

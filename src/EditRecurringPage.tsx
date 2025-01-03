@@ -1,12 +1,6 @@
-// src/EditRecurringPage.tsx
 import { useEffect, useState, useCallback } from "react";
-import { useLocation, useNavigate } from "react-router-dom";
 import { Recurring } from "./types";
 import { Form, Button, Spinner, Row, Col, Alert } from "react-bootstrap";
-import { FaArrowLeft } from "react-icons/fa";
-
-import FullPageSpinner from "./FullPageSpinner";
-
 import {
   DescriptionField,
   TypeField,
@@ -15,8 +9,7 @@ import {
 } from "./CommonFormFields";
 import CurrencyInput from "./CurrencyInput";
 import UnifiedFileManager from "./UnifiedFileManager";
-
-// Import Firebase Storage functions and the initialized storage instance
+import FullSizeImageModal from "./FullSizeImageModal";
 import {
   ref,
   uploadBytes,
@@ -25,95 +18,60 @@ import {
   listAll,
 } from "firebase/storage";
 import { storage } from "./firebase";
-import FullSizeImageModal from "./FullSizeImageModal";
 
 interface EditRecurringPageProps {
+  selectedRecurring: Recurring;
   categories: string[];
   nonRecurringTags: string[];
   onUpdateItem: (updatedRecurring: Recurring) => Promise<void>;
   deleteItem: (item: Recurring) => Promise<void>;
-  loading: boolean;
-  recurring: Recurring[];
+  onClose: () => void; // Callback to collapse the row
 }
 
 function EditRecurringPage({
+  selectedRecurring,
   categories,
   nonRecurringTags,
   onUpdateItem,
   deleteItem,
-  loading,
-  recurring,
+  onClose,
 }: EditRecurringPageProps) {
-  const location = useLocation();
-  const navigate = useNavigate();
-  const recurringTypes = ["Expense", "Income"];
-
-  const [selectedRecurring, setSelectedRecurring] = useState<Recurring | null>(
-    null,
-  );
-  const [updatedRecurring, setUpdatedRecurring] = useState<Recurring | null>(
-    null,
-  );
-
-  const [tags, setTags] = useState<string[]>([]);
+  const [updatedRecurring, setUpdatedRecurring] =
+    useState<Recurring>(selectedRecurring);
+  const [tags, setTags] = useState<string[]>(selectedRecurring.tags || []);
   const [newTags, setNewTags] = useState<string[]>([]);
-
   const [submitting, setSubmitting] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-
-  // Image management states
-  const [newFiles, setNewFiles] = useState<File[]>([]); // New images to upload
-  const [removedPaths, setRemovedPaths] = useState<string[]>([]); // Existing images to remove
-
-  // State for displaying selected image in modal
+  const [newFiles, setNewFiles] = useState<File[]>([]);
+  const [removedPaths, setRemovedPaths] = useState<string[]>([]);
   const [selectedImageUrl, setSelectedImageUrl] = useState<string | null>(null);
 
-  const queryParams = new URLSearchParams(location.search);
-  const idParam = queryParams.get("id");
+  const recurringTypes = ["Expense", "Income"];
 
-  // Load the recurring item and initialize state
   useEffect(() => {
-    if (loading) return;
-    if (!idParam) {
-      navigate("/recurring");
-      return;
-    }
-
-    const foundRecurring = recurring.find((r) => r.id === idParam);
-    if (!foundRecurring) {
-      navigate("/recurring");
-      return;
-    }
-    setSelectedRecurring(foundRecurring);
-    setUpdatedRecurring(foundRecurring);
-
-    setTags(foundRecurring.tags || []);
+    setUpdatedRecurring(selectedRecurring);
+    setTags(selectedRecurring.tags || []);
     setNewTags([]);
-  }, [loading, idParam, recurring, navigate]);
+  }, [selectedRecurring]);
 
   const handleFieldChange = useCallback(
     (field: keyof Recurring, value: string | number | string[]) => {
-      if (!updatedRecurring) return;
       setUpdatedRecurring({ ...updatedRecurring, [field]: value });
     },
     [updatedRecurring],
   );
 
   const handleSave = useCallback(async () => {
-    if (!updatedRecurring) return;
-
     setSubmitting(true);
     setError(null);
     try {
-      // Combine existing + new tags
       const finalTags = [
         ...tags,
         ...newTags.map((t) => t.trim()).filter(Boolean),
       ];
       updatedRecurring.tags = finalTags;
 
-      // Upload new images
       const uploadedUrls: string[] = [];
       for (const file of newFiles) {
         const fileRef = ref(
@@ -125,17 +83,13 @@ function EditRecurringPage({
         uploadedUrls.push(downloadURL);
       }
 
-      // Delete removed images
       for (const path of removedPaths) {
         const fileRef = ref(storage, path);
         await deleteObject(fileRef);
       }
 
-      // Optionally, you can store uploadedUrls in the recurring object if needed
-      // e.g., updatedRecurring.imageUrls = uploadedUrls;
-
       await onUpdateItem(updatedRecurring);
-      navigate("/recurring");
+      onClose(); // Collapse the row after saving
     } catch (error: any) {
       console.error("Error saving recurring:", error);
       setError("An error occurred while saving the recurring item.");
@@ -149,12 +103,10 @@ function EditRecurringPage({
     newFiles,
     removedPaths,
     onUpdateItem,
-    navigate,
+    onClose,
   ]);
 
   const handleDelete = useCallback(async () => {
-    if (!selectedRecurring) return;
-
     const confirmDelete = window.confirm(
       "Are you sure you want to delete this recurring item?",
     );
@@ -163,7 +115,6 @@ function EditRecurringPage({
     setDeleting(true);
     setError(null);
     try {
-      // Optionally, delete all images associated with this recurring
       if (selectedRecurring.id) {
         const folderRef = ref(storage, `images/${selectedRecurring.id}`);
         const res = await listAll(folderRef);
@@ -173,48 +124,17 @@ function EditRecurringPage({
       }
 
       await deleteItem(selectedRecurring);
-      navigate("/recurring");
+      onClose(); // Collapse the row after deleting
     } catch (error: any) {
       console.error("Error deleting recurring item:", error);
       setError("An error occurred while deleting the recurring item.");
     } finally {
       setDeleting(false);
     }
-  }, [selectedRecurring, deleteItem, navigate]);
-
-  // --- Callback Handlers ---
-  const handleSetError = useCallback((err: string | null) => {
-    setError(err);
-  }, []);
-
-  const handleSelectImage = useCallback((url: string | null) => {
-    setSelectedImageUrl(url);
-  }, []);
-
-  const handleNewFilesChange = useCallback((files: File[]) => {
-    setNewFiles(files);
-  }, []);
-
-  const handleRemovedPathsChange = useCallback((paths: string[]) => {
-    setRemovedPaths(paths);
-  }, []);
-
-  if (loading) {
-    return <FullPageSpinner />;
-  }
-  if (!updatedRecurring) {
-    return <p>Loading recurring data or no recurring found...</p>;
-  }
+  }, [selectedRecurring, deleteItem, onClose]);
 
   return (
     <div>
-      <div style={{ marginBottom: "20px" }}>
-        <Button variant="secondary" onClick={() => navigate("/recurring")}>
-          <FaArrowLeft /> Back
-        </Button>
-      </div>
-
-      <h2 className="mb-4">Edit Recurring</h2>
       {error && <Alert variant="danger">{error}</Alert>}
 
       <Form>
@@ -286,17 +206,17 @@ function EditRecurringPage({
         id={updatedRecurring.id}
         folderName="images"
         disabled={submitting}
-        onSetError={handleSetError}
-        onSelectImage={handleSelectImage}
-        onNewFilesChange={handleNewFilesChange}
-        onRemovedPathsChange={handleRemovedPathsChange}
+        onSetError={setError}
+        onSelectImage={setSelectedImageUrl}
+        onNewFilesChange={setNewFiles}
+        onRemovedPathsChange={setRemovedPaths}
       />
 
       <div className="d-flex justify-content-end">
         <Button
           variant="danger"
           onClick={handleDelete}
-          disabled={!updatedRecurring || deleting || submitting}
+          disabled={deleting || submitting}
         >
           {deleting ? (
             <Spinner as="span" animation="border" size="sm" />
@@ -306,7 +226,7 @@ function EditRecurringPage({
         </Button>
         <Button
           variant="secondary"
-          onClick={() => navigate("/recurring")}
+          onClick={onClose}
           disabled={submitting}
           style={{ marginLeft: "10px" }}
         >
@@ -315,7 +235,7 @@ function EditRecurringPage({
         <Button
           variant="primary"
           onClick={handleSave}
-          disabled={!updatedRecurring || submitting}
+          disabled={submitting}
           style={{ marginLeft: "10px" }}
         >
           {submitting ? (
@@ -326,7 +246,6 @@ function EditRecurringPage({
         </Button>
       </div>
 
-      {/* Modal to display full-size images */}
       <FullSizeImageModal
         show={selectedImageUrl !== null}
         imageUrl={selectedImageUrl}

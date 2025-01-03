@@ -1,23 +1,15 @@
-// src/EditHistoryPage.tsx
-import { useEffect, useState, useCallback } from "react";
-import { useLocation, useNavigate } from "react-router-dom";
-import { History, Recurring } from "./types";
+import { useState, useCallback, useEffect } from "react";
+import { History } from "./types";
 import { Form, Button, Spinner, Row, Col, Alert } from "react-bootstrap";
-import { FaArrowLeft } from "react-icons/fa";
-
-import FullPageSpinner from "./FullPageSpinner";
-
 import {
   DateField,
   CategoryField,
   TagField,
   DescriptionField,
 } from "./CommonFormFields";
-
 import CurrencyInput from "./CurrencyInput";
 import UnifiedFileManager from "./UnifiedFileManager";
-
-// Import Firebase Storage functions and the initialized storage instance
+import FullSizeImageModal from "./FullSizeImageModal";
 import {
   ref,
   uploadBytes,
@@ -26,89 +18,58 @@ import {
   listAll,
 } from "firebase/storage";
 import { storage } from "./firebase";
-import FullSizeImageModal from "./FullSizeImageModal";
 
 interface EditHistoryPageProps {
+  selectedHistory: History;
   categories: string[];
   nonRecurringTags: string[];
   onUpdateItem: (updatedHistory: History) => Promise<void>;
-  deleteItem: (item: History | Recurring) => Promise<void>;
-  loading: boolean;
-  history: History[];
+  deleteItem: (item: History) => Promise<void>;
+  onClose: () => void; // Callback to collapse the row
 }
 
 function EditHistoryPage({
+  selectedHistory,
   categories,
   nonRecurringTags,
   onUpdateItem,
   deleteItem,
-  loading,
-  history,
+  onClose,
 }: EditHistoryPageProps) {
-  const location = useLocation();
-  const navigate = useNavigate();
-
-  const [selectedHistory, setSelectedHistory] = useState<History | null>(null);
-  const [updatedHistory, setUpdatedHistory] = useState<History | null>(null);
-
-  const [tags, setTags] = useState<string[]>([]);
+  const [updatedHistory, setUpdatedHistory] =
+    useState<History>(selectedHistory);
+  const [tags, setTags] = useState<string[]>(selectedHistory.tags || []);
   const [newTags, setNewTags] = useState<string[]>([]);
-
   const [submitting, setSubmitting] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-
-  // Image management states
-  const [newFiles, setNewFiles] = useState<File[]>([]); // New images to upload
-  const [removedPaths, setRemovedPaths] = useState<string[]>([]); // Existing images to remove
-
-  // State for displaying selected image in modal
+  const [newFiles, setNewFiles] = useState<File[]>([]);
+  const [removedPaths, setRemovedPaths] = useState<string[]>([]);
   const [selectedImageUrl, setSelectedImageUrl] = useState<string | null>(null);
 
-  const queryParams = new URLSearchParams(location.search);
-  const idParam = queryParams.get("id");
-
-  // Load the history item and initialize state
   useEffect(() => {
-    if (loading) return;
-    if (!idParam) {
-      navigate("/history");
-      return;
-    }
-    const foundHistory = history.find((h) => h.id === idParam);
-    if (!foundHistory) {
-      navigate("/history");
-      return;
-    }
-    setSelectedHistory(foundHistory);
-    setUpdatedHistory(foundHistory);
-
-    setTags(foundHistory.tags || []);
+    setUpdatedHistory(selectedHistory);
+    setTags(selectedHistory.tags || []);
     setNewTags([]);
-  }, [loading, idParam, history, navigate]);
+  }, [selectedHistory]);
 
   const handleFieldChange = useCallback(
     (field: keyof History, value: string | number | string[]) => {
-      if (!updatedHistory) return;
       setUpdatedHistory({ ...updatedHistory, [field]: value });
     },
     [updatedHistory],
   );
 
   const handleSave = useCallback(async () => {
-    if (!updatedHistory) return;
-
     setSubmitting(true);
     setError(null);
     try {
-      // Combine existing + new tags
       const finalTags = [
         ...tags,
         ...newTags.map((t) => t.trim()).filter(Boolean),
       ];
       updatedHistory.tags = finalTags;
 
-      // Upload new images
       const uploadedUrls: string[] = [];
       for (const file of newFiles) {
         const fileRef = ref(
@@ -120,17 +81,13 @@ function EditHistoryPage({
         uploadedUrls.push(downloadURL);
       }
 
-      // Delete removed images
       for (const path of removedPaths) {
         const fileRef = ref(storage, path);
         await deleteObject(fileRef);
       }
 
-      // Optionally, you can store uploadedUrls in the history object if needed
-      // e.g., updatedHistory.imageUrls = uploadedUrls;
-
       await onUpdateItem(updatedHistory);
-      navigate("/history");
+      onClose(); // Collapse the row after saving
     } catch (error: any) {
       console.error("Error saving history:", error);
       setError("An error occurred while saving the history.");
@@ -144,12 +101,10 @@ function EditHistoryPage({
     newFiles,
     removedPaths,
     onUpdateItem,
-    navigate,
+    onClose,
   ]);
 
   const handleDelete = useCallback(async () => {
-    if (!selectedHistory) return;
-
     const confirmDelete = window.confirm(
       "Are you sure you want to delete this history item?",
     );
@@ -158,7 +113,6 @@ function EditHistoryPage({
     setDeleting(true);
     setError(null);
     try {
-      // Optionally, delete all images associated with this history
       if (selectedHistory.id) {
         const folderRef = ref(storage, `images/${selectedHistory.id}`);
         const res = await listAll(folderRef);
@@ -168,50 +122,19 @@ function EditHistoryPage({
       }
 
       await deleteItem(selectedHistory);
-      navigate("/history");
+      onClose(); // Collapse the row after deleting
     } catch (error: any) {
       console.error("Error deleting history item:", error);
       setError("An error occurred while deleting the history item.");
     } finally {
       setDeleting(false);
     }
-  }, [selectedHistory, deleteItem, navigate]);
-
-  // --- Callback Handlers ---
-  const handleSetError = useCallback((err: string | null) => {
-    setError(err);
-  }, []);
-
-  const handleSelectImage = useCallback((url: string | null) => {
-    setSelectedImageUrl(url);
-  }, []);
-
-  const handleNewFilesChange = useCallback((files: File[]) => {
-    setNewFiles(files);
-  }, []);
-
-  const handleRemovedPathsChange = useCallback((paths: string[]) => {
-    setRemovedPaths(paths);
-  }, []);
-
-  if (loading) {
-    return <FullPageSpinner />;
-  }
-  if (!updatedHistory) {
-    return <p>Loading history data or no history found...</p>;
-  }
+  }, [selectedHistory, deleteItem, onClose]);
 
   return (
     <div>
-      <div style={{ marginBottom: "20px" }}>
-        <Button variant="secondary" onClick={() => navigate("/history")}>
-          <FaArrowLeft /> Back
-        </Button>
-      </div>
-
-      <h2 className="mb-4">Edit {updatedHistory.type} History</h2>
       {error && <Alert variant="danger">{error}</Alert>}
-
+      <h5 className="mb-3">Edit {selectedHistory.type}</h5>
       <Form>
         <Row>
           <Col xs={6}>
@@ -231,7 +154,6 @@ function EditHistoryPage({
             />
           </Col>
         </Row>
-
         <Row>
           <Col xs={6}>
             <TagField
@@ -261,7 +183,6 @@ function EditHistoryPage({
             </Form.Group>
           </Col>
         </Row>
-
         <Row>
           <Col>
             <DescriptionField
@@ -279,17 +200,17 @@ function EditHistoryPage({
         id={updatedHistory.id}
         folderName="images"
         disabled={submitting}
-        onSetError={handleSetError}
-        onSelectImage={handleSelectImage}
-        onNewFilesChange={handleNewFilesChange}
-        onRemovedPathsChange={handleRemovedPathsChange}
+        onSetError={setError}
+        onSelectImage={setSelectedImageUrl}
+        onNewFilesChange={setNewFiles}
+        onRemovedPathsChange={setRemovedPaths}
       />
 
       <div className="d-flex justify-content-end">
         <Button
           variant="danger"
           onClick={handleDelete}
-          disabled={!updatedHistory || deleting || submitting}
+          disabled={deleting || submitting}
         >
           {deleting ? (
             <Spinner as="span" animation="border" size="sm" />
@@ -299,7 +220,7 @@ function EditHistoryPage({
         </Button>
         <Button
           variant="secondary"
-          onClick={() => navigate("/history")}
+          onClick={onClose}
           disabled={submitting}
           style={{ marginLeft: "10px" }}
         >
@@ -308,7 +229,7 @@ function EditHistoryPage({
         <Button
           variant="primary"
           onClick={handleSave}
-          disabled={!updatedHistory || submitting}
+          disabled={submitting}
           style={{ marginLeft: "10px" }}
         >
           {submitting ? (
@@ -319,7 +240,6 @@ function EditHistoryPage({
         </Button>
       </div>
 
-      {/* Modal to display full-size images */}
       <FullSizeImageModal
         show={selectedImageUrl !== null}
         imageUrl={selectedImageUrl}

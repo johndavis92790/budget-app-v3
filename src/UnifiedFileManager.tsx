@@ -42,11 +42,6 @@ interface UnifiedFileManagerProps {
   label?: string;
 
   /**
-   * Help text under the file input
-   */
-  helpText?: string;
-
-  /**
    * Callback to pass up new files added
    */
   onNewFilesChange?: (newFiles: File[]) => void;
@@ -128,7 +123,6 @@ function UnifiedFileManager({
   onSetError,
   onSelectImage,
   label = "Images",
-  helpText = "Take a photo for each image. To add more, tap again.",
   onNewFilesChange,
   onRemovedPathsChange,
 }: UnifiedFileManagerProps) {
@@ -279,7 +273,9 @@ function UnifiedFileManager({
           disabled={disabled}
           onChange={handleFileChange}
         />
-        {helpText && <Form.Text className="text-muted">{helpText}</Form.Text>}
+        <Form.Text className="text-muted">
+          Add one image at a time, tap again to add another.
+        </Form.Text>
       </Form.Group>
 
       {/* Preview newly added files */}

@@ -65,7 +65,8 @@ function AddHistoryPage({
   const [error, setError] = useState<string | null>(null);
 
   // Unique ID for "Edit" link once we create it
-  const editURLFragment = "https://budget-app-v3.web.app/edit-history?id=";
+  const editURLFragment =
+    "https://console.firebase.google.com/u/0/project/budget-app-v3/storage/budget-app-v3.firebasestorage.app/files/~2Fimages~2F";
 
   // ------------- Image Management States -------------
   const [newFiles, setNewFiles] = useState<File[]>([]); // Files to upload
@@ -174,8 +175,15 @@ function AddHistoryPage({
   }
 
   return (
-    <>
-      <h2 className="mb-4">Add an Expense or Refund</h2>
+    <div
+      className="p-3 mt-2"
+      style={{
+        backgroundColor: "#fff",
+        border: "1px solid #ddd",
+        borderRadius: "5px",
+      }}
+    >
+      <h4 className="mb-4">Add an Expense or Refund</h4>
       {error && <Alert variant="danger">{error}</Alert>}
       <Form>
         <Row>
@@ -239,7 +247,6 @@ function AddHistoryPage({
           <Col md={4}>
             <UnifiedFileManager
               label="Images"
-              helpText="Take a photo for each image. To add more, tap again."
               disabled={submitting}
               onSelectImage={(url) => setSelectedImageUrl(url)}
               onNewFilesChange={(files) => setNewFiles(files)}
@@ -281,7 +288,7 @@ function AddHistoryPage({
         imageUrl={selectedImageUrl}
         onClose={() => setSelectedImageUrl(null)}
       />
-    </>
+    </div>
   );
 }
 
