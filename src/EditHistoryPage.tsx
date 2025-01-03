@@ -92,7 +92,7 @@ function EditHistoryPage({
       if (!updatedHistory) return;
       setUpdatedHistory({ ...updatedHistory, [field]: value });
     },
-    [updatedHistory]
+    [updatedHistory],
   );
 
   const handleSave = useCallback(async () => {
@@ -113,7 +113,7 @@ function EditHistoryPage({
       for (const file of newFiles) {
         const fileRef = ref(
           storage,
-          `images/${updatedHistory.id}/${file.name}`
+          `images/${updatedHistory.id}/${file.name}`,
         );
         await uploadBytes(fileRef, file);
         const downloadURL = await getDownloadURL(fileRef);
@@ -137,13 +137,21 @@ function EditHistoryPage({
     } finally {
       setSubmitting(false);
     }
-  }, [updatedHistory, tags, newTags, newFiles, removedPaths, onUpdateItem, navigate]);
+  }, [
+    updatedHistory,
+    tags,
+    newTags,
+    newFiles,
+    removedPaths,
+    onUpdateItem,
+    navigate,
+  ]);
 
   const handleDelete = useCallback(async () => {
     if (!selectedHistory) return;
 
     const confirmDelete = window.confirm(
-      "Are you sure you want to delete this history item?"
+      "Are you sure you want to delete this history item?",
     );
     if (!confirmDelete) return;
 

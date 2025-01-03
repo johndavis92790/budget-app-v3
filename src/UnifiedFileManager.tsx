@@ -1,11 +1,6 @@
 // src/UnifiedFileManager.tsx
 import React, { useEffect, useState, useCallback } from "react";
-import {
-  ref,
-  getDownloadURL,
-  listAll,
-  getStorage,
-} from "firebase/storage";
+import { ref, getDownloadURL, listAll, getStorage } from "firebase/storage";
 import { Spinner, Button, Form } from "react-bootstrap";
 import { FaTimes } from "react-icons/fa";
 
@@ -68,7 +63,7 @@ interface UnifiedFileManagerProps {
 async function compressImageFile(
   file: File,
   maxWidth = 1200,
-  quality = 0.8
+  quality = 0.8,
 ): Promise<File> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -109,7 +104,7 @@ async function compressImageFile(
             resolve(compressedFile);
           },
           file.type,
-          quality
+          quality,
         );
       };
       if (typeof loadEvent.target?.result === "string") {
@@ -161,7 +156,7 @@ function UnifiedFileManager({
           res.items.map(async (itemRef) => {
             const fileUrl = await getDownloadURL(itemRef);
             return { url: fileUrl, fullPath: itemRef.fullPath };
-          })
+          }),
         );
         setExistingFiles(items);
       } catch (error: any) {
@@ -193,7 +188,7 @@ function UnifiedFileManager({
       }
       setNewFiles((prev) => [...prev, ...compressedFiles]);
     },
-    []
+    [],
   );
 
   // --- Remove a newly added file ---

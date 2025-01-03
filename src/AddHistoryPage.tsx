@@ -152,7 +152,7 @@ function AddHistoryPage({
       setValue("");
       setDescription("");
       setNewFiles([]);
-      
+
       navigate("/history");
     } catch (err) {
       console.error("Error adding history:", err);

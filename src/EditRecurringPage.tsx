@@ -49,10 +49,10 @@ function EditRecurringPage({
   const recurringTypes = ["Expense", "Income"];
 
   const [selectedRecurring, setSelectedRecurring] = useState<Recurring | null>(
-    null
+    null,
   );
   const [updatedRecurring, setUpdatedRecurring] = useState<Recurring | null>(
-    null
+    null,
   );
 
   const [tags, setTags] = useState<string[]>([]);
@@ -97,7 +97,7 @@ function EditRecurringPage({
       if (!updatedRecurring) return;
       setUpdatedRecurring({ ...updatedRecurring, [field]: value });
     },
-    [updatedRecurring]
+    [updatedRecurring],
   );
 
   const handleSave = useCallback(async () => {
@@ -118,7 +118,7 @@ function EditRecurringPage({
       for (const file of newFiles) {
         const fileRef = ref(
           storage,
-          `images/${updatedRecurring.id}/${file.name}`
+          `images/${updatedRecurring.id}/${file.name}`,
         );
         await uploadBytes(fileRef, file);
         const downloadURL = await getDownloadURL(fileRef);
@@ -142,13 +142,21 @@ function EditRecurringPage({
     } finally {
       setSubmitting(false);
     }
-  }, [updatedRecurring, tags, newTags, newFiles, removedPaths, onUpdateItem, navigate]);
+  }, [
+    updatedRecurring,
+    tags,
+    newTags,
+    newFiles,
+    removedPaths,
+    onUpdateItem,
+    navigate,
+  ]);
 
   const handleDelete = useCallback(async () => {
     if (!selectedRecurring) return;
 
     const confirmDelete = window.confirm(
-      "Are you sure you want to delete this recurring item?"
+      "Are you sure you want to delete this recurring item?",
     );
     if (!confirmDelete) return;
 
