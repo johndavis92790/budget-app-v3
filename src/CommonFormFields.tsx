@@ -128,7 +128,7 @@ export function CategoryField({
 }
 
 /** ========== TagField ========== */
-export interface TagFieldProps {
+interface TagFieldProps {
   tags: string[];
   setTags: (newTags: string[]) => void;
   newTags: string[]; // always required
@@ -151,7 +151,7 @@ export function TagField({
 }: TagFieldProps) {
   // Existing tags (multi-select) change handler
   const handleExistingTagsChange = (
-    e: React.ChangeEvent<HTMLSelectElement>,
+    e: React.ChangeEvent<HTMLSelectElement>
   ) => {
     const opts = e.target.options;
     const selected: string[] = [];
@@ -230,6 +230,82 @@ export function TagField({
       >
         + Add New Tag
       </Button>
+    </div>
+  );
+}
+
+interface MultiSelectFieldProps {
+  selectedOptions: string[];
+  setSelectedOptions: (newOptions: string[]) => void;
+  availableOptions: string[];
+  disabled?: boolean;
+  required?: boolean;
+}
+
+export function MultiSelectField({
+  selectedOptions,
+  setSelectedOptions,
+  availableOptions,
+  disabled,
+  required,
+}: MultiSelectFieldProps) {
+  // Handle changes in the multi-select dropdown
+  const handleMultiSelectChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const opts = e.target.options;
+    const selected: string[] = [];
+    for (let i = 0; i < opts.length; i++) {
+      if (opts[i].selected) {
+        selected.push(opts[i].value);
+      }
+    }
+    setSelectedOptions(selected);
+  };
+
+  // Remove a selected option
+  const handleRemoveOption = (option: string) => {
+    setSelectedOptions(selectedOptions.filter((opt) => opt !== option));
+  };
+
+  return (
+    <div>
+      <Form.Group controlId="multiSelectField" className="mb-3">
+        <Form.Select
+          multiple
+          value={selectedOptions}
+          onChange={handleMultiSelectChange}
+          disabled={disabled}
+          required={required}
+        >
+          {availableOptions.map((option, index) => (
+            <option key={index} value={option}>
+              {option}
+            </option>
+          ))}
+        </Form.Select>
+      </Form.Group>
+
+      {/* Display selected options with remove functionality */}
+      <div className="mb-3">
+        {selectedOptions.map((option, index) => (
+          <InputGroup className="mb-2" key={index}>
+            <Form.Control
+              type="text"
+              value={option}
+              readOnly
+              disabled={disabled}
+            />
+            <Button
+              variant="outline-danger"
+              onClick={() => handleRemoveOption(option)}
+              disabled={disabled}
+              className="d-flex align-items-center justify-content-center"
+              style={{ lineHeight: 1 }}
+            >
+              <FaTrash />
+            </Button>
+          </InputGroup>
+        ))}
+      </div>
     </div>
   );
 }
