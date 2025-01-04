@@ -21,7 +21,7 @@ import { useNavigate } from "react-router-dom";
 
 interface AddHistoryPageProps {
   categories: string[];
-  nonRecurringTags: string[];
+  existingTags: string[];
   addItem: (history: History) => Promise<boolean>;
   loading: boolean;
   weeklyGoal: number;
@@ -34,7 +34,7 @@ interface AddHistoryPageProps {
 
 function AddHistoryPage({
   categories,
-  nonRecurringTags,
+  existingTags,
   addItem,
   loading,
   weeklyGoal,
@@ -54,7 +54,7 @@ function AddHistoryPage({
   const [category, setCategory] = useState("");
 
   // ------------- Two states for tags -------------
-  const [tags, setTags] = useState<string[]>([]);
+  const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const [newTags, setNewTags] = useState<string[]>([]);
 
   // ------------- Other fields -------------
@@ -75,7 +75,7 @@ function AddHistoryPage({
   const handleSubmit = async (type: "Expense" | "Refund") => {
     // Combine existing + new tags
     const finalTags = [
-      ...tags,
+      ...selectedTags,
       ...newTags.map((t) => t.trim()).filter(Boolean),
     ];
 
@@ -148,7 +148,7 @@ function AddHistoryPage({
       setDate(`${yyyyNew}-${mmNew}-${ddNew}`);
 
       setCategory("");
-      setTags([]);
+      setSelectedTags([]);
       setNewTags([]);
       setValue("");
       setDescription("");
@@ -163,12 +163,12 @@ function AddHistoryPage({
     }
   };
 
-  if (loading && categories.length === 0 && nonRecurringTags.length === 0) {
+  if (loading && categories.length === 0 && existingTags.length === 0) {
     return <FullPageSpinner />;
   }
 
   function handleExistingTagsUpdate(newArray: string[]) {
-    setTags(newArray);
+    setSelectedTags(newArray);
   }
   function handleNewTagsUpdate(newArray: string[]) {
     setNewTags(newArray);
@@ -209,9 +209,9 @@ function AddHistoryPage({
         <Row>
           <Col xs={6}>
             <TagField
-              tags={tags}
-              setTags={handleExistingTagsUpdate}
-              availableTags={nonRecurringTags}
+              selectedTags={selectedTags}
+              setSelectedTags={handleExistingTagsUpdate}
+              existingTags={existingTags}
               disabled={submitting}
               required
               newTags={newTags}

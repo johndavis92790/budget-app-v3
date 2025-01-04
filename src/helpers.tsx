@@ -48,3 +48,18 @@ export function formatDateFromYYYYMMDD(isoDateStr: string) {
 
   return `${weekday}, ${monthName} ${day}${daySuffix}`;
 }
+
+export function generateRandom10DigitNumber() {
+  const random10DigitNumber = Math.floor(
+    1000000000 + Math.random() * 9000000000,
+  );
+  return random10DigitNumber;
+}
+
+export const getFormattedTodaysDate = () => {
+  const today = new Date();
+  const yyyy = today.getFullYear();
+  const mm = String(today.getMonth() + 1).padStart(2, "0");
+  const dd = String(today.getDate()).padStart(2, "0");
+  return `${yyyy}-${mm}-${dd}`;
+};

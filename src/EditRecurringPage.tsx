@@ -22,7 +22,7 @@ import { storage } from "./firebase";
 interface EditRecurringPageProps {
   selectedRecurring: Recurring;
   categories: string[];
-  nonRecurringTags: string[];
+  existingTags: string[];
   onUpdateItem: (updatedRecurring: Recurring) => Promise<void>;
   deleteItem: (item: Recurring) => Promise<void>;
   onClose: () => void; // Callback to collapse the row
@@ -31,14 +31,16 @@ interface EditRecurringPageProps {
 function EditRecurringPage({
   selectedRecurring,
   categories,
-  nonRecurringTags,
+  existingTags,
   onUpdateItem,
   deleteItem,
   onClose,
 }: EditRecurringPageProps) {
   const [updatedRecurring, setUpdatedRecurring] =
     useState<Recurring>(selectedRecurring);
-  const [tags, setTags] = useState<string[]>(selectedRecurring.tags || []);
+  const [selectedTags, setSelectedTags] = useState<string[]>(
+    selectedRecurring.tags || [],
+  );
   const [newTags, setNewTags] = useState<string[]>([]);
   const [submitting, setSubmitting] = useState(false);
   const [deleting, setDeleting] = useState(false);
@@ -51,7 +53,7 @@ function EditRecurringPage({
 
   useEffect(() => {
     setUpdatedRecurring(selectedRecurring);
-    setTags(selectedRecurring.tags || []);
+    setSelectedTags(selectedRecurring.tags || []);
     setNewTags([]);
   }, [selectedRecurring]);
 
@@ -67,7 +69,7 @@ function EditRecurringPage({
     setError(null);
     try {
       const finalTags = [
-        ...tags,
+        ...selectedTags,
         ...newTags.map((t) => t.trim()).filter(Boolean),
       ];
       updatedRecurring.tags = finalTags;
@@ -98,7 +100,7 @@ function EditRecurringPage({
     }
   }, [
     updatedRecurring,
-    tags,
+    selectedTags,
     newTags,
     newFiles,
     removedPaths,
@@ -172,9 +174,9 @@ function EditRecurringPage({
         <Row>
           <Col xs={6}>
             <TagField
-              tags={tags}
-              setTags={setTags}
-              availableTags={nonRecurringTags}
+              selectedTags={selectedTags}
+              setSelectedTags={setSelectedTags}
+              existingTags={existingTags}
               disabled={submitting}
               newTags={newTags}
               setNewTags={setNewTags}

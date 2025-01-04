@@ -22,7 +22,7 @@ import { storage } from "./firebase";
 interface EditHistoryPageProps {
   selectedHistory: History;
   categories: string[];
-  nonRecurringTags: string[];
+  existingTags: string[];
   onUpdateItem: (updatedHistory: History) => Promise<void>;
   deleteItem: (item: History) => Promise<void>;
   onClose: () => void; // Callback to collapse the row
@@ -31,14 +31,16 @@ interface EditHistoryPageProps {
 function EditHistoryPage({
   selectedHistory,
   categories,
-  nonRecurringTags,
+  existingTags,
   onUpdateItem,
   deleteItem,
   onClose,
 }: EditHistoryPageProps) {
   const [updatedHistory, setUpdatedHistory] =
     useState<History>(selectedHistory);
-  const [tags, setTags] = useState<string[]>(selectedHistory.tags || []);
+  const [selectedTags, setSelectedTags] = useState<string[]>(
+    selectedHistory.tags || [],
+  );
   const [newTags, setNewTags] = useState<string[]>([]);
   const [submitting, setSubmitting] = useState(false);
   const [deleting, setDeleting] = useState(false);
@@ -49,7 +51,7 @@ function EditHistoryPage({
 
   useEffect(() => {
     setUpdatedHistory(selectedHistory);
-    setTags(selectedHistory.tags || []);
+    setSelectedTags(selectedHistory.tags || []);
     setNewTags([]);
   }, [selectedHistory]);
 
@@ -65,7 +67,7 @@ function EditHistoryPage({
     setError(null);
     try {
       const finalTags = [
-        ...tags,
+        ...selectedTags,
         ...newTags.map((t) => t.trim()).filter(Boolean),
       ];
       updatedHistory.tags = finalTags;
@@ -96,7 +98,7 @@ function EditHistoryPage({
     }
   }, [
     updatedHistory,
-    tags,
+    selectedTags,
     newTags,
     newFiles,
     removedPaths,
@@ -157,9 +159,9 @@ function EditHistoryPage({
         <Row>
           <Col xs={6}>
             <TagField
-              tags={tags}
-              setTags={setTags}
-              availableTags={nonRecurringTags}
+              selectedTags={selectedTags}
+              setSelectedTags={setSelectedTags}
+              existingTags={existingTags}
               disabled={submitting}
               newTags={newTags}
               setNewTags={setNewTags}

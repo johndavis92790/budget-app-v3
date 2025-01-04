@@ -129,20 +129,20 @@ export function CategoryField({
 
 /** ========== TagField ========== */
 interface TagFieldProps {
-  tags: string[];
-  setTags: (newTags: string[]) => void;
+  selectedTags: string[];
+  setSelectedTags: (newTags: string[]) => void;
   newTags: string[]; // always required
   setNewTags: (vals: string[]) => void;
-  availableTags: string[];
+  existingTags: string[];
   disabled?: boolean;
   required?: boolean;
   label?: string;
 }
 
 export function TagField({
-  tags,
-  setTags,
-  availableTags,
+  selectedTags,
+  setSelectedTags,
+  existingTags,
   disabled,
   required,
   label = "Tags",
@@ -161,7 +161,7 @@ export function TagField({
       }
     }
     // We pass the final string[] to setTags
-    setTags(selected);
+    setSelectedTags(selected);
   };
 
   // Add a blank new tag
@@ -187,12 +187,12 @@ export function TagField({
         <Form.Label>{label}</Form.Label>
         <Form.Select
           multiple
-          value={tags}
+          value={selectedTags}
           onChange={handleExistingTagsChange}
           disabled={disabled}
           required={required}
         >
-          {availableTags.map((tag, i) => (
+          {existingTags.map((tag, i) => (
             <option key={i} value={tag}>
               {tag}
             </option>
@@ -261,11 +261,6 @@ export function MultiSelectField({
     setSelectedOptions(selected);
   };
 
-  // Remove a selected option
-  const handleRemoveOption = (option: string) => {
-    setSelectedOptions(selectedOptions.filter((opt) => opt !== option));
-  };
-
   return (
     <div>
       <Form.Group controlId="multiSelectField" className="mb-3">
@@ -283,29 +278,6 @@ export function MultiSelectField({
           ))}
         </Form.Select>
       </Form.Group>
-
-      {/* Display selected options with remove functionality */}
-      <div className="mb-3">
-        {selectedOptions.map((option, index) => (
-          <InputGroup className="mb-2" key={index}>
-            <Form.Control
-              type="text"
-              value={option}
-              readOnly
-              disabled={disabled}
-            />
-            <Button
-              variant="outline-danger"
-              onClick={() => handleRemoveOption(option)}
-              disabled={disabled}
-              className="d-flex align-items-center justify-content-center"
-              style={{ lineHeight: 1 }}
-            >
-              <FaTrash />
-            </Button>
-          </InputGroup>
-        ))}
-      </div>
     </div>
   );
 }

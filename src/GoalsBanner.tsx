@@ -49,7 +49,7 @@ function GoalsBanner({ weeklyGoal, monthlyGoal }: GoalsBannerProps) {
 
   return (
     <div
-      className="m-3"
+      className="m-3 mb-4"
       style={{ overflow: "hidden", borderRadius, border: "none" }}
     >
       <Row className="m-0 align-items-stretch" style={{ height: "100%" }}>

@@ -11,7 +11,7 @@ interface RecurringPageProps {
   recurring: Recurring[];
   loading: boolean;
   categories: string[];
-  recurringTags: string[];
+  existingTags: string[];
   onUpdateItem: (updatedRecurring: Recurring) => Promise<void>;
   deleteItem: (item: Recurring) => Promise<void>;
   addItem: (recurring: Recurring) => Promise<boolean>; // Add new recurring
@@ -21,7 +21,7 @@ function RecurringPage({
   recurring,
   loading,
   categories,
-  recurringTags,
+  existingTags,
   onUpdateItem,
   deleteItem,
   addItem,
@@ -112,7 +112,7 @@ function RecurringPage({
                 >
                   <EditRecurringPage
                     categories={categories}
-                    nonRecurringTags={recurringTags}
+                    existingTags={existingTags}
                     onUpdateItem={onUpdateItem}
                     deleteItem={deleteItem}
                     selectedRecurring={item}
@@ -133,7 +133,7 @@ function RecurringPage({
             }}
           >
             <AddRecurringPage
-              recurringTags={recurringTags}
+              existingTags={existingTags}
               categories={categories}
               addItem={addItem}
               onClose={handleClose}
@@ -215,7 +215,7 @@ function RecurringPage({
                 >
                   <EditRecurringPage
                     categories={categories}
-                    nonRecurringTags={recurringTags}
+                    existingTags={existingTags}
                     onUpdateItem={onUpdateItem}
                     deleteItem={deleteItem}
                     selectedRecurring={item}
@@ -236,7 +236,7 @@ function RecurringPage({
             }}
           >
             <AddRecurringPage
-              recurringTags={recurringTags}
+              existingTags={existingTags}
               categories={categories}
               addItem={addItem}
               onClose={handleClose}

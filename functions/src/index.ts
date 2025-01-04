@@ -19,7 +19,7 @@ const RECURRING_RANGE = `${RECURRING_TABLE_NAME}!${RECURRING_FIRST_COLUMN}1:${RE
 const WEEKLY_GOAL_RANGE = "Goals!A2";
 const MONTHLY_GOAL_RANGE = "Goals!B2";
 
-const METADATA_RANGE = "Metadata!A1:C";
+const METADATA_RANGE = "Metadata!A1:B";
 
 const FISCAL_WEEKS_RANGE = "Fiscal Weeks!A1:F";
 const FISCAL_MONTHS_RANGE = "Fiscal Months!A1:D";
@@ -268,16 +268,12 @@ function convertArrayToObjectById(arr: any[]): Record<string, any> {
 
 // ---------------------- TAGS HELPER ----------------------
 
-async function addMissingTags(
-  sheets: any,
-  tags: string[],
-  isRecurring: boolean
-) {
+async function addMissingTags(sheets: any, tags: string[]) {
   if (!tags || tags.length === 0) return;
 
   const listsRows = await getSheetData(sheets, METADATA_RANGE, false);
   const dataRows = listsRows.slice(1);
-  const colIndex = isRecurring ? 2 : 1;
+  const colIndex = 1;
   const existingTags = dataRows
     .map((row) => (row[colIndex] ? row[colIndex].trim() : ""))
     .filter(Boolean);
@@ -285,9 +281,7 @@ async function addMissingTags(
   const newTags = tags.filter((tag) => !existingTags.includes(tag));
   if (newTags.length === 0) return;
 
-  const rowsToAppend = newTags.map((tag) =>
-    isRecurring ? ["", "", tag] : ["", tag, ""]
-  );
+  const rowsToAppend = newTags.map((tag) => ["", tag]);
   await appendDataToSheet(sheets, METADATA_RANGE, rowsToAppend);
 }
 
@@ -380,7 +374,7 @@ async function insertItem(
   const isRecurring = itemType === "recurring";
   const range = isRecurring ? RECURRING_RANGE : HISTORY_RANGE;
 
-  await addMissingTags(sheets, data.tags, isRecurring);
+  await addMissingTags(sheets, data.tags);
 
   // For History only: we need the date in MM/DD/YYYY.
   const dateFormatted = !isRecurring ? convertToMMDDYYYY(data.date) : "";
@@ -454,7 +448,7 @@ async function updateItem(
   }
 
   // Insert new tags, if any
-  await addMissingTags(sheets, data.tags, isRecurring);
+  await addMissingTags(sheets, data.tags);
 
   // Build our updated row
   const hyperlinkFormula = `=HYPERLINK("${existingRow[isRecurring ? 5 : 6]}", "Edit")`;
@@ -581,8 +575,7 @@ async function handleGET(sheets: any, req: Request, res: Response) {
   const listsAll = await getSheetData(sheets, METADATA_RANGE, false);
   const listsRows = listsAll.slice(1);
   const categories = listsRows.map((row) => row[0]).filter(Boolean);
-  const nonRecurringTags = listsRows.map((row) => row[1]).filter(Boolean);
-  const recurringTags = listsRows.map((row) => row[2]).filter(Boolean);
+  const tags = listsRows.map((row) => row[1]).filter(Boolean);
 
   // 4) Weekly & Monthly Goals
   const [wgResp, mgResp] = await Promise.all([
@@ -667,8 +660,7 @@ async function handleGET(sheets: any, req: Request, res: Response) {
     weeklyGoal,
     monthlyGoal,
     categories,
-    nonRecurringTags,
-    recurringTags,
+    tags,
     fiscalWeeks: fiscalWeeksObj,
     fiscalMonths: fiscalMonthsObj,
     fiscalYears: fiscalYearsObj,

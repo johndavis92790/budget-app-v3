@@ -4,12 +4,7 @@ import { storage } from "./firebase";
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 
 import FullSizeImageModal from "./FullSizeImageModal";
-import {
-  TypeField,
-  TagField,
-  DescriptionField,
-  CategoryField,
-} from "./CommonFormFields";
+import { TagField, DescriptionField, CategoryField } from "./CommonFormFields";
 
 import CurrencyInput from "./CurrencyInput";
 import { Recurring } from "./types";
@@ -17,7 +12,7 @@ import UnifiedFileManager from "./UnifiedFileManager";
 
 interface AddRecurringPageProps {
   type: string;
-  recurringTags: string[];
+  existingTags: string[];
   categories: string[];
   addItem: (recurring: Recurring) => Promise<boolean>;
   onClose?: () => void; // Optional, for inline usage to collapse the UI
@@ -25,7 +20,7 @@ interface AddRecurringPageProps {
 
 function AddRecurringPage({
   type,
-  recurringTags,
+  existingTags,
   categories,
   addItem,
   onClose,
@@ -33,7 +28,7 @@ function AddRecurringPage({
   const [category, setCategory] = useState("");
   const [description, setDescription] = useState("");
 
-  const [tags, setTags] = useState<string[]>([]);
+  const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const [newTags, setNewTags] = useState<string[]>([]);
 
   const [value, setValue] = useState("");
@@ -49,7 +44,7 @@ function AddRecurringPage({
     e.preventDefault();
 
     const finalTags = [
-      ...tags,
+      ...selectedTags,
       ...newTags.map((t) => t.trim()).filter(Boolean),
     ];
 
@@ -102,7 +97,7 @@ function AddRecurringPage({
 
       setCategory("");
       setDescription("");
-      setTags([]);
+      setSelectedTags([]);
       setNewTags([]);
       setValue("");
       setNewFiles([]);
@@ -146,9 +141,9 @@ function AddRecurringPage({
           <Col xs={6}>
             <TagField
               label="Tags"
-              tags={tags}
-              setTags={setTags}
-              availableTags={recurringTags}
+              selectedTags={selectedTags}
+              setSelectedTags={setSelectedTags}
+              existingTags={existingTags}
               newTags={newTags}
               setNewTags={setNewTags}
               disabled={submitting}

@@ -17,8 +17,7 @@ function App() {
   const [history, setHistory] = useState<History[]>([]);
   const [recurring, setRecurring] = useState<Recurring[]>([]);
   const [categories, setCategories] = useState<string[]>([]);
-  const [nonRecurringTags, setNonRecurringTags] = useState<string[]>([]);
-  const [recurringTags, setRecurringTags] = useState<string[]>([]);
+  const [existingTags, setExistingTags] = useState<string[]>([]);
   const [weeklyGoal, setWeeklyGoal] = useState<number>(0);
   const [monthlyGoal, setMonthlyGoal] = useState<number>(0);
   const [fiscalWeeks, setFiscalWeeks] = useState<Record<string, FiscalWeek>>(
@@ -55,8 +54,7 @@ function App() {
       );
 
       setCategories(data.categories || []);
-      setNonRecurringTags(data.nonRecurringTags || []);
-      setRecurringTags(data.recurringTags || []);
+      setExistingTags(data.nonRecurringTags || []);
       setWeeklyGoal(data.weeklyGoal);
       setMonthlyGoal(data.monthlyGoal);
       setFiscalWeeks(data.fiscalWeeks || {});
@@ -173,7 +171,7 @@ function App() {
               element={
                 <AddHistoryPage
                   categories={categories}
-                  nonRecurringTags={nonRecurringTags}
+                  existingTags={existingTags}
                   addItem={addItem}
                   loading={loading}
                   weeklyGoal={weeklyGoal}
@@ -187,7 +185,7 @@ function App() {
               element={
                 <HistoryPage
                   categories={categories}
-                  nonRecurringTags={nonRecurringTags}
+                  existingTags={existingTags}
                   history={history}
                   loading={loading}
                   onUpdateItem={onUpdateItem}
@@ -202,7 +200,7 @@ function App() {
                   recurring={recurring}
                   loading={loading}
                   categories={categories}
-                  recurringTags={recurringTags}
+                  existingTags={existingTags}
                   addItem={addItem}
                   onUpdateItem={onUpdateItem}
                   deleteItem={deleteItem}

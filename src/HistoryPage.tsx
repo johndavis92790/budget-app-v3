@@ -9,7 +9,11 @@ import {
   Form,
   InputGroup,
 } from "react-bootstrap";
-import { formatDateFromYYYYMMDD } from "./helpers";
+import {
+  formatDateFromYYYYMMDD,
+  generateRandom10DigitNumber,
+  getFormattedTodaysDate,
+} from "./helpers";
 import FullPageSpinner from "./FullPageSpinner";
 import EditHistoryPage from "./EditHistoryPage";
 import "./HistoryPage.css";
@@ -19,7 +23,7 @@ interface HistoryPageProps {
   history: History[];
   loading: boolean;
   categories: string[];
-  nonRecurringTags: string[];
+  existingTags: string[];
   onUpdateItem: (updatedHistory: History) => Promise<void>;
   deleteItem: (item: History) => Promise<void>;
 }
@@ -28,12 +32,12 @@ function HistoryPage({
   history,
   loading,
   categories,
-  nonRecurringTags,
+  existingTags,
   onUpdateItem,
   deleteItem,
 }: HistoryPageProps) {
   const [expandedRowId, setExpandedRowId] = useState<string | null>(null);
-  const [itemsToShow, setItemsToShow] = useState(10);
+  const [itemsToShow, setItemsToShow] = useState(100);
   const [showFilters, setShowFilters] = useState(false);
 
   // Filters state
@@ -42,16 +46,8 @@ function HistoryPage({
   const [selectedTypes, setSelectedTypes] = useState<string[]>([]);
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
 
-  const getFormattedDate = () => {
-    const today = new Date();
-    const yyyy = today.getFullYear();
-    const mm = String(today.getMonth() + 1).padStart(2, "0");
-    const dd = String(today.getDate()).padStart(2, "0");
-    return `${yyyy}-${mm}-${dd}`;
-  };
-
-  const [startDate, setStartDate] = useState(getFormattedDate);
-  const [endDate, setEndDate] = useState(getFormattedDate);
+  const [startDate, setStartDate] = useState(getFormattedTodaysDate);
+  const [endDate, setEndDate] = useState(getFormattedTodaysDate);
 
   if (loading) {
     return <FullPageSpinner />;
@@ -110,26 +106,31 @@ function HistoryPage({
   };
 
   const handleLoadMore = () => {
-    setItemsToShow(itemsToShow + 10); // Load more items
+    setItemsToShow(itemsToShow + 50); // Load more items
   };
 
-  function generateRandom10DigitNumber() {
-    const random10DigitNumber = Math.floor(
-      1000000000 + Math.random() * 9000000000,
-    );
-    return random10DigitNumber;
-  }
+  const handleRemoveFilters = () => {
+    setSearchTerm("");
+    setSelectedCategories([]);
+    setSelectedTypes([]);
+    setSelectedTags([]);
+    setStartDate("");
+    setEndDate("");
+  };
 
   return (
     <div>
-      <h2 className="mb-4">History</h2>
-      <Button
-        variant="secondary"
-        className="mb-3"
-        onClick={() => setShowFilters(!showFilters)}
-      >
-        {showFilters ? "Hide Filters" : "Show Filters"}
-      </Button>
+      <div className="d-flex justify-content-between mb-2">
+        <h2>History</h2>
+        <Button
+          variant="secondary"
+          className="mb-3"
+          onClick={() => setShowFilters(!showFilters)}
+        >
+          {showFilters ? "Hide Filters" : "Show Filters"}
+        </Button>
+      </div>
+
       {showFilters && (
         <div
           className="filters mb-4 p-3"
@@ -161,7 +162,7 @@ function HistoryPage({
                   <MultiSelectField
                     selectedOptions={selectedTags}
                     setSelectedOptions={setSelectedTags}
-                    availableOptions={nonRecurringTags}
+                    availableOptions={existingTags}
                   />
                 </Form.Group>
               </Col>
@@ -191,6 +192,11 @@ function HistoryPage({
                 </Form.Group>
               </Col>
             </Row>
+            <div className="d-flex justify-content-end">
+              <Button variant="outline-danger" onClick={handleRemoveFilters}>
+                Clear Filters
+              </Button>
+            </div>
           </Form.Group>
         </div>
       )}
@@ -265,7 +271,7 @@ function HistoryPage({
                 >
                   <EditHistoryPage
                     categories={categories}
-                    nonRecurringTags={nonRecurringTags}
+                    existingTags={existingTags}
                     onUpdateItem={onUpdateItem}
                     deleteItem={deleteItem}
                     selectedHistory={hist}
