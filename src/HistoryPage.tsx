@@ -115,7 +115,7 @@ function HistoryPage({
 
   function generateRandom10DigitNumber() {
     const random10DigitNumber = Math.floor(
-      1000000000 + Math.random() * 9000000000
+      1000000000 + Math.random() * 9000000000,
     );
     return random10DigitNumber;
   }

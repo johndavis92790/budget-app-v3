@@ -151,7 +151,7 @@ export function TagField({
 }: TagFieldProps) {
   // Existing tags (multi-select) change handler
   const handleExistingTagsChange = (
-    e: React.ChangeEvent<HTMLSelectElement>
+    e: React.ChangeEvent<HTMLSelectElement>,
   ) => {
     const opts = e.target.options;
     const selected: string[] = [];
