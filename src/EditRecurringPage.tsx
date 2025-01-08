@@ -1,11 +1,7 @@
 import { useEffect, useState, useCallback } from "react";
 import { Recurring } from "./types";
 import { Form, Button, Spinner, Row, Col, Alert } from "react-bootstrap";
-import {
-  DescriptionField,
-  TagField,
-  CategoryField,
-} from "./CommonFormFields";
+import { DescriptionField, TagField, CategoryField } from "./CommonFormFields";
 import CurrencyInput from "./CurrencyInput";
 import UnifiedFileManager from "./UnifiedFileManager";
 import FullSizeImageModal from "./FullSizeImageModal";
