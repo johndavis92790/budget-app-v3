@@ -41,7 +41,6 @@ function EditHistoryPage({
   const [selectedTags, setSelectedTags] = useState<string[]>(
     selectedHistory.tags || [],
   );
-  const [newTags, setNewTags] = useState<string[]>([]);
   const [submitting, setSubmitting] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -52,7 +51,6 @@ function EditHistoryPage({
   useEffect(() => {
     setUpdatedHistory(selectedHistory);
     setSelectedTags(selectedHistory.tags || []);
-    setNewTags([]);
   }, [selectedHistory]);
 
   const handleFieldChange = useCallback(
@@ -66,11 +64,7 @@ function EditHistoryPage({
     setSubmitting(true);
     setError(null);
     try {
-      const finalTags = [
-        ...selectedTags,
-        ...newTags.map((t) => t.trim()).filter(Boolean),
-      ];
-      updatedHistory.tags = finalTags;
+      updatedHistory.tags = selectedTags; // Assign updated tags
 
       const uploadedUrls: string[] = [];
       for (const file of newFiles) {
@@ -99,7 +93,6 @@ function EditHistoryPage({
   }, [
     updatedHistory,
     selectedTags,
-    newTags,
     newFiles,
     removedPaths,
     onUpdateItem,
@@ -139,7 +132,7 @@ function EditHistoryPage({
       <h5 className="mb-3">Edit {selectedHistory.type}</h5>
       <Form>
         <Row>
-          <Col xs={6}>
+          <Col xs={7}>
             <CategoryField
               categoryValue={updatedHistory.category}
               setCategoryValue={(val) => handleFieldChange("category", val)}
@@ -148,7 +141,7 @@ function EditHistoryPage({
               required
             />
           </Col>
-          <Col xs={6}>
+          <Col xs={5}>
             <Form.Group controlId="formValue" className="mb-3">
               <CurrencyInput
                 value={String(updatedHistory.value || 0)}
@@ -168,13 +161,10 @@ function EditHistoryPage({
 
         <Row>
           <Col xs={6}>
-            <TagField
-              selectedTags={selectedTags}
-              setSelectedTags={setSelectedTags}
-              existingTags={existingTags}
+            <DescriptionField
+              value={updatedHistory.description}
+              onChange={(val) => handleFieldChange("description", val)}
               disabled={submitting}
-              newTags={newTags}
-              setNewTags={setNewTags}
             />
           </Col>
           <Col xs={6}>
@@ -188,9 +178,10 @@ function EditHistoryPage({
 
         <Row>
           <Col>
-            <DescriptionField
-              value={updatedHistory.description}
-              onChange={(val) => handleFieldChange("description", val)}
+            <TagField
+              selectedTags={selectedTags}
+              setSelectedTags={setSelectedTags}
+              existingTags={existingTags}
               disabled={submitting}
             />
           </Col>
@@ -198,7 +189,6 @@ function EditHistoryPage({
       </Form>
 
       <hr />
-      <h5>Images</h5>
       <UnifiedFileManager
         id={updatedHistory.id}
         folderName="images"

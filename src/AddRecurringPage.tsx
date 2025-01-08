@@ -27,10 +27,7 @@ function AddRecurringPage({
 }: AddRecurringPageProps) {
   const [category, setCategory] = useState("");
   const [description, setDescription] = useState("");
-
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
-  const [newTags, setNewTags] = useState<string[]>([]);
-
   const [value, setValue] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -43,13 +40,8 @@ function AddRecurringPage({
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
 
-    const finalTags = [
-      ...selectedTags,
-      ...newTags.map((t) => t.trim()).filter(Boolean),
-    ];
-
-    if (!type || !category || finalTags.length === 0 || !value) {
-      setError("Type, at least one Tag, and Value are required.");
+    if (!type || !category || !value) {
+      setError("Type, Category, and Value are required.");
       return;
     }
 
@@ -57,8 +49,7 @@ function AddRecurringPage({
     setError(null);
     try {
       const uniqueId = String(Date.now());
-      let initialDigit = "";
-      type === "Income" ? (initialDigit = "2") : (initialDigit = "3");
+      const initialDigit = type === "Income" ? "2" : "3";
       const updatedId = initialDigit + uniqueId.slice(1);
 
       const storageRef = ref(storage, `images/${updatedId}`);
@@ -85,7 +76,7 @@ function AddRecurringPage({
         type,
         category,
         description,
-        tags: finalTags,
+        tags: selectedTags,
         value: numericValue,
         editURL,
         id: updatedId,
@@ -98,10 +89,10 @@ function AddRecurringPage({
         return;
       }
 
+      // Reset form fields
       setCategory("");
       setDescription("");
       setSelectedTags([]);
-      setNewTags([]);
       setValue("");
       setNewFiles([]);
 
@@ -122,7 +113,7 @@ function AddRecurringPage({
       <h5 className="mb-3">Add New {type}</h5>
       <Form onSubmit={handleSubmit}>
         <Row>
-          <Col xs={6}>
+          <Col xs={7}>
             <CategoryField
               categoryValue={category}
               setCategoryValue={setCategory}
@@ -131,28 +122,7 @@ function AddRecurringPage({
               required
             />
           </Col>
-          <Col xs={6}>
-            <DescriptionField
-              value={description}
-              onChange={setDescription}
-              disabled={submitting}
-            />
-          </Col>
-        </Row>
-
-        <Row>
-          <Col xs={6}>
-            <TagField
-              selectedTags={selectedTags}
-              setSelectedTags={setSelectedTags}
-              existingTags={existingTags}
-              newTags={newTags}
-              setNewTags={setNewTags}
-              disabled={submitting}
-              required
-            />
-          </Col>
-          <Col xs={6}>
+          <Col xs={5}>
             <Form.Group controlId="formValue" className="mb-3">
               <CurrencyInput
                 value={value}
@@ -165,6 +135,28 @@ function AddRecurringPage({
           </Col>
         </Row>
 
+        <Row>
+          <Col>
+            <DescriptionField
+              value={description}
+              onChange={setDescription}
+              disabled={submitting}
+            />
+          </Col>
+        </Row>
+
+        <Row>
+          <Col>
+            <TagField
+              selectedTags={selectedTags}
+              setSelectedTags={setSelectedTags}
+              existingTags={existingTags}
+              disabled={submitting}
+            />
+          </Col>
+        </Row>
+
+        <hr />
         <Row>
           <Col md={4}>
             <UnifiedFileManager

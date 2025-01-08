@@ -1,6 +1,14 @@
-// src/AddHistoryPage.tsx
 import { useState } from "react";
-import { Form, Button, Row, Col, Spinner, Alert } from "react-bootstrap";
+import {
+  Form,
+  Button,
+  Row,
+  Col,
+  Spinner,
+  Alert,
+  Dropdown,
+  ButtonGroup,
+} from "react-bootstrap";
 import { storage } from "./firebase";
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 
@@ -42,6 +50,7 @@ function AddHistoryPage({
   onUpdateGoal,
 }: AddHistoryPageProps) {
   const navigate = useNavigate();
+
   // ----------------- Basic form states -----------------
   const [date, setDate] = useState(() => {
     const today = new Date();
@@ -52,34 +61,30 @@ function AddHistoryPage({
   });
 
   const [category, setCategory] = useState("");
-
-  // ------------- Two states for tags -------------
-  const [selectedTags, setSelectedTags] = useState<string[]>([]);
-  const [newTags, setNewTags] = useState<string[]>([]);
-
-  // ------------- Other fields -------------
+  const [selectedTags, setSelectedTags] = useState<string[]>([]); // Combined tag state
   const [value, setValue] = useState("");
   const [description, setDescription] = useState("");
   const [selectedImageUrl, setSelectedImageUrl] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Unique ID for "Edit" link once we create it
+  const [selectedType, setSelectedType] = useState<"Expense" | "Refund">(
+    "Expense",
+  );
+
   const editURLFragment =
     "https://console.firebase.google.com/u/0/project/budget-app-v3/storage/budget-app-v3.firebasestorage.app/files/~2Fimages~2F";
+
+  const handleSelectType = (type: "Expense" | "Refund") => {
+    setSelectedType(type);
+  };
 
   // ------------- Image Management States -------------
   const [newFiles, setNewFiles] = useState<File[]>([]); // Files to upload
 
-  // ------------- Helper: handle existing + new tags on submit -------------
+  // ------------- Submit Handler -------------
   const handleSubmit = async (type: "Expense" | "Refund") => {
-    // Combine existing + new tags
-    const finalTags = [
-      ...selectedTags,
-      ...newTags.map((t) => t.trim()).filter(Boolean),
-    ];
-
-    if (!date || !category || finalTags.length === 0 || !value) {
+    if (!date || !category || selectedTags.length === 0 || !value) {
       setError("Date, Category, at least one Tag, and Value are required.");
       return;
     }
@@ -116,7 +121,7 @@ function AddHistoryPage({
         date,
         type,
         category,
-        tags: finalTags,
+        tags: selectedTags,
         value: numericValue,
         description,
         editURL,
@@ -149,7 +154,6 @@ function AddHistoryPage({
 
       setCategory("");
       setSelectedTags([]);
-      setNewTags([]);
       setValue("");
       setDescription("");
       setNewFiles([]);
@@ -167,13 +171,6 @@ function AddHistoryPage({
     return <FullPageSpinner />;
   }
 
-  function handleExistingTagsUpdate(newArray: string[]) {
-    setSelectedTags(newArray);
-  }
-  function handleNewTagsUpdate(newArray: string[]) {
-    setNewTags(newArray);
-  }
-
   return (
     <div
       className="p-3 mt-2"
@@ -187,7 +184,7 @@ function AddHistoryPage({
       {error && <Alert variant="danger">{error}</Alert>}
       <Form>
         <Row>
-          <Col xs={6}>
+          <Col xs={7}>
             <CategoryField
               categoryValue={category}
               setCategoryValue={setCategory}
@@ -196,7 +193,7 @@ function AddHistoryPage({
               required
             />
           </Col>
-          <Col xs={6}>
+          <Col xs={5}>
             <Form.Group controlId="formValue" className="mb-3">
               <CurrencyInput
                 value={value}
@@ -211,14 +208,10 @@ function AddHistoryPage({
 
         <Row>
           <Col xs={6}>
-            <TagField
-              selectedTags={selectedTags}
-              setSelectedTags={handleExistingTagsUpdate}
-              existingTags={existingTags}
+            <DescriptionField
+              value={description}
+              onChange={setDescription}
               disabled={submitting}
-              required
-              newTags={newTags}
-              setNewTags={handleNewTagsUpdate}
             />
           </Col>
           <Col xs={6}>
@@ -233,15 +226,16 @@ function AddHistoryPage({
 
         <Row>
           <Col>
-            <DescriptionField
-              value={description}
-              onChange={setDescription}
+            <TagField
+              selectedTags={selectedTags}
+              setSelectedTags={setSelectedTags}
+              existingTags={existingTags}
               disabled={submitting}
             />
           </Col>
         </Row>
 
-        {/* UnifiedFileManager to let user pick/compress images */}
+        <hr />
         <Row>
           <Col md={4}>
             <UnifiedFileManager
@@ -254,31 +248,50 @@ function AddHistoryPage({
           </Col>
         </Row>
 
-        <div className="d-flex justify-content-around mt-3">
-          <Button
-            type="button"
-            variant="success"
-            onClick={() => handleSubmit("Refund")}
-            disabled={submitting}
-          >
-            {submitting ? (
-              <Spinner as="span" animation="border" size="sm" />
-            ) : (
-              "Refund"
-            )}
-          </Button>
-          <Button
-            type="button"
-            variant="danger"
-            onClick={() => handleSubmit("Expense")}
-            disabled={submitting}
-          >
-            {submitting ? (
-              <Spinner as="span" animation="border" size="sm" />
-            ) : (
-              "Expense"
-            )}
-          </Button>
+        <div className="d-flex justify-content-end mt-3">
+          <Dropdown as={ButtonGroup}>
+            <Button
+              type="button"
+              variant={selectedType === "Expense" ? "danger" : "success"}
+              onClick={() => handleSubmit(selectedType)}
+              disabled={submitting}
+              className="d-flex align-items-center ps-3 pe-3"
+            >
+              {submitting ? (
+                <Spinner as="span" animation="border" size="sm" />
+              ) : (
+                selectedType
+              )}
+            </Button>
+
+            {/* Vertical Divider */}
+            <div
+              style={{
+                width: "2px",
+                backgroundColor: "#ccc",
+                margin: "0",
+                alignSelf: "stretch",
+              }}
+            ></div>
+
+            <Dropdown.Toggle
+              split
+              variant={selectedType === "Expense" ? "danger" : "success"}
+              id="dropdown-split-basic"
+              disabled={submitting}
+              className="ps-3 pe-3"
+            />
+
+            <Dropdown.Menu>
+              <Dropdown.Item onClick={() => handleSelectType("Expense")}>
+                Expense
+              </Dropdown.Item>
+              <Dropdown.Divider />
+              <Dropdown.Item onClick={() => handleSelectType("Refund")}>
+                Refund
+              </Dropdown.Item>
+            </Dropdown.Menu>
+          </Dropdown>
         </div>
       </Form>
 

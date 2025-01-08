@@ -1,6 +1,8 @@
-import React from "react";
-import { Button, Form, InputGroup } from "react-bootstrap";
-import { FaCalendar, FaTrash } from "react-icons/fa";
+import React, { useState } from "react";
+import { Form, InputGroup } from "react-bootstrap";
+import { FaCalendar } from "react-icons/fa";
+import { MultiValue } from "react-select";
+import CreatableSelect from "react-select/creatable";
 
 /**
  * Common props for all fields that handle 'value' + 'onChange'.
@@ -130,12 +132,9 @@ export function CategoryField({
 /** ========== TagField ========== */
 interface TagFieldProps {
   selectedTags: string[];
-  setSelectedTags: (newTags: string[]) => void;
-  newTags: string[]; // always required
-  setNewTags: (vals: string[]) => void;
+  setSelectedTags: (tags: string[]) => void;
   existingTags: string[];
   disabled?: boolean;
-  required?: boolean;
 }
 
 export function TagField({
@@ -143,91 +142,40 @@ export function TagField({
   setSelectedTags,
   existingTags,
   disabled,
-  required,
-  newTags,
-  setNewTags,
 }: TagFieldProps) {
-  // Existing tags (multi-select) change handler
-  const handleExistingTagsChange = (
-    e: React.ChangeEvent<HTMLSelectElement>,
+  // Map existing tags to the format required by react-select
+  const [options, setOptions] = useState(
+    existingTags.map((tag) => ({ label: tag, value: tag })),
+  );
+
+  // Handle selection changes
+  const handleChange = (
+    newValue: MultiValue<{ label: string; value: string }>,
   ) => {
-    const opts = e.target.options;
-    const selected: string[] = [];
-    for (let i = 0; i < opts.length; i++) {
-      if (opts[i].selected) {
-        selected.push(opts[i].value);
-      }
-    }
-    // We pass the final string[] to setTags
-    setSelectedTags(selected);
+    setSelectedTags(
+      newValue.map((item: { label: string; value: string }) => item.value),
+    );
   };
 
-  // Add a blank new tag
-  const handleAddNewTagField = () => {
-    setNewTags([...newTags, ""]);
-  };
-
-  // Update the text of one new tag
-  const handleNewTagChange = (idx: number, value: string) => {
-    const copy = [...newTags];
-    copy[idx] = value;
-    setNewTags(copy);
-  };
-
-  // Remove one new tag
-  const handleRemoveNewTag = (idx: number) => {
-    setNewTags(newTags.filter((_, i) => i !== idx));
+  // Handle creating a new tag
+  const handleCreate = (inputValue: string) => {
+    const newOption = { label: inputValue, value: inputValue };
+    setOptions((prevOptions) => [...prevOptions, newOption]); // Add to available options
+    setSelectedTags([...selectedTags, inputValue]); // Add to selected tags
   };
 
   return (
-    <div>
-      <Form.Group controlId="formTags" className="mb-3">
-        <Form.Select
-          multiple
-          value={selectedTags}
-          onChange={handleExistingTagsChange}
-          disabled={disabled}
-          required={required}
-        >
-          {existingTags.map((tag, i) => (
-            <option key={i} value={tag}>
-              {tag}
-            </option>
-          ))}
-        </Form.Select>
-      </Form.Group>
-
-      {/* newly created custom tags */}
-      {newTags.map((tagValue, idx) => (
-        <InputGroup className="mb-2" key={idx}>
-          <Form.Control
-            type="text"
-            placeholder="Enter a new tag"
-            value={tagValue}
-            disabled={disabled}
-            onChange={(e) => handleNewTagChange(idx, e.target.value)}
-          />
-          <Button
-            variant="outline-secondary"
-            onClick={() => handleRemoveNewTag(idx)}
-            disabled={disabled}
-            className="d-flex align-items-center justify-content-center"
-            style={{ lineHeight: 1 }}
-          >
-            <FaTrash />
-          </Button>
-        </InputGroup>
-      ))}
-
-      <Button
-        className="mb-3"
-        variant="outline-primary"
-        onClick={handleAddNewTagField}
-        disabled={disabled}
-      >
-        + Add New Tag
-      </Button>
-    </div>
+    <CreatableSelect
+      isMulti
+      isDisabled={disabled}
+      value={selectedTags.map((tag) => ({ label: tag, value: tag }))}
+      onChange={handleChange}
+      onCreateOption={handleCreate}
+      options={options}
+      placeholder="Select or create tags..."
+      noOptionsMessage={() => "No matching tags"}
+      className="mb-3"
+    />
   );
 }
 

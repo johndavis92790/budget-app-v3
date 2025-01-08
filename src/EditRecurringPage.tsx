@@ -36,7 +36,6 @@ function EditRecurringPage({
   const [selectedTags, setSelectedTags] = useState<string[]>(
     selectedRecurring.tags || [],
   );
-  const [newTags, setNewTags] = useState<string[]>([]);
   const [submitting, setSubmitting] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -47,7 +46,6 @@ function EditRecurringPage({
   useEffect(() => {
     setUpdatedRecurring(selectedRecurring);
     setSelectedTags(selectedRecurring.tags || []);
-    setNewTags([]);
   }, [selectedRecurring]);
 
   const handleFieldChange = useCallback(
@@ -61,11 +59,7 @@ function EditRecurringPage({
     setSubmitting(true);
     setError(null);
     try {
-      const finalTags = [
-        ...selectedTags,
-        ...newTags.map((t) => t.trim()).filter(Boolean),
-      ];
-      updatedRecurring.tags = finalTags;
+      updatedRecurring.tags = selectedTags; // Assign updated tags
 
       const uploadedUrls: string[] = [];
       for (const file of newFiles) {
@@ -94,7 +88,6 @@ function EditRecurringPage({
   }, [
     updatedRecurring,
     selectedTags,
-    newTags,
     newFiles,
     removedPaths,
     onUpdateItem,
@@ -134,7 +127,7 @@ function EditRecurringPage({
       <h5 className="mb-3">Edit {updatedRecurring.type}</h5>
       <Form>
         <Row>
-          <Col xs={6}>
+          <Col xs={7}>
             <CategoryField
               categoryValue={updatedRecurring.category}
               setCategoryValue={(val) => handleFieldChange("category", val)}
@@ -143,27 +136,7 @@ function EditRecurringPage({
               required
             />
           </Col>
-          <Col xs={6}>
-            <DescriptionField
-              value={updatedRecurring.description}
-              onChange={(val) => handleFieldChange("description", val)}
-              disabled={submitting}
-            />
-          </Col>
-        </Row>
-
-        <Row>
-          <Col xs={6}>
-            <TagField
-              selectedTags={selectedTags}
-              setSelectedTags={setSelectedTags}
-              existingTags={existingTags}
-              disabled={submitting}
-              newTags={newTags}
-              setNewTags={setNewTags}
-            />
-          </Col>
-          <Col xs={6}>
+          <Col xs={5}>
             <Form.Group controlId="formValue" className="mb-3">
               <CurrencyInput
                 value={String(updatedRecurring.value || 0)}
@@ -178,6 +151,27 @@ function EditRecurringPage({
                 }}
               />
             </Form.Group>
+          </Col>
+        </Row>
+
+        <Row>
+          <Col>
+            <DescriptionField
+              value={updatedRecurring.description}
+              onChange={(val) => handleFieldChange("description", val)}
+              disabled={submitting}
+            />
+          </Col>
+        </Row>
+
+        <Row>
+          <Col>
+            <TagField
+              selectedTags={selectedTags}
+              setSelectedTags={setSelectedTags}
+              existingTags={existingTags}
+              disabled={submitting}
+            />
           </Col>
         </Row>
       </Form>

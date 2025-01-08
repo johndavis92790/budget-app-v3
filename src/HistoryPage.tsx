@@ -61,7 +61,11 @@ function HistoryPage({
         // Search filter
         const matchesSearch =
           searchTerm === "" ||
-          item.description.toLowerCase().includes(searchTerm.toLowerCase());
+          item.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          item.category.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          item.tags.some((tag) =>
+            tag.toLowerCase().includes(searchTerm.toLowerCase()),
+          );
 
         // Category filter
         const matchesCategory =
@@ -191,7 +195,7 @@ function HistoryPage({
                   />
                 </Form.Group>
                 <Form.Group className="mb-3">
-                  <label>Description</label>
+                  <label>Search</label>
                   <InputGroup>
                     <Form.Control
                       type="text"
