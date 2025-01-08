@@ -57,8 +57,11 @@ function AddRecurringPage({
     setError(null);
     try {
       const uniqueId = String(Date.now());
+      let initialDigit = "";
+      type === "Income" ? (initialDigit = "2") : (initialDigit = "3");
+      const updatedId = initialDigit + uniqueId.slice(1);
 
-      const storageRef = ref(storage, `images/${uniqueId}`);
+      const storageRef = ref(storage, `images/${updatedId}`);
       const uploadedUrls: string[] = [];
 
       for (const file of newFiles) {
@@ -68,7 +71,7 @@ function AddRecurringPage({
         uploadedUrls.push(downloadURL);
       }
 
-      const editURL = `${editURLFragment}${uniqueId}`;
+      const editURL = `${editURLFragment}${updatedId}`;
 
       const numericStr = value.replace(/[^0-9.-]/g, "");
       const numericValue = parseFloat(numericStr);
@@ -85,7 +88,7 @@ function AddRecurringPage({
         tags: finalTags,
         value: numericValue,
         editURL,
-        id: uniqueId,
+        id: updatedId,
         itemType: "recurring",
       };
 
@@ -120,13 +123,6 @@ function AddRecurringPage({
       <Form onSubmit={handleSubmit}>
         <Row>
           <Col xs={6}>
-            <DescriptionField
-              value={description}
-              onChange={setDescription}
-              disabled={submitting}
-            />
-          </Col>
-          <Col xs={6}>
             <CategoryField
               categoryValue={category}
               setCategoryValue={setCategory}
@@ -135,12 +131,18 @@ function AddRecurringPage({
               required
             />
           </Col>
+          <Col xs={6}>
+            <DescriptionField
+              value={description}
+              onChange={setDescription}
+              disabled={submitting}
+            />
+          </Col>
         </Row>
 
         <Row>
           <Col xs={6}>
             <TagField
-              label="Tags"
               selectedTags={selectedTags}
               setSelectedTags={setSelectedTags}
               existingTags={existingTags}
@@ -152,7 +154,6 @@ function AddRecurringPage({
           </Col>
           <Col xs={6}>
             <Form.Group controlId="formValue" className="mb-3">
-              <Form.Label>Amount</Form.Label>
               <CurrencyInput
                 value={value}
                 onChange={(e) => setValue(e.target.value)}

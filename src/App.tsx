@@ -54,7 +54,7 @@ function App() {
       );
 
       setCategories(data.categories || []);
-      setExistingTags(data.nonRecurringTags || []);
+      setExistingTags(data.tags || []);
       setWeeklyGoal(data.weeklyGoal);
       setMonthlyGoal(data.monthlyGoal);
       setFiscalWeeks(data.fiscalWeeks || {});

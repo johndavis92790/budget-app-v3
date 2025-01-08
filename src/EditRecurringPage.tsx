@@ -3,7 +3,6 @@ import { Recurring } from "./types";
 import { Form, Button, Spinner, Row, Col, Alert } from "react-bootstrap";
 import {
   DescriptionField,
-  TypeField,
   TagField,
   CategoryField,
 } from "./CommonFormFields";
@@ -48,8 +47,6 @@ function EditRecurringPage({
   const [newFiles, setNewFiles] = useState<File[]>([]);
   const [removedPaths, setRemovedPaths] = useState<string[]>([]);
   const [selectedImageUrl, setSelectedImageUrl] = useState<string | null>(null);
-
-  const recurringTypes = ["Expense", "Income"];
 
   useEffect(() => {
     setUpdatedRecurring(selectedRecurring);
@@ -138,28 +135,9 @@ function EditRecurringPage({
   return (
     <div>
       {error && <Alert variant="danger">{error}</Alert>}
-
+      <h5 className="mb-3">Edit {updatedRecurring.type}</h5>
       <Form>
         <Row>
-          <Col md={8}>
-            <DescriptionField
-              value={updatedRecurring.description}
-              onChange={(val) => handleFieldChange("description", val)}
-              disabled={submitting}
-            />
-          </Col>
-        </Row>
-
-        <Row>
-          <Col xs={6}>
-            <TypeField
-              typeValue={updatedRecurring.type}
-              setTypeValue={(val) => handleFieldChange("type", val)}
-              options={recurringTypes}
-              disabled={submitting}
-              required
-            />
-          </Col>
           <Col xs={6}>
             <CategoryField
               categoryValue={updatedRecurring.category}
@@ -167,6 +145,13 @@ function EditRecurringPage({
               categories={categories}
               disabled={submitting}
               required
+            />
+          </Col>
+          <Col xs={6}>
+            <DescriptionField
+              value={updatedRecurring.description}
+              onChange={(val) => handleFieldChange("description", val)}
+              disabled={submitting}
             />
           </Col>
         </Row>
@@ -184,7 +169,6 @@ function EditRecurringPage({
           </Col>
           <Col xs={6}>
             <Form.Group controlId="formValue" className="mb-3">
-              <Form.Label>Amount</Form.Label>
               <CurrencyInput
                 value={String(updatedRecurring.value || 0)}
                 placeholder="$0.00"
@@ -203,7 +187,6 @@ function EditRecurringPage({
       </Form>
 
       <hr />
-      <h5>Images</h5>
       <UnifiedFileManager
         id={updatedRecurring.id}
         folderName="images"

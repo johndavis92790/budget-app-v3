@@ -51,7 +51,7 @@ export function DescriptionField({ value, onChange, disabled }: FieldProps) {
 interface TypeFieldProps {
   typeValue: string;
   setTypeValue?: (val: string) => void;
-  options: string[]; // e.g. nonRecurringTypes or recurringTypes
+  options: string[]; // e.g. types
   disabled?: boolean;
   required?: boolean;
   label?: string; // e.g. "Type"
@@ -136,7 +136,6 @@ interface TagFieldProps {
   existingTags: string[];
   disabled?: boolean;
   required?: boolean;
-  label?: string;
 }
 
 export function TagField({
@@ -145,7 +144,6 @@ export function TagField({
   existingTags,
   disabled,
   required,
-  label = "Tags",
   newTags,
   setNewTags,
 }: TagFieldProps) {
@@ -184,7 +182,6 @@ export function TagField({
   return (
     <div>
       <Form.Group controlId="formTags" className="mb-3">
-        <Form.Label>{label}</Form.Label>
         <Form.Select
           multiple
           value={selectedTags}

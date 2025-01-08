@@ -140,13 +140,6 @@ function EditHistoryPage({
       <Form>
         <Row>
           <Col xs={6}>
-            <DateField
-              value={updatedHistory.date}
-              onChange={(val) => handleFieldChange("date", val)}
-              disabled={submitting}
-            />
-          </Col>
-          <Col xs={6}>
             <CategoryField
               categoryValue={updatedHistory.category}
               setCategoryValue={(val) => handleFieldChange("category", val)}
@@ -155,21 +148,8 @@ function EditHistoryPage({
               required
             />
           </Col>
-        </Row>
-        <Row>
-          <Col xs={6}>
-            <TagField
-              selectedTags={selectedTags}
-              setSelectedTags={setSelectedTags}
-              existingTags={existingTags}
-              disabled={submitting}
-              newTags={newTags}
-              setNewTags={setNewTags}
-            />
-          </Col>
           <Col xs={6}>
             <Form.Group controlId="formValue" className="mb-3">
-              <Form.Label>Value</Form.Label>
               <CurrencyInput
                 value={String(updatedHistory.value || 0)}
                 placeholder="$0.00"
@@ -185,6 +165,27 @@ function EditHistoryPage({
             </Form.Group>
           </Col>
         </Row>
+
+        <Row>
+          <Col xs={6}>
+            <TagField
+              selectedTags={selectedTags}
+              setSelectedTags={setSelectedTags}
+              existingTags={existingTags}
+              disabled={submitting}
+              newTags={newTags}
+              setNewTags={setNewTags}
+            />
+          </Col>
+          <Col xs={6}>
+            <DateField
+              value={updatedHistory.date}
+              onChange={(val) => handleFieldChange("date", val)}
+              disabled={submitting}
+            />
+          </Col>
+        </Row>
+
         <Row>
           <Col>
             <DescriptionField

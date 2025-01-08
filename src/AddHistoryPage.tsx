@@ -188,14 +188,6 @@ function AddHistoryPage({
       <Form>
         <Row>
           <Col xs={6}>
-            <DateField
-              value={date}
-              onChange={setDate}
-              disabled={submitting}
-              required
-            />
-          </Col>
-          <Col xs={6}>
             <CategoryField
               categoryValue={category}
               setCategoryValue={setCategory}
@@ -203,6 +195,17 @@ function AddHistoryPage({
               disabled={submitting}
               required
             />
+          </Col>
+          <Col xs={6}>
+            <Form.Group controlId="formValue" className="mb-3">
+              <CurrencyInput
+                value={value}
+                onChange={(e) => setValue(e.target.value)}
+                placeholder="$0.00"
+                disabled={submitting}
+                style={{ width: "100%" }}
+              />
+            </Form.Group>
           </Col>
         </Row>
 
@@ -219,16 +222,12 @@ function AddHistoryPage({
             />
           </Col>
           <Col xs={6}>
-            <Form.Group controlId="formValue" className="mb-3">
-              <Form.Label>Amount</Form.Label>
-              <CurrencyInput
-                value={value}
-                onChange={(e) => setValue(e.target.value)}
-                placeholder="$0.00"
-                disabled={submitting}
-                style={{ width: "100%" }}
-              />
-            </Form.Group>
+            <DateField
+              value={date}
+              onChange={setDate}
+              disabled={submitting}
+              required
+            />
           </Col>
         </Row>
 

@@ -6,6 +6,7 @@ import EditRecurringPage from "./EditRecurringPage";
 import AddRecurringPage from "./AddRecurringPage";
 import { FaPlus } from "react-icons/fa";
 import "./RecurringPage.css";
+import { generateRandom10DigitNumber, getCategoryIcon } from "./helpers";
 
 interface RecurringPageProps {
   recurring: Recurring[];
@@ -46,7 +47,7 @@ function RecurringPage({
 
   return (
     <div>
-      <h2 className="mb-4">Recurring</h2>
+      <h2 className="mb-4">Recurring Budget</h2>
 
       {/* Income Section */}
       <h4 className="mb-3">Income</h4>
@@ -56,7 +57,7 @@ function RecurringPage({
             index % 2 === 0 ? "row-light" : "row-white";
 
           return (
-            <div key={item.id}>
+            <div key={`${item.id}-${generateRandom10DigitNumber()}`}>
               <ListGroup.Item
                 className={`py-3 ${backgroundColorClass}`}
                 onClick={() => toggleRow(item.id)}
@@ -68,20 +69,30 @@ function RecurringPage({
                       <Badge
                         pill
                         bg="info"
-                        className="me-1"
-                        style={{ fontSize: "1em" }}
+                        className="mb-1"
+                        style={{
+                          fontSize: "1em",
+                          display: "inline-flex",
+                          alignItems: "center",
+                          gap: "0.5rem",
+                        }}
                       >
+                        {getCategoryIcon(item.category)}
                         {item.category}
-                      </Badge>{" "}
+                      </Badge>
+                    </div>
+                    <div className="mb-1 ms-2" style={{ fontSize: "1em" }}>
                       {item.description}
                     </div>
-                    <div className="text-muted" style={{ fontSize: "0.9em" }}>
-                      {item.type}
-                    </div>
+
                     {item.tags.length > 0 && (
-                      <div className="mt-1">
+                      <div className="mb-1 ms-2">
                         {item.tags.map((tag, i) => (
-                          <Badge key={i} bg="secondary" className="me-1">
+                          <Badge
+                            key={`income-tag-${item.id}-${i}-${generateRandom10DigitNumber()}`}
+                            bg="secondary"
+                            className="me-1"
+                          >
                             {tag}
                           </Badge>
                         ))}
@@ -89,6 +100,9 @@ function RecurringPage({
                     )}
                   </Col>
                   <Col xs={4} className="text-end">
+                    <div className="text-muted" style={{ fontSize: "0.9em" }}>
+                      {item.type}
+                    </div>
                     <div
                       className="text-success"
                       style={{ fontSize: "1.1em", fontWeight: "bold" }}
@@ -159,7 +173,7 @@ function RecurringPage({
             index % 2 === 0 ? "row-light" : "row-white";
 
           return (
-            <div key={item.id}>
+            <div key={`${item.id}-${generateRandom10DigitNumber()}`}>
               <ListGroup.Item
                 className={`py-3 ${backgroundColorClass}`}
                 onClick={() => toggleRow(item.id)}
@@ -171,20 +185,30 @@ function RecurringPage({
                       <Badge
                         pill
                         bg="info"
-                        className="me-1"
-                        style={{ fontSize: "1em" }}
+                        className="mb-1"
+                        style={{
+                          fontSize: "1em",
+                          display: "inline-flex",
+                          alignItems: "center",
+                          gap: "0.5rem",
+                        }}
                       >
+                        {getCategoryIcon(item.category)}
                         {item.category}
-                      </Badge>{" "}
+                      </Badge>
+                    </div>
+                    <div className="mb-1 ms-2" style={{ fontSize: "1em" }}>
                       {item.description}
                     </div>
-                    <div className="text-muted" style={{ fontSize: "0.9em" }}>
-                      {item.type}
-                    </div>
+
                     {item.tags.length > 0 && (
-                      <div className="mt-1">
+                      <div className="mb-1 ms-2">
                         {item.tags.map((tag, i) => (
-                          <Badge key={i} bg="secondary" className="me-1">
+                          <Badge
+                            key={`expense-tag-${item.id}-${i}-${generateRandom10DigitNumber()}`}
+                            bg="secondary"
+                            className="me-1"
+                          >
                             {tag}
                           </Badge>
                         ))}
@@ -192,6 +216,9 @@ function RecurringPage({
                     )}
                   </Col>
                   <Col xs={4} className="text-end">
+                    <div className="text-muted" style={{ fontSize: "0.9em" }}>
+                      {item.type}
+                    </div>
                     <div
                       className="text-danger"
                       style={{ fontSize: "1.1em", fontWeight: "bold" }}

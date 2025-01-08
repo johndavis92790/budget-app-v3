@@ -12,7 +12,7 @@ import {
 import {
   formatDateFromYYYYMMDD,
   generateRandom10DigitNumber,
-  getFormattedTodaysDate,
+  getCategoryIcon,
 } from "./helpers";
 import FullPageSpinner from "./FullPageSpinner";
 import EditHistoryPage from "./EditHistoryPage";
@@ -36,8 +36,10 @@ function HistoryPage({
   onUpdateItem,
   deleteItem,
 }: HistoryPageProps) {
+  const initialitemsToShow = 100;
+  const itemsToRevealOnClick = 30;
   const [expandedRowId, setExpandedRowId] = useState<string | null>(null);
-  const [itemsToShow, setItemsToShow] = useState(100);
+  const [itemsToShow, setItemsToShow] = useState(initialitemsToShow);
   const [showFilters, setShowFilters] = useState(false);
 
   // Filters state
@@ -46,8 +48,8 @@ function HistoryPage({
   const [selectedTypes, setSelectedTypes] = useState<string[]>([]);
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
 
-  const [startDate, setStartDate] = useState(getFormattedTodaysDate);
-  const [endDate, setEndDate] = useState(getFormattedTodaysDate);
+  const [startDate, setStartDate] = useState("");
+  const [endDate, setEndDate] = useState("");
 
   if (loading) {
     return <FullPageSpinner />;
@@ -94,7 +96,15 @@ function HistoryPage({
   const sortedHistory = filteredHistory.sort((a, b) => {
     const dateA = new Date(a.date);
     const dateB = new Date(b.date);
-    return dateB.getTime() - dateA.getTime(); // Latest dates first
+
+    // Compare by date first (latest dates first)
+    const dateComparison = dateB.getTime() - dateA.getTime();
+    if (dateComparison !== 0) {
+      return dateComparison;
+    }
+
+    // If dates are the same, compare by id (highest id first)
+    return parseInt(b.id, 10) - parseInt(a.id, 10);
   });
 
   const toggleRow = (id: string) => {
@@ -106,7 +116,7 @@ function HistoryPage({
   };
 
   const handleLoadMore = () => {
-    setItemsToShow(itemsToShow + 50); // Load more items
+    setItemsToShow(itemsToShow + itemsToRevealOnClick); // Load more items
   };
 
   const handleRemoveFilters = () => {
@@ -222,32 +232,44 @@ function HistoryPage({
                 style={{ cursor: "pointer" }}
               >
                 <Row>
-                  <Col xs={8}>
+                  <Col xs={7}>
                     <div style={{ fontSize: "1em" }}>
                       <Badge
                         pill
                         bg="info"
-                        className="me-1"
-                        style={{ fontSize: "1em" }}
+                        className="mb-1"
+                        style={{
+                          fontSize: "1em",
+                          display: "inline-flex",
+                          alignItems: "center",
+                          gap: "0.5rem",
+                        }}
                       >
+                        {getCategoryIcon(hist.category)}
                         {hist.category}
-                      </Badge>{" "}
+                      </Badge>
+                    </div>
+                    <div className="mb-1 ms-2" style={{ fontSize: "1em" }}>
                       {hist.description}
                     </div>
-                    <div className="text-muted" style={{ fontSize: "0.9em" }}>
-                      {hist.type}
-                    </div>
                     {hist.tags.length > 0 && (
-                      <div className="mt-1">
+                      <div className="mb-1 ms-2">
                         {hist.tags.map((tag, i) => (
-                          <Badge key={i} bg="secondary" className="me-1">
+                          <Badge
+                            key={`history-tag-${hist.id}-${i}-${generateRandom10DigitNumber()}`}
+                            bg="secondary"
+                            className="me-1"
+                          >
                             {tag}
                           </Badge>
                         ))}
                       </div>
                     )}
                   </Col>
-                  <Col xs={4} className="text-end">
+                  <Col xs={5} className="text-end">
+                    <div className="text-muted" style={{ fontSize: "0.9em" }}>
+                      {hist.type}
+                    </div>
                     <div
                       className={valueColor}
                       style={{ fontSize: "1.1em", fontWeight: "bold" }}

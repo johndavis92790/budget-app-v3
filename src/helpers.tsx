@@ -1,3 +1,23 @@
+import {
+  FaChild,
+  FaTshirt,
+  FaStore,
+  FaUtensils,
+  FaSmile,
+  FaGasPump,
+  FaGift,
+  FaShoppingCart,
+  FaHeartbeat,
+  FaHome,
+  FaBriefcase,
+  FaQuestionCircle,
+  FaMobileAlt,
+  FaPiggyBank,
+  FaPray,
+  FaPlane,
+  FaCar,
+} from "react-icons/fa";
+
 export const API_URL = process.env.REACT_APP_API_URL!;
 
 export function getDaySuffix(day: number) {
@@ -32,21 +52,21 @@ export function yyyymmddToMmddyyyy(dateStr: string): string {
 }
 
 /**
- * Convert YYYY-MM-DD to a nice readable format like "Fri, Dec 13th"
+ * Convert YYYY-MM-DD to a nice readable format like "Fri, Dec 13th '24"
  */
 export function formatDateFromYYYYMMDD(isoDateStr: string) {
   // isoDateStr is "YYYY-MM-DD"
   const [y, m, d] = isoDateStr.split("-");
-  const year = parseInt(y, 10);
+  const year = y.slice(2);
   const month = parseInt(m, 10);
   const day = parseInt(d, 10);
 
-  const date = new Date(year, month - 1, day);
+  const date = new Date(parseInt(y, 10), month - 1, day);
   const weekday = date.toLocaleDateString(undefined, { weekday: "short" });
   const monthName = date.toLocaleDateString(undefined, { month: "short" });
   const daySuffix = getDaySuffix(day);
 
-  return `${weekday}, ${monthName} ${day}${daySuffix}`;
+  return `${weekday}, ${monthName} ${day}${daySuffix} '${year}`;
 }
 
 export function generateRandom10DigitNumber() {
@@ -63,3 +83,27 @@ export const getFormattedTodaysDate = () => {
   const dd = String(today.getDate()).padStart(2, "0");
   return `${yyyy}-${mm}-${dd}`;
 };
+
+export function getCategoryIcon(category: string) {
+  const icons: { [key: string]: JSX.Element } = {
+    Children: <FaChild />,
+    Clothes: <FaTshirt />,
+    Costco: <FaStore />,
+    Dining: <FaUtensils />,
+    Fun: <FaSmile />,
+    Gas: <FaGasPump />,
+    Gifts: <FaGift />,
+    Groceries: <FaShoppingCart />,
+    Health: <FaHeartbeat />,
+    House: <FaHome />,
+    Job: <FaBriefcase />,
+    Other: <FaQuestionCircle />,
+    Phones: <FaMobileAlt />,
+    Savings: <FaPiggyBank />,
+    Tithing: <FaPray />,
+    Travel: <FaPlane />,
+    Vehicles: <FaCar />,
+  };
+
+  return icons[category] || <FaQuestionCircle />; // Fallback icon for unknown categories
+}

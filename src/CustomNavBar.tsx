@@ -78,7 +78,7 @@ function CustomNavBar() {
               to="/recurring"
               onClick={() => setNavExpanded(false)}
             >
-              Recurring
+              Recurring Budget
             </Nav.Link>
           </Nav>
         </Navbar.Collapse>
