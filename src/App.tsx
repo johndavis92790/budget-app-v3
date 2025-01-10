@@ -1,17 +1,27 @@
 import { useEffect, useState } from "react";
 import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
-import { Container } from "react-bootstrap";
+import { Container, Navbar } from "react-bootstrap";
 
-import { FiscalWeek, History, Recurring } from "./types";
+import { FiscalWeek, History, Recurring, UpdateGoal } from "./types";
 import HistoryPage from "./HistoryPage";
 import RecurringPage from "./RecurringPage";
 import AddHistoryPage from "./AddHistoryPage";
 import HomePage from "./HomePage";
 import GoalsBanner from "./GoalsBanner";
 import FiscalCalendar from "./FiscalCalendar";
-
-import CustomNavBar from "./CustomNavBar"; // <-- Import our new Navbar
+import CustomNavBar from "./CustomNavBar";
 import { API_URL, mmddyyyyToYyyyMmDd } from "./helpers";
+
+// Firebase Auth
+import {
+  GoogleAuthProvider,
+  signInWithPopup,
+  onAuthStateChanged,
+  signOut,
+  User,
+} from "firebase/auth";
+import { auth } from "./firebase";
+import { AuthContext } from "./authContext";
 
 function App() {
   const [history, setHistory] = useState<History[]>([]);
@@ -25,7 +35,55 @@ function App() {
   );
   const [loading, setLoading] = useState<boolean>(true);
 
-  // Fetch the main data from your API
+  // Auth states
+  const [currentUser, setCurrentUser] = useState<User | null>(null);
+  const [isAuthorized, setIsAuthorized] = useState<boolean>(false);
+
+  // Emails allowed to access the app
+  const ALLOWED_EMAILS = [
+    process.env.REACT_APP_GOOGLE_ACCOUNT_1,
+    process.env.REACT_APP_GOOGLE_ACCOUNT_2,
+  ];
+
+  // Listen for Firebase Auth state changes
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, async (user) => {
+      if (!user?.email) {
+        setCurrentUser(null);
+        setIsAuthorized(false);
+        return;
+      }
+      if (ALLOWED_EMAILS.includes(user.email)) {
+        setCurrentUser(user);
+        setIsAuthorized(true);
+      } else {
+        // Not allowed => sign out
+        await signOut(auth);
+        setIsAuthorized(false);
+      }
+    });
+    return unsubscribe;
+  }, []);
+
+  // Google Sign-In (popup)
+  const handleSignInWithGoogle = async () => {
+    try {
+      const provider = new GoogleAuthProvider();
+      await signInWithPopup(auth, provider);
+      // onAuthStateChanged listener will set states
+    } catch (err) {
+      console.error("Error during sign-in:", err);
+    }
+  };
+
+  // Sign out
+  const handleSignOut = async () => {
+    await signOut(auth);
+    setIsAuthorized(false);
+    setCurrentUser(null);
+  };
+
+  // Fetch data only AFTER authorized
   const fetchData = async () => {
     setLoading(true);
     try {
@@ -64,19 +122,19 @@ function App() {
     setLoading(false);
   };
 
+  // Only fetch data once the user is authorized
   useEffect(() => {
-    fetchData();
-  }, []);
+    if (isAuthorized) {
+      fetchData();
+    }
+  }, [isAuthorized]);
 
-  // Called when adding a new history or recurring item
+  // CRUD actions
   const addItem = async (newItem: History | Recurring) => {
-    console.log("newItem", newItem);
     try {
       const response = await fetch(API_URL, {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify(newItem),
       });
       if (!response.ok) {
@@ -84,7 +142,7 @@ function App() {
       }
       const result = await response.json();
       console.log("Item added with ID:", result.id);
-      fetchData(); // Refresh data after adding
+      fetchData();
       return true;
     } catch (error) {
       console.error("Error adding item:", error);
@@ -92,57 +150,44 @@ function App() {
     }
   };
 
-  // Called when updating a history or recurring item
   const onUpdateItem = async (updatedItem: History | Recurring) => {
     try {
       console.log("updatedItem: ", updatedItem);
       const response = await fetch(API_URL, {
         method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify(updatedItem),
       });
       if (!response.ok) {
         throw new Error(`Error: ${response.statusText}`);
       }
       console.log("Item updated with ID: ", updatedItem.id);
-      fetchData(); // Refresh data after updating
+      fetchData();
     } catch (error) {
       console.error("Error updating item:", error);
     }
   };
 
-  // Updating goals
-  const onUpdateGoal = async (
-    itemType: "weeklyGoal" | "monthlyGoal",
-    newValue: number,
-  ) => {
+  const onUpdateGoal = async (updatedGoal: UpdateGoal) => {
     try {
       await fetch(API_URL, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ itemType, value: newValue }),
+        body: JSON.stringify(updatedGoal),
       });
-      // Re-fetch data (which updates weeklyGoal and monthlyGoal)
       await fetchData();
     } catch (err) {
       console.error("Error updating goal:", err);
     }
   };
 
-  // Called when deleting a history or recurring item
   const deleteItem = async (item: History | Recurring) => {
-    console.log("item", item);
     try {
-      const response = await fetch(`${API_URL}`, {
+      const response = await fetch(API_URL, {
         method: "DELETE",
-        headers: {
-          "Content-Type": "application/json",
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify(item),
       });
-
       if (!response.ok) {
         throw new Error(`Error deleting item: ${response.statusText}`);
       }
@@ -153,67 +198,107 @@ function App() {
     }
   };
 
-  return (
-    <div className="mb-5">
-      <Router>
-        {/* Our new Navbar component */}
-        <CustomNavBar />
+  // Render Sign-in screen if not authorized
+  if (!isAuthorized) {
+    return (
+      <>
+        {/* A dark header that resembles your navbar styling */}
+        <Navbar bg="dark" variant="dark" className="mb-4">
+          <Container>
+            <Navbar.Brand>Family Budget Tracker</Navbar.Brand>
+          </Container>
+        </Navbar>
 
-        {/* Goals banner */}
-        <GoalsBanner weeklyGoal={weeklyGoal} monthlyGoal={monthlyGoal} />
-
-        {/* Main container with routes */}
-        <Container>
-          <Routes>
-            <Route path="/" element={<HomePage loading={loading} />} />
-            <Route
-              path="/add-history"
-              element={
-                <AddHistoryPage
-                  categories={categories}
-                  existingTags={existingTags}
-                  addItem={addItem}
-                  loading={loading}
-                  weeklyGoal={weeklyGoal}
-                  monthlyGoal={monthlyGoal}
-                  onUpdateGoal={onUpdateGoal}
-                />
-              }
+        <Container className="text-center" style={{ marginTop: "3rem" }}>
+          <button
+            onClick={handleSignInWithGoogle}
+            className="btn btn-light"
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              gap: "8px",
+              fontWeight: 500,
+              border: "1px solid #ddd",
+              borderRadius: "6px",
+              padding: "0.5rem 1rem",
+            }}
+          >
+            <img
+              alt="Google logo"
+              src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg"
+              style={{ width: "20px", height: "20px" }}
             />
-            <Route
-              path="/history"
-              element={
-                <HistoryPage
-                  categories={categories}
-                  existingTags={existingTags}
-                  history={history}
-                  loading={loading}
-                  onUpdateItem={onUpdateItem}
-                  deleteItem={deleteItem}
-                />
-              }
-            />
-            <Route
-              path="/recurring"
-              element={
-                <RecurringPage
-                  recurring={recurring}
-                  loading={loading}
-                  categories={categories}
-                  existingTags={existingTags}
-                  addItem={addItem}
-                  onUpdateItem={onUpdateItem}
-                  deleteItem={deleteItem}
-                />
-              }
-            />
-          </Routes>
+            Sign in with Google
+          </button>
         </Container>
+      </>
+    );
+  }
 
-        {/* Fiscal calendar */}
-        <FiscalCalendar fiscalWeeks={fiscalWeeks} history={history} />
-      </Router>
-    </div>
+  // If authorized, show the main app
+  return (
+    <AuthContext.Provider value={{ currentUser, isAuthorized }}>
+      <div className="mb-5">
+        <Router>
+          {/* Pass handleSignOut and isAuthorized to the navbar */}
+          <CustomNavBar
+            handleSignOut={handleSignOut}
+            isAuthorized={isAuthorized}
+          />
+
+          <GoalsBanner weeklyGoal={weeklyGoal} monthlyGoal={monthlyGoal} />
+
+          <Container>
+            <Routes>
+              <Route path="/" element={<HomePage loading={loading} />} />
+              <Route
+                path="/add-history"
+                element={
+                  <AddHistoryPage
+                    categories={categories}
+                    existingTags={existingTags}
+                    addItem={addItem}
+                    loading={loading}
+                    weeklyGoal={weeklyGoal}
+                    monthlyGoal={monthlyGoal}
+                    onUpdateGoal={onUpdateGoal}
+                  />
+                }
+              />
+              <Route
+                path="/history"
+                element={
+                  <HistoryPage
+                    categories={categories}
+                    existingTags={existingTags}
+                    history={history}
+                    loading={loading}
+                    onUpdateItem={onUpdateItem}
+                    deleteItem={deleteItem}
+                  />
+                }
+              />
+              <Route
+                path="/recurring"
+                element={
+                  <RecurringPage
+                    recurring={recurring}
+                    loading={loading}
+                    categories={categories}
+                    existingTags={existingTags}
+                    addItem={addItem}
+                    onUpdateItem={onUpdateItem}
+                    deleteItem={deleteItem}
+                  />
+                }
+              />
+            </Routes>
+          </Container>
+
+          <FiscalCalendar fiscalWeeks={fiscalWeeks} history={history} />
+        </Router>
+      </div>
+    </AuthContext.Provider>
   );
 }
 

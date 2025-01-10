@@ -1,5 +1,6 @@
 export interface History {
   date: string;
+  userEmail: string | null | undefined;
   type: string;
   category: string;
   tags: string[];
@@ -14,6 +15,7 @@ export interface History {
 }
 
 export interface Recurring {
+  userEmail: string | null | undefined;
   type: string;
   category: string;
   tags: string[];
@@ -31,4 +33,10 @@ export interface FiscalWeek {
   year_title: string;
   month_id: string;
   itemType: string;
+}
+
+export interface UpdateGoal {
+  itemType: "weeklyGoal" | "monthlyGoal";
+  value: number;
+  userEmail: string | null | undefined;
 }

@@ -9,6 +9,7 @@ import { TagField, DescriptionField, CategoryField } from "./CommonFormFields";
 import CurrencyInput from "./CurrencyInput";
 import { Recurring } from "./types";
 import UnifiedFileManager from "./UnifiedFileManager";
+import { useAuthContext } from "./authContext";
 
 interface AddRecurringPageProps {
   type: string;
@@ -25,6 +26,9 @@ function AddRecurringPage({
   addItem,
   onClose,
 }: AddRecurringPageProps) {
+  const { currentUser } = useAuthContext();
+  const userEmail = currentUser?.email;
+
   const [category, setCategory] = useState("");
   const [description, setDescription] = useState("");
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
@@ -73,6 +77,7 @@ function AddRecurringPage({
       }
 
       const newRecurring: Recurring = {
+        userEmail,
         type,
         category,
         description,

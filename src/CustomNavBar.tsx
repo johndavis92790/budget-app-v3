@@ -3,11 +3,16 @@ import { Link } from "react-router-dom";
 import { Navbar, Nav, Container } from "react-bootstrap";
 import { Spin as Hamburger } from "hamburger-react";
 
-function CustomNavBar() {
+interface CustomNavBarProps {
+  handleSignOut: () => void;
+  isAuthorized: boolean;
+}
+
+function CustomNavBar({ handleSignOut, isAuthorized }: CustomNavBarProps) {
   const [navExpanded, setNavExpanded] = useState(false);
   const navbarRef = useRef<HTMLDivElement | null>(null);
 
-  // Close navbar if clicking outside of it
+  // Close navbar if clicking outside
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
       if (
@@ -38,7 +43,7 @@ function CustomNavBar() {
           Family Budget Tracker
         </Navbar.Brand>
 
-        {/* Remove <Navbar.Toggle /> and replace with hamburger-react toggler */}
+        {/* Hamburger toggler */}
         <div
           style={{
             border: "none",
@@ -81,6 +86,20 @@ function CustomNavBar() {
               Recurring Budget
             </Nav.Link>
           </Nav>
+
+          {/* Right side: Log Out if authorized */}
+          {isAuthorized && (
+            <Nav className="ms-auto">
+              <Nav.Link
+                onClick={() => {
+                  setNavExpanded(false);
+                  handleSignOut();
+                }}
+              >
+                Log Out
+              </Nav.Link>
+            </Nav>
+          )}
         </Navbar.Collapse>
       </Container>
     </Navbar>
