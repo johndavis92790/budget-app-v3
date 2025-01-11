@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { History } from "./types";
+import { FiscalWeek, History } from "./types";
 import {
   ListGroup,
   Badge,
@@ -18,9 +18,11 @@ import FullPageSpinner from "./FullPageSpinner";
 import EditHistoryPage from "./EditHistoryPage";
 import "./HistoryPage.css";
 import { DateField, MultiSelectField } from "./CommonFormFields";
+import FiscalCalendar from "./FiscalCalendar";
 
 interface HistoryPageProps {
   history: History[];
+  fiscalWeeks: Record<string, FiscalWeek>;
   loading: boolean;
   categories: string[];
   existingTags: string[];
@@ -30,6 +32,7 @@ interface HistoryPageProps {
 
 function HistoryPage({
   history,
+  fiscalWeeks,
   loading,
   categories,
   existingTags,
@@ -316,6 +319,9 @@ function HistoryPage({
           </Button>
         </div>
       )}
+
+      <FiscalCalendar fiscalWeeks={fiscalWeeks} history={history} />
+      
     </div>
   );
 }

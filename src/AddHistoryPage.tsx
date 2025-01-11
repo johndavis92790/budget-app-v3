@@ -23,10 +23,11 @@ import {
 } from "./CommonFormFields";
 
 import CurrencyInput from "./CurrencyInput";
-import { History, UpdateGoal } from "./types";
+import { FiscalWeek, History, UpdateGoal } from "./types";
 import UnifiedFileManager from "./UnifiedFileManager";
 import { useNavigate } from "react-router-dom";
 import { useAuthContext } from "./authContext";
+import FiscalCalendar from "./FiscalCalendar";
 
 interface AddHistoryPageProps {
   categories: string[];
@@ -36,6 +37,8 @@ interface AddHistoryPageProps {
   weeklyGoal: number;
   monthlyGoal: number;
   onUpdateGoal: (updatedGoal: UpdateGoal) => Promise<void>;
+  fiscalWeeks: Record<string, FiscalWeek>;
+  history: History[];
 }
 
 function AddHistoryPage({
@@ -46,6 +49,8 @@ function AddHistoryPage({
   weeklyGoal,
   monthlyGoal,
   onUpdateGoal,
+  fiscalWeeks,
+  history,
 }: AddHistoryPageProps) {
   const navigate = useNavigate();
   const { currentUser } = useAuthContext();
@@ -322,6 +327,9 @@ function AddHistoryPage({
         imageUrl={selectedImageUrl}
         onClose={() => setSelectedImageUrl(null)}
       />
+
+      <FiscalCalendar fiscalWeeks={fiscalWeeks} history={history} />
+      
     </div>
   );
 }

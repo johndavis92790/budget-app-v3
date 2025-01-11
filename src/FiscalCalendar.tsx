@@ -1,7 +1,7 @@
 import { useState, useMemo } from "react";
 import Calendar, { CalendarProps } from "react-calendar";
-import "react-calendar/dist/Calendar.css"; // Default styles
-import "./FiscalCalendar.css"; // Custom styles
+import "react-calendar/dist/Calendar.css";
+import "./FiscalCalendar.css";
 import { FaChevronLeft, FaChevronRight } from "react-icons/fa";
 import { FiscalWeek, History } from "./types";
 
@@ -24,50 +24,57 @@ interface FiscalCalendarProps {
 function FiscalCalendar({ fiscalWeeks, history }: FiscalCalendarProps) {
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
 
-  // Transform fiscalWeeks into events
   const events = useMemo(() => {
+    const today = new Date();
+
     return Object.entries(fiscalWeeks).map(([key, weekData]) => {
+      // Convert the week's start/end to Date
+      const start = new Date(`${weekData.start_date}T07:00:00Z`);
+      const end = new Date(`${weekData.end_date}T07:00:00Z`);
+
+      // Check if this week includes today
+      const isCurrentWeek = today >= start && today <= end;
       const matchingHistory = history.filter(
-        (item) => item.fiscalWeekId === key,
+        (item) => item.fiscalWeekId === key
       );
+      if (isCurrentWeek) {
+        console.log(matchingHistory);
+      }
+      const total = matchingHistory.reduce((sum, item) => {
+        if (item.itemType === "history") {
+          return item.type === "Expense"
+            ? sum + item.value
+            : item.type === "Refund"
+              ? sum - item.value
+              : sum;
+        }
+        return sum;
+      }, 0);
 
-      const total = matchingHistory.reduce((sum, item) => sum + item.value, 0);
+      let backgroundColor;
+      let textColor;
+      let borderColor;
 
-      let backgroundColor = "rgb(209, 209, 209)";
-      let textColor = "rgb(82, 82, 82)";
-      let borderColor = "rgb(132, 132, 132)";
-
-      switch (weekData.number) {
-        case "1":
-          backgroundColor = "rgb(212, 237, 218)";
-          textColor = "rgb(85, 110, 91)";
-          borderColor = "rgb(135, 160, 141)";
-          break;
-        case "2":
-          backgroundColor = "rgb(236, 237, 212)";
-          textColor = "rgb(109, 110, 85)";
-          borderColor = "rgb(159, 160, 135)";
-          break;
-        case "3":
-          backgroundColor = "rgb(212, 222, 237)";
-          textColor = "rgb(85, 95, 110)";
-          borderColor = "rgb(135, 145, 160)";
-          break;
-        case "4":
-          backgroundColor = "rgb(228, 191, 191)";
-          textColor = "rgb(112, 72, 72)";
-          borderColor = "rgb(168, 111, 111)";
-          break;
+      if (isCurrentWeek) {
+        // Colors for the current week
+        backgroundColor = "rgb(212, 237, 218)";
+        textColor = "rgb(85, 110, 91)";
+        borderColor = "rgb(135, 160, 141)";
+      } else {
+        // Grey for all other weeks
+        backgroundColor = "rgb(209, 209, 209)";
+        textColor = "rgb(82, 82, 82)";
+        borderColor = "rgb(132, 132, 132)";
       }
 
       return {
         id: key,
-        start: new Date(`${weekData.start_date}T07:00:00Z`), // Use UTC explicitly
-        end: new Date(`${weekData.end_date}T07:00:00Z`), // Ensure end date includes the whole day
+        start,
+        end,
         backgroundColor,
         textColor,
         borderColor,
-        label: `Week ${weekData.number}`,
+        label: `Week ${weekData.number}`, // Still label as “Week X”
         total,
       };
     });
@@ -87,13 +94,14 @@ function FiscalCalendar({ fiscalWeeks, history }: FiscalCalendarProps) {
 
         const isMiddleDay = current > event.start && current < event.end;
 
+        // On the first "middle" day, show the currency label
         if (isMiddleDay && !isFirstMiddleDateLogged) {
           map[key].push({
             ...event,
             label: `${event.total.toLocaleString("en-US", {
               style: "currency",
               currency: "USD",
-            })}`, // Display total on the first middle date
+            })}`,
           });
           isFirstMiddleDateLogged = true;
         } else {
@@ -116,15 +124,15 @@ function FiscalCalendar({ fiscalWeeks, history }: FiscalCalendarProps) {
     }
   };
 
-  const isSameDay = (date1: Date, date2: Date) => {
+  function isSameDay(date1: Date, date2: Date) {
     return (
       date1.getDate() === date2.getDate() &&
       date1.getMonth() === date2.getMonth() &&
       date1.getFullYear() === date2.getFullYear()
     );
-  };
+  }
 
-  const getEventRole = (event: CalendarEvent, date: Date) => {
+  function getEventRole(event: CalendarEvent, date: Date) {
     if (isSameDay(date, event.start) && isSameDay(date, event.end)) {
       return "single";
     }
@@ -135,22 +143,22 @@ function FiscalCalendar({ fiscalWeeks, history }: FiscalCalendarProps) {
       return "end";
     }
     return "middle";
-  };
+  }
 
   return (
     <div className="my-calendar-container">
       <Calendar
         onChange={handleDateChange}
         value={selectedDate}
-        showNeighboringMonth={true}
+        showNeighboringMonth
         next2Label={null}
         prev2Label={null}
         prevLabel={<FaChevronLeft />}
         nextLabel={<FaChevronRight />}
+        locale="en-US"
         formatShortWeekday={(locale, date) =>
           date.toLocaleString(locale, { weekday: "short" })
         }
-        locale="en-US" // Set locale to start week on Sunday
         tileContent={({ date, view }) => {
           if (view !== "month") return null;
 
@@ -165,7 +173,7 @@ function FiscalCalendar({ fiscalWeeks, history }: FiscalCalendarProps) {
                 const role = getEventRole(event, date);
                 return (
                   <div
-                    key={`${event.id}-${role}`} // Ensure unique key
+                    key={`${event.id}-${role}`}
                     className={`event-band ${role}`}
                     style={{
                       backgroundColor: event.backgroundColor,

@@ -35,6 +35,14 @@ export interface FiscalWeek {
   itemType: string;
 }
 
+export interface FiscalMonth {
+  id: string;
+  start_date: string;
+  end_date: string;
+  year_title: string;
+  itemType: string;
+}
+
 export interface UpdateGoal {
   itemType: "weeklyGoal" | "monthlyGoal";
   value: number;

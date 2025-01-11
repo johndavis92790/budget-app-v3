@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Recurring } from "./types";
+import { FiscalMonth, Recurring, History } from "./types";
 import { ListGroup, Badge, Row, Col, Button } from "react-bootstrap";
 import FullPageSpinner from "./FullPageSpinner";
 import EditRecurringPage from "./EditRecurringPage";
@@ -7,9 +7,12 @@ import AddRecurringPage from "./AddRecurringPage";
 import { FaPlus } from "react-icons/fa";
 import "./RecurringPage.css";
 import { generateRandom10DigitNumber, getCategoryIcon } from "./helpers";
+import FiscalMonthCalendar from "./FiscalMonthCalendar";
 
 interface RecurringPageProps {
+  history: History[];
   recurring: Recurring[];
+  fiscalMonths: Record<string, FiscalMonth>;
   loading: boolean;
   categories: string[];
   existingTags: string[];
@@ -19,7 +22,9 @@ interface RecurringPageProps {
 }
 
 function RecurringPage({
+  history,
   recurring,
+  fiscalMonths,
   loading,
   categories,
   existingTags,
@@ -280,6 +285,10 @@ function RecurringPage({
           </Button>
         </div>
       )}
+      <FiscalMonthCalendar
+        fiscalMonths={fiscalMonths}
+        history={history}
+      />
     </div>
   );
 }

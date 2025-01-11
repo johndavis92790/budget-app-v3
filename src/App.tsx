@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
 import { Container, Navbar } from "react-bootstrap";
 
-import { FiscalWeek, History, Recurring, UpdateGoal } from "./types";
+import { FiscalMonth, FiscalWeek, History, Recurring, UpdateGoal } from "./types";
 import HistoryPage from "./HistoryPage";
 import RecurringPage from "./RecurringPage";
 import AddHistoryPage from "./AddHistoryPage";
@@ -32,6 +32,9 @@ function App() {
   const [monthlyGoal, setMonthlyGoal] = useState<number>(0);
   const [fiscalWeeks, setFiscalWeeks] = useState<Record<string, FiscalWeek>>(
     {},
+  );
+  const [fiscalMonths, setFiscalMonths] = useState<Record<string, FiscalMonth>>(
+    {}
   );
   const [loading, setLoading] = useState<boolean>(true);
 
@@ -63,7 +66,7 @@ function App() {
       }
     });
     return unsubscribe;
-  }, []);
+  }, [ALLOWED_EMAILS]);
 
   // Google Sign-In (popup)
   const handleSignInWithGoogle = async () => {
@@ -116,6 +119,7 @@ function App() {
       setWeeklyGoal(data.weeklyGoal);
       setMonthlyGoal(data.monthlyGoal);
       setFiscalWeeks(data.fiscalWeeks || {});
+      setFiscalMonths(data.fiscalMonths || {});
     } catch (error) {
       console.error("Error fetching data:", error);
     }
@@ -262,6 +266,8 @@ function App() {
                     weeklyGoal={weeklyGoal}
                     monthlyGoal={monthlyGoal}
                     onUpdateGoal={onUpdateGoal}
+                    fiscalWeeks={fiscalWeeks}
+                    history={history}
                   />
                 }
               />
@@ -272,6 +278,7 @@ function App() {
                     categories={categories}
                     existingTags={existingTags}
                     history={history}
+                    fiscalWeeks={fiscalWeeks}
                     loading={loading}
                     onUpdateItem={onUpdateItem}
                     deleteItem={deleteItem}
@@ -282,7 +289,9 @@ function App() {
                 path="/recurring"
                 element={
                   <RecurringPage
+                    history={history}
                     recurring={recurring}
+                    fiscalMonths={fiscalMonths}
                     loading={loading}
                     categories={categories}
                     existingTags={existingTags}
@@ -295,7 +304,7 @@ function App() {
             </Routes>
           </Container>
 
-          <FiscalCalendar fiscalWeeks={fiscalWeeks} history={history} />
+          {/* <FiscalCalendar fiscalWeeks={fiscalWeeks} history={history} /> */}
         </Router>
       </div>
     </AuthContext.Provider>
