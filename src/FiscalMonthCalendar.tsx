@@ -46,7 +46,7 @@ function FiscalMonthCalendar({
       // Filter history items that match this fiscalMonth
       // (since you'll have item.fiscalMonthId === monthId)
       const matchingHistory = history.filter(
-        (item) => item.fiscalMonthId === monthId
+        (item) => item.fiscalMonthId === monthId,
       );
 
       const total = matchingHistory.reduce((sum, item) => {

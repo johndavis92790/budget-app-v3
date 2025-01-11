@@ -2,7 +2,13 @@ import { useEffect, useState } from "react";
 import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
 import { Container, Navbar } from "react-bootstrap";
 
-import { FiscalMonth, FiscalWeek, History, Recurring, UpdateGoal } from "./types";
+import {
+  FiscalMonth,
+  FiscalWeek,
+  History,
+  Recurring,
+  UpdateGoal,
+} from "./types";
 import HistoryPage from "./HistoryPage";
 import RecurringPage from "./RecurringPage";
 import AddHistoryPage from "./AddHistoryPage";
@@ -34,7 +40,7 @@ function App() {
     {},
   );
   const [fiscalMonths, setFiscalMonths] = useState<Record<string, FiscalMonth>>(
-    {}
+    {},
   );
   const [loading, setLoading] = useState<boolean>(true);
 

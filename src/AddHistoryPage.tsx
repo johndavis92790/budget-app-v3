@@ -329,7 +329,6 @@ function AddHistoryPage({
       />
 
       <FiscalCalendar fiscalWeeks={fiscalWeeks} history={history} />
-      
     </div>
   );
 }

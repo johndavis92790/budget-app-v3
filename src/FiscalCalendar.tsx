@@ -35,7 +35,7 @@ function FiscalCalendar({ fiscalWeeks, history }: FiscalCalendarProps) {
       // Check if this week includes today
       const isCurrentWeek = today >= start && today <= end;
       const matchingHistory = history.filter(
-        (item) => item.fiscalWeekId === key
+        (item) => item.fiscalWeekId === key,
       );
       if (isCurrentWeek) {
         console.log(matchingHistory);

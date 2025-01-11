@@ -285,10 +285,7 @@ function RecurringPage({
           </Button>
         </div>
       )}
-      <FiscalMonthCalendar
-        fiscalMonths={fiscalMonths}
-        history={history}
-      />
+      <FiscalMonthCalendar fiscalMonths={fiscalMonths} history={history} />
     </div>
   );
 }
