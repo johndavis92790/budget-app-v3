@@ -48,3 +48,8 @@ export interface UpdateGoal {
   value: number;
   userEmail: string | null | undefined;
 }
+
+export interface NotificationPayload {
+  title: string | undefined;
+  body: string | undefined;
+}

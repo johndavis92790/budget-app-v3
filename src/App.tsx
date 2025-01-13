@@ -6,6 +6,7 @@ import {
   FiscalMonth,
   FiscalWeek,
   History,
+  NotificationPayload,
   Recurring,
   UpdateGoal,
 } from "./types";
@@ -14,9 +15,11 @@ import RecurringPage from "./RecurringPage";
 import AddHistoryPage from "./AddHistoryPage";
 import HomePage from "./HomePage";
 import GoalsBanner from "./GoalsBanner";
-import FiscalCalendar from "./FiscalCalendar";
 import CustomNavBar from "./CustomNavBar";
 import { API_URL, mmddyyyyToYyyyMmDd } from "./helpers";
+import { messaging, db } from "./firebase";
+import { getToken, onMessage } from "firebase/messaging";
+import { collection, doc, setDoc } from "firebase/firestore";
 
 // Firebase Auth
 import {
@@ -47,6 +50,10 @@ function App() {
   // Auth states
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [isAuthorized, setIsAuthorized] = useState<boolean>(false);
+
+  const [notification, setNotification] = useState<NotificationPayload | null>(
+    null,
+  );
 
   // Emails allowed to access the app
   const ALLOWED_EMAILS = [
@@ -90,6 +97,64 @@ function App() {
     await signOut(auth);
     setIsAuthorized(false);
     setCurrentUser(null);
+  };
+
+  useEffect(() => {
+    const initializeMessaging = async () => {
+      try {
+        const permission = await Notification.requestPermission();
+        console.log("Notification permission: ", permission);
+
+        if (permission === "granted") {
+          const currentToken = await getToken(messaging, {
+            vapidKey: process.env.REACT_APP_VAPID_KEY,
+          });
+          if (currentToken) {
+            console.log("FCM Token:", currentToken);
+            await storeTokenInFirestore(currentToken);
+          }
+        }
+      } catch (error) {
+        console.error("Error initializing messaging: ", error);
+      }
+    };
+
+    initializeMessaging();
+
+    // Register the onMessage listener
+    const unsubscribe = onMessage(messaging, (payload) => {
+      console.log("Foreground notification payload received: ", payload);
+
+      if (payload.data) {
+        const { title, body } = payload.data;
+
+        // Show the notification explicitly
+        new Notification(title || "Default Title", {
+          body: body || "Default Body",
+          icon: payload.data.icon || "/favicon.ico",
+        });
+
+        // Optional: Update app UI
+        setNotification({ title, body });
+      } else {
+        console.warn("Notification payload missing 'data' field.");
+      }
+    });
+
+    return () => unsubscribe();
+  }, []);
+
+  const storeTokenInFirestore = async (token: string): Promise<void> => {
+    try {
+      // For simplicity, store with the token as the document ID
+      const tokensRef = collection(db, "fcmTokens");
+      await setDoc(doc(tokensRef, token), {
+        token,
+        createdAt: new Date(),
+      });
+    } catch (err) {
+      console.error("Error storing token:", err);
+    }
   };
 
   // Fetch data only AFTER authorized
@@ -249,6 +314,15 @@ function App() {
   return (
     <AuthContext.Provider value={{ currentUser, isAuthorized }}>
       <div className="mb-5">
+        {/* <div>
+          <h1>My Notification Test</h1>
+          {notification && (
+            <div>
+              <p>Title: {notification.title}</p>
+              <p>Body: {notification.body}</p>
+            </div>
+          )}
+        </div> */}
         <Router>
           {/* Pass handleSignOut and isAuthorized to the navbar */}
           <CustomNavBar

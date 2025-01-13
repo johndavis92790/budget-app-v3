@@ -2,6 +2,110 @@ import { onRequest } from "firebase-functions/v2/https";
 import { Request, Response } from "express";
 import { google } from "googleapis";
 
+const functions = require("firebase-functions");
+const admin = require("firebase-admin");
+const { GoogleAuth } = require("google-auth-library");
+const fetch = require("node-fetch");
+
+admin.initializeApp();
+
+const SECRET_TOKEN = "9a7ce018-5796-427d-8a67-3f204d4419af";
+
+exports.sendNotification = functions.https.onRequest(
+  async (req: any, res: any) => {
+    // Only allow POST requests
+    if (req.method !== "POST") {
+      return res.status(405).send("Method Not Allowed");
+    }
+
+    // Verify secret token
+    const token = req.headers["x-secret-token"];
+    if (token !== SECRET_TOKEN) {
+      return res.status(403).send("Forbidden");
+    }
+
+    const { title, body } = req.body;
+    if (!title || !body) {
+      return res.status(400).send("Missing title or body");
+    }
+
+    try {
+      // Retrieve all tokens from Firestore
+      const tokensSnapshot = await admin
+        .firestore()
+        .collection("fcmTokens")
+        .get();
+      const tokens = tokensSnapshot.docs.map((doc: any) => doc.data().token);
+
+      if (tokens.length === 0) {
+        return res.status(200).send("No tokens found");
+      }
+
+      // Generate an OAuth 2.0 access token
+      const auth = new GoogleAuth({
+        scopes: ["https://www.googleapis.com/auth/firebase.messaging"],
+      });
+      const accessToken = await auth.getAccessToken();
+
+      // Prepare notification payload and send to each token
+      const results = [];
+      for (const token of tokens) {
+        const message = {
+          message: {
+            token: token,
+            data: {
+              title: title,
+              body: body,
+              icon: "/favicon.ico",
+            },
+            android: {
+              priority: "high",
+            },
+            apns: {
+              headers: {
+                "apns-priority": "10",
+              },
+            },
+            webpush: {
+              headers: {
+                Urgency: "high",
+              },
+            },
+          },
+        };
+
+        const response = await fetch(
+          "https://fcm.googleapis.com/v1/projects/budget-app-v3/messages:send",
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${accessToken}`,
+            },
+            body: JSON.stringify(message),
+          }
+        );
+
+        const responseData = await response.json();
+        results.push({
+          token,
+          response: responseData,
+          success: response.ok,
+        });
+      }
+
+      // Log and return the results
+      return res.status(200).send({
+        success: true,
+        results,
+      });
+    } catch (error) {
+      console.error("Error sending notification:", error);
+      return res.status(500).send(error);
+    }
+  }
+);
+
 const SPREADSHEET_ID = "1KROs_Swh-1zeQhLajtRw-E7DcYnJRMHEOXX5ECwTGSI";
 
 const HISTORY_TABLE_NAME = "History";
@@ -102,7 +206,8 @@ async function logAction(
   const userEmail = data.userEmail || "";
 
   // 3) Pretty-print data & error as multi-line JSON
-  const dataStr = Object.keys(data).length > 0 ? JSON.stringify(data, null, 2) : "";
+  const dataStr =
+    Object.keys(data).length > 0 ? JSON.stringify(data, null, 2) : "";
   const errorStr = errorMessage ? JSON.stringify(errorMessage, null, 2) : "";
 
   // 4) Prepare the row for columns A-E
