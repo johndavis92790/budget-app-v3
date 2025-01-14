@@ -442,14 +442,11 @@ async function addMissingTags(sheets: any, tags: string[]) {
 async function adjustGoalIfSameFiscalPeriod(
   sheets: any,
   oldValue: number,
-  newValue: number,
-  itemType: string,
-  fiscalWeekId: string | null,
-  fiscalMonthId: string | null
+  data: any
 ) {
-  if (fiscalWeekId) {
+  if (data.fiscalWeekId) {
     try {
-      const sameWeek = await isSameFiscalWeekById(fiscalWeekId, sheets);
+      const sameWeek = await isSameFiscalWeekById(data.fiscalWeekId, sheets);
       if (sameWeek) {
         const wgData = await sheets.spreadsheets.values.get({
           spreadsheetId: SPREADSHEET_ID,
@@ -457,28 +454,39 @@ async function adjustGoalIfSameFiscalPeriod(
         });
         const rawWG = wgData.data.values?.[0]?.[0] || "0";
         let weeklyGoal = parseFloat(rawWG.replace(/[^0-9.-]/g, ""));
+        let difference = 0;
 
-        if (newValue > oldValue) {
-          const difference = newValue - oldValue;
-          weeklyGoal = isExpenseType(itemType)
+        if (data.value > oldValue) {
+          difference = data.value - oldValue;
+          weeklyGoal = isExpenseType(data.type)
             ? weeklyGoal - difference
             : weeklyGoal + difference;
-        } else if (newValue < oldValue) {
-          const difference = oldValue - newValue;
-          weeklyGoal = isExpenseType(itemType)
+        } else if (data.value < oldValue) {
+          difference = oldValue - data.value;
+          weeklyGoal = isExpenseType(data.type)
             ? weeklyGoal + difference
             : weeklyGoal - difference;
         }
         await updateSingleCellGoal(sheets, WEEKLY_GOAL_RANGE, weeklyGoal);
+        await logAction(sheets, "UPDATE_WEEKLY_GOAL", {
+          itemType: data.itemType,
+          type: data.type,
+          userEmail: data.userEmail,
+          before: parseFloat(rawWG.replace(/[^0-9.-]/g, "")),
+          oldValue: oldValue,
+          newValue: data.value,
+          difference: difference,
+          after: weeklyGoal,
+        });
       }
     } catch (err) {
       console.error("[adjustGoalIfSameFiscalPeriod-week] error:", err);
     }
   }
 
-  if (fiscalMonthId) {
+  if (data.fiscalMonthId) {
     try {
-      const sameMonth = await isSameFiscalMonthById(fiscalMonthId, sheets);
+      const sameMonth = await isSameFiscalMonthById(data.fiscalMonthId, sheets);
       if (sameMonth) {
         const mgData = await sheets.spreadsheets.values.get({
           spreadsheetId: SPREADSHEET_ID,
@@ -486,22 +494,92 @@ async function adjustGoalIfSameFiscalPeriod(
         });
         const rawMG = mgData.data.values?.[0]?.[0] || "0";
         let monthlyGoal = parseFloat(rawMG.replace(/[^0-9.-]/g, ""));
+        let difference = 0;
 
-        if (newValue > oldValue) {
-          const difference = newValue - oldValue;
-          monthlyGoal = isExpenseType(itemType)
+        if (data.value > oldValue) {
+          difference = data.value - oldValue;
+          monthlyGoal = isExpenseType(data.type)
             ? monthlyGoal - difference
             : monthlyGoal + difference;
-        } else if (newValue < oldValue) {
-          const difference = oldValue - newValue;
-          monthlyGoal = isExpenseType(itemType)
+        } else if (data.value < oldValue) {
+          difference = oldValue - data.value;
+          monthlyGoal = isExpenseType(data.type)
             ? monthlyGoal + difference
             : monthlyGoal - difference;
         }
         await updateSingleCellGoal(sheets, MONTHLY_GOAL_RANGE, monthlyGoal);
+        await logAction(sheets, "UPDATE_MONTHLY_GOAL", {
+          itemType: data.itemType,
+          type: data.type,
+          userEmail: data.userEmail,
+          before: parseFloat(rawMG.replace(/[^0-9.-]/g, "")),
+          oldValue: oldValue,
+          newValue: data.value,
+          difference: difference,
+          after: monthlyGoal,
+        });
       }
     } catch (err) {
       console.error("[adjustGoalIfSameFiscalPeriod-month] error:", err);
+    }
+  }
+}
+
+// Adjust goals if in the same fiscal period
+async function changeGoalIfSameFiscalPeriod(sheets: any, data: any) {
+  if (data.fiscalWeekId) {
+    try {
+      const sameWeek = await isSameFiscalWeekById(data.fiscalWeekId, sheets);
+      if (sameWeek) {
+        const wgData = await sheets.spreadsheets.values.get({
+          spreadsheetId: SPREADSHEET_ID,
+          range: WEEKLY_GOAL_RANGE,
+        });
+        const rawWG = wgData.data.values?.[0]?.[0] || "0";
+        let weeklyGoal = parseFloat(rawWG.replace(/[^0-9.-]/g, ""));
+        weeklyGoal = isExpenseType(data.type)
+          ? weeklyGoal - data.value
+          : weeklyGoal + data.value;
+        await updateSingleCellGoal(sheets, WEEKLY_GOAL_RANGE, weeklyGoal);
+        await logAction(sheets, "UPDATE_WEEKLY_GOAL", {
+          itemType: data.itemType,
+          type: data.type,
+          userEmail: data.userEmail,
+          before: parseFloat(rawWG.replace(/[^0-9.-]/g, "")),
+          value: data.value,
+          after: weeklyGoal,
+        });
+      }
+    } catch (err) {
+      console.error("[changeGoalIfSameFiscalPeriod-week] error:", err);
+    }
+  }
+
+  if (data.fiscalMonthId) {
+    try {
+      const sameMonth = await isSameFiscalMonthById(data.fiscalMonthId, sheets);
+      if (sameMonth) {
+        const mgData = await sheets.spreadsheets.values.get({
+          spreadsheetId: SPREADSHEET_ID,
+          range: MONTHLY_GOAL_RANGE,
+        });
+        const rawMG = mgData.data.values?.[0]?.[0] || "0";
+        let monthlyGoal = parseFloat(rawMG.replace(/[^0-9.-]/g, ""));
+        monthlyGoal = isExpenseType(data.type)
+          ? monthlyGoal - data.value
+          : monthlyGoal + data.value;
+        await updateSingleCellGoal(sheets, MONTHLY_GOAL_RANGE, monthlyGoal);
+        await logAction(sheets, "UPDATE_MONTHLY_GOAL", {
+          itemType: data.itemType,
+          type: data.type,
+          userEmail: data.userEmail,
+          before: parseFloat(rawMG.replace(/[^0-9.-]/g, "")),
+          value: data.value,
+          after: monthlyGoal,
+        });
+      }
+    } catch (err) {
+      console.error("[changeGoalIfSameFiscalPeriod-month] error:", err);
     }
   }
 }
@@ -826,6 +904,9 @@ async function handlePOST(sheets: any, req: Request, res: Response) {
 
       await insertItem(sheets, data, "history");
       await logAction(sheets, "ADD_HISTORY", data);
+
+      await changeGoalIfSameFiscalPeriod(sheets, data);
+
       res.status(200).json({ status: "success", id: data.id, fiscalIDs });
       return;
     }
@@ -878,14 +959,7 @@ async function handlePUT(sheets: any, req: Request, res: Response) {
         const rawOriginalValue = existingRow[4];
         const originalValue = parseCellValue(rawOriginalValue);
         if (data.value !== originalValue) {
-          await adjustGoalIfSameFiscalPeriod(
-            sheets,
-            originalValue,
-            data.value,
-            data.type,
-            data.fiscalWeekId,
-            data.fiscalMonthId
-          );
+          await adjustGoalIfSameFiscalPeriod(sheets, originalValue, data);
         }
 
         await logAction(sheets, "UPDATE_HISTORY", data);
@@ -976,6 +1050,14 @@ async function handleDELETE(sheets: any, req: Request, res: Response) {
             ? weeklyGoal + data.value
             : weeklyGoal - data.value;
           await updateSingleCellGoal(sheets, WEEKLY_GOAL_RANGE, weeklyGoal);
+          await logAction(sheets, "UPDATE_WEEKLY_GOAL", {
+            itemType: data.itemType,
+            type: data.type,
+            userEmail: data.userEmail,
+            before: parseFloat(rawWG.replace(/[^0-9.-]/g, "")),
+            value: data.value,
+            after: weeklyGoal,
+          });
         }
       } catch (err) {
         console.error("Error adjusting weekly goal in DELETE:", err);
@@ -997,6 +1079,14 @@ async function handleDELETE(sheets: any, req: Request, res: Response) {
             ? monthlyGoal + data.value
             : monthlyGoal - data.value;
           await updateSingleCellGoal(sheets, MONTHLY_GOAL_RANGE, monthlyGoal);
+          await logAction(sheets, "UPDATE_MONTHLY_GOAL", {
+            itemType: data.itemType,
+            type: data.type,
+            userEmail: data.userEmail,
+            before: parseFloat(rawMG.replace(/[^0-9.-]/g, "")),
+            value: data.value,
+            after: monthlyGoal,
+          });
         }
       } catch (err) {
         console.error("Error adjusting monthly goal in DELETE:", err);
@@ -1038,7 +1128,10 @@ export const expenses = onRequest(
 
     // Convert escaped newlines in the private key
     const privateKey = SERVICE_ACCOUNT_PRIVATE_KEY.replace(/\\n/g, "\n");
-    const SCOPES = ["https://www.googleapis.com/auth/spreadsheets"];
+    const SCOPES = [
+      "https://www.googleapis.com/auth/spreadsheets",
+      "https://www.googleapis.com/auth/firebase.messaging",
+    ];
     const jwtClient = new google.auth.JWT(
       SERVICE_ACCOUNT_EMAIL,
       undefined,

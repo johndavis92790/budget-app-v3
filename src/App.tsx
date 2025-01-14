@@ -8,7 +8,6 @@ import {
   History,
   NotificationPayload,
   Recurring,
-  UpdateGoal,
 } from "./types";
 import HistoryPage from "./HistoryPage";
 import RecurringPage from "./RecurringPage";
@@ -243,19 +242,6 @@ function App() {
     }
   };
 
-  const onUpdateGoal = async (updatedGoal: UpdateGoal) => {
-    try {
-      await fetch(API_URL, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(updatedGoal),
-      });
-      await fetchData();
-    } catch (err) {
-      console.error("Error updating goal:", err);
-    }
-  };
-
   const deleteItem = async (item: History | Recurring) => {
     try {
       const response = await fetch(API_URL, {
@@ -314,15 +300,6 @@ function App() {
   return (
     <AuthContext.Provider value={{ currentUser, isAuthorized }}>
       <div className="mb-5">
-        {/* <div>
-          <h1>My Notification Test</h1>
-          {notification && (
-            <div>
-              <p>Title: {notification.title}</p>
-              <p>Body: {notification.body}</p>
-            </div>
-          )}
-        </div> */}
         <Router>
           {/* Pass handleSignOut and isAuthorized to the navbar */}
           <CustomNavBar
@@ -330,6 +307,7 @@ function App() {
             isAuthorized={isAuthorized}
           />
 
+          {/* GoalsBanner can remain if it displays current goals */}
           <GoalsBanner weeklyGoal={weeklyGoal} monthlyGoal={monthlyGoal} />
 
           <Container>
@@ -343,9 +321,6 @@ function App() {
                     existingTags={existingTags}
                     addItem={addItem}
                     loading={loading}
-                    weeklyGoal={weeklyGoal}
-                    monthlyGoal={monthlyGoal}
-                    onUpdateGoal={onUpdateGoal}
                     fiscalWeeks={fiscalWeeks}
                     history={history}
                   />
@@ -383,8 +358,6 @@ function App() {
               />
             </Routes>
           </Container>
-
-          {/* <FiscalCalendar fiscalWeeks={fiscalWeeks} history={history} /> */}
         </Router>
       </div>
     </AuthContext.Provider>

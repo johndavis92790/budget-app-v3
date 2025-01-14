@@ -23,7 +23,7 @@ import {
 } from "./CommonFormFields";
 
 import CurrencyInput from "./CurrencyInput";
-import { FiscalWeek, History, UpdateGoal } from "./types";
+import { FiscalWeek, History } from "./types";
 import UnifiedFileManager from "./UnifiedFileManager";
 import { useNavigate } from "react-router-dom";
 import { useAuthContext } from "./authContext";
@@ -34,9 +34,6 @@ interface AddHistoryPageProps {
   existingTags: string[];
   addItem: (history: History) => Promise<boolean>;
   loading: boolean;
-  weeklyGoal: number;
-  monthlyGoal: number;
-  onUpdateGoal: (updatedGoal: UpdateGoal) => Promise<void>;
   fiscalWeeks: Record<string, FiscalWeek>;
   history: History[];
 }
@@ -46,9 +43,6 @@ function AddHistoryPage({
   existingTags,
   addItem,
   loading,
-  weeklyGoal,
-  monthlyGoal,
-  onUpdateGoal,
   fiscalWeeks,
   history,
 }: AddHistoryPageProps) {
@@ -89,8 +83,8 @@ function AddHistoryPage({
 
   // ------------- Submit Handler -------------
   const handleSubmit = async (type: "Expense" | "Refund") => {
-    if (!date || !category || selectedTags.length === 0 || !value) {
-      setError("Date, Category, at least one Tag, and Value are required.");
+    if (!date || !category || !value) {
+      setError("Date, Category, and Value are required.");
       return;
     }
 
@@ -134,42 +128,13 @@ function AddHistoryPage({
         id: uniqueId,
         itemType: "history",
       };
+      console.log("newHistory: ", newHistory);
 
       // Send to your backend
       const success = await addItem(newHistory);
       if (!success) {
         setError("Failed to add history.");
         return;
-      }
-      let weeklyGoalUpdate: UpdateGoal;
-      let monthlyGoalUpdate: UpdateGoal;
-      // Adjust weekly/monthly goals
-      if (type === "Expense") {
-        weeklyGoalUpdate = {
-          itemType: "weeklyGoal",
-          value: weeklyGoal - numericValue,
-          userEmail: userEmail,
-        };
-        await onUpdateGoal(weeklyGoalUpdate);
-        monthlyGoalUpdate = {
-          itemType: "monthlyGoal",
-          value: monthlyGoal - numericValue,
-          userEmail: userEmail,
-        };
-        await onUpdateGoal(monthlyGoalUpdate);
-      } else if (type === "Refund") {
-        weeklyGoalUpdate = {
-          itemType: "weeklyGoal",
-          value: weeklyGoal + numericValue,
-          userEmail: userEmail,
-        };
-        await onUpdateGoal(weeklyGoalUpdate);
-        monthlyGoalUpdate = {
-          itemType: "monthlyGoal",
-          value: monthlyGoal + numericValue,
-          userEmail: userEmail,
-        };
-        await onUpdateGoal(monthlyGoalUpdate);
       }
 
       // Reset form fields
