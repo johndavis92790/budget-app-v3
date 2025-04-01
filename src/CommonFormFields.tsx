@@ -1,9 +1,16 @@
 import React, { useState } from "react";
-import { Form, InputGroup } from "react-bootstrap";
+import {
+  Badge,
+  Dropdown,
+  DropdownButton,
+  Form,
+  InputGroup,
+} from "react-bootstrap";
 import { FaCalendar } from "react-icons/fa";
 import { MultiValue } from "react-select";
 import CreatableSelect from "react-select/creatable";
-
+import { getCategoryIcon } from "./helpers";
+import "./CommonFormFields.css";
 /**
  * Common props for all fields that handle 'value' + 'onChange'.
  */
@@ -105,26 +112,55 @@ export function CategoryField({
   disabled,
   required,
 }: CategoryFieldProps) {
+  const [isOpen, setIsOpen] = useState(false);
+
   return (
     <Form.Group controlId="formCategory" className="mb-3">
-      <Form.Select
-        value={categoryValue}
-        onChange={(e) => {
-          const selected = e.target.value;
-          if (categories.includes(selected)) {
-            setCategoryValue(selected);
-          }
-        }}
-        disabled={disabled}
-        required={required}
+      <Dropdown
+        className="w-100"
+        onSelect={(selected) => selected && setCategoryValue(selected)}
+        onToggle={(open) => setIsOpen(open)}
       >
-        <option value="">Select a Category</option>
-        {categories.map((cat, idx) => (
-          <option key={idx} value={cat}>
-            {cat}
-          </option>
-        ))}
-      </Form.Select>
+        <Dropdown.Toggle
+          disabled={disabled}
+          className="w-100 d-flex align-items-center justify-content-between category-dropdown-toggle"
+        >
+          {categoryValue ? (
+            <span className="d-flex align-items-center">
+              {getCategoryIcon(categoryValue)}
+              <span className="ms-2">{categoryValue}</span>
+            </span>
+          ) : (
+            <span>Select a Category</span>
+          )}
+
+          <span className={`ms-auto dropdown-chevron ${isOpen ? "open" : ""}`}>
+            ▼
+          </span>
+        </Dropdown.Toggle>
+
+        <Dropdown.Menu className="w-100 category-dropdown-menu">
+          {categories.map((cat) => (
+            <Dropdown.Item
+              eventKey={cat}
+              key={cat}
+              active={cat === categoryValue}
+              className="d-flex align-items-center category-dropdown-item"
+            >
+              {getCategoryIcon(cat)}
+              <span className="ms-2">{cat}</span>
+            </Dropdown.Item>
+          ))}
+        </Dropdown.Menu>
+
+        {required && (
+          <Form.Control
+            type="hidden"
+            required={required}
+            value={categoryValue}
+          />
+        )}
+      </Dropdown>
     </Form.Group>
   );
 }
