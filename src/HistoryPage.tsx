@@ -70,7 +70,7 @@ function HistoryPage({
           item.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
           item.category.toLowerCase().includes(searchTerm.toLowerCase()) ||
           item.tags.some((tag) =>
-            tag.toLowerCase().includes(searchTerm.toLowerCase())
+            tag.toLowerCase().includes(searchTerm.toLowerCase()),
           );
 
         // Category filter

@@ -1,9 +1,6 @@
 import FullPageSpinner from "./FullPageSpinner";
 import AddHistoryPage from "./AddHistoryPage";
-import {
-  FiscalWeek,
-  History,
-} from "./types";
+import { FiscalWeek, History } from "./types";
 
 interface HomePageProps {
   categories: string[];
@@ -22,7 +19,6 @@ function HomePage({
   fiscalWeeks,
   history,
 }: HomePageProps) {
-
   if (loading) {
     return <FullPageSpinner />;
   }
