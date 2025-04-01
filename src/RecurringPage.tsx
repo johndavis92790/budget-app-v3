@@ -46,9 +46,14 @@ function RecurringPage({
     setExpandedRowId(null); // Collapse the expanded row
   };
 
-  // Split recurring items into Income and Expenses
-  const incomeItems = recurring.filter((item) => item.type === "Income");
-  const expenseItems = recurring.filter((item) => item.type === "Expense");
+  // Split recurring items into Income and Expenses, sorted by highest value first
+  const incomeItems = recurring
+    .filter((item) => item.type === "Income")
+    .sort((a, b) => b.value - a.value);
+
+  const expenseItems = recurring
+    .filter((item) => item.type === "Expense")
+    .sort((a, b) => b.value - a.value);
 
   return (
     <div>

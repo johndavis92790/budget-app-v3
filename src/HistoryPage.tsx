@@ -104,14 +104,20 @@ function HistoryPage({
     const dateA = new Date(a.date);
     const dateB = new Date(b.date);
 
-    // Compare by date first (latest dates first)
+    // First: Compare by date (latest dates first)
     const dateComparison = dateB.getTime() - dateA.getTime();
     if (dateComparison !== 0) {
       return dateComparison;
     }
 
-    // If dates are the same, compare by id (highest id first)
-    return parseInt(b.id, 10) - parseInt(a.id, 10);
+    // Second: Compare by type (alphabetically, ascending order)
+    const typeComparison = a.type.localeCompare(b.type);
+    if (typeComparison !== 0) {
+      return typeComparison;
+    }
+
+    // Third: Compare by value (lowest value first)
+    return a.value - b.value;
   });
 
   const toggleRow = (id: string) => {
