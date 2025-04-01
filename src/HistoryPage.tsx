@@ -19,6 +19,7 @@ import EditHistoryPage from "./EditHistoryPage";
 import "./HistoryPage.css";
 import { DateField, MultiSelectField } from "./CommonFormFields";
 import FiscalCalendar from "./FiscalCalendar";
+import { useNavigate } from "react-router-dom";
 
 interface HistoryPageProps {
   history: History[];
@@ -54,6 +55,8 @@ function HistoryPage({
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
 
+  const navigate = useNavigate();
+
   if (loading) {
     return <FullPageSpinner />;
   }
@@ -67,7 +70,7 @@ function HistoryPage({
           item.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
           item.category.toLowerCase().includes(searchTerm.toLowerCase()) ||
           item.tags.some((tag) =>
-            tag.toLowerCase().includes(searchTerm.toLowerCase()),
+            tag.toLowerCase().includes(searchTerm.toLowerCase())
           );
 
         // Category filter
@@ -143,6 +146,12 @@ function HistoryPage({
 
   return (
     <div>
+      <div className="d-flex justify-content-center mb-2">
+        <Button onClick={() => navigate(`/add-history`)}>
+          Add Expense/Refund
+        </Button>
+      </div>
+
       <div className="d-flex justify-content-between mb-2">
         <h2>History</h2>
         <Button

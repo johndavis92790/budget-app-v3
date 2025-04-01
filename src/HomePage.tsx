@@ -1,30 +1,41 @@
-import { Button } from "react-bootstrap";
 import FullPageSpinner from "./FullPageSpinner";
-import { useNavigate } from "react-router-dom";
+import AddHistoryPage from "./AddHistoryPage";
+import {
+  FiscalWeek,
+  History,
+} from "./types";
 
 interface HomePageProps {
+  categories: string[];
+  existingTags: string[];
+  addItem: (history: History) => Promise<boolean>;
   loading: boolean;
+  fiscalWeeks: Record<string, FiscalWeek>;
+  history: History[];
 }
 
-function HomePage({ loading }: HomePageProps) {
-  const navigate = useNavigate();
+function HomePage({
+  categories,
+  existingTags,
+  addItem,
+  loading,
+  fiscalWeeks,
+  history,
+}: HomePageProps) {
 
   if (loading) {
     return <FullPageSpinner />;
   }
 
   return (
-    <div className="d-grid gap-2">
-      <Button size="lg" onClick={() => navigate(`/add-history`)}>
-        Add Expense/Refund
-      </Button>
-      <Button size="lg" onClick={() => navigate(`/history`)}>
-        History
-      </Button>
-      <Button size="lg" onClick={() => navigate(`/recurring`)}>
-        Recurring
-      </Button>
-    </div>
+    <AddHistoryPage
+      categories={categories}
+      existingTags={existingTags}
+      addItem={addItem}
+      loading={loading}
+      fiscalWeeks={fiscalWeeks}
+      history={history}
+    />
   );
 }
 

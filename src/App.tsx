@@ -312,7 +312,19 @@ function App() {
 
           <Container>
             <Routes>
-              <Route path="/" element={<HomePage loading={loading} />} />
+              <Route
+                path="/"
+                element={
+                  <HomePage
+                    categories={categories}
+                    existingTags={existingTags}
+                    addItem={addItem}
+                    loading={loading}
+                    fiscalWeeks={fiscalWeeks}
+                    history={history}
+                  />
+                }
+              />
               <Route
                 path="/add-history"
                 element={
