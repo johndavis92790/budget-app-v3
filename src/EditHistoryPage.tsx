@@ -48,6 +48,23 @@ function EditHistoryPage({
   const [removedPaths, setRemovedPaths] = useState<string[]>([]);
   const [selectedImageUrl, setSelectedImageUrl] = useState<string | null>(null);
 
+  // ----------------- Memoized Callbacks for File Manager -----------------
+  const handleFileSelect = useCallback((url: string | null) => {
+    setSelectedImageUrl(url);
+  }, []);
+
+  const handleNewFilesChange = useCallback((files: File[]) => {
+    setNewFiles(files);
+  }, []);
+
+  const handleRemovedPathsChange = useCallback((paths: string[]) => {
+    setRemovedPaths(paths);
+  }, []);
+
+  const handleError = useCallback((error: string | null) => {
+    setError(error);
+  }, []);
+
   useEffect(() => {
     setUpdatedHistory(selectedHistory);
     setSelectedTags(selectedHistory.tags || []);
@@ -191,12 +208,13 @@ function EditHistoryPage({
       <hr />
       <UnifiedFileManager
         id={updatedHistory.id}
+        label="Images / PDFs"
         folderName="images"
         disabled={submitting}
-        onSetError={setError}
-        onSelectImage={setSelectedImageUrl}
-        onNewFilesChange={setNewFiles}
-        onRemovedPathsChange={setRemovedPaths}
+        onSetError={handleError}
+        onSelectImage={handleFileSelect}
+        onNewFilesChange={handleNewFilesChange}
+        onRemovedPathsChange={handleRemovedPathsChange}
       />
 
       <div className="d-flex justify-content-end">

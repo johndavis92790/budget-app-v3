@@ -9,6 +9,14 @@ interface FileItem {
   fullPath: string;
 }
 
+interface NewFileItem {
+  file: File;
+  // For images, previewUrl is generated via URL.createObjectURL;
+  // for PDFs, we'll use a static PDF icon located in public/pdf-icon.png.
+  previewUrl: string;
+  isPdf: boolean;
+}
+
 interface UnifiedFileManagerProps {
   /**
    * If provided, we'll load existing files from
@@ -32,7 +40,7 @@ interface UnifiedFileManagerProps {
   onSetError?: (err: string | null) => void;
 
   /**
-   * Callback so parent can show a full preview if user taps an image
+   * Callback so parent can show a full preview if user taps an image or PDF icon
    */
   onSelectImage?: (url: string | null) => void;
 
@@ -77,15 +85,12 @@ async function compressImageFile(
 
         canvas.width = width;
         canvas.height = height;
-
         const ctx = canvas.getContext("2d");
         if (!ctx) {
           reject(new Error("Could not get 2D context from canvas."));
           return;
         }
-
         ctx.drawImage(img, 0, 0, width, height);
-
         canvas.toBlob(
           (blob) => {
             if (!blob) {
@@ -122,19 +127,17 @@ function UnifiedFileManager({
   disabled = false,
   onSetError,
   onSelectImage,
-  label = "Images",
+  label = "Images / PDFs",
   onNewFilesChange,
   onRemovedPathsChange,
 }: UnifiedFileManagerProps) {
   // Existing files (only relevant if we have an ID)
   const [existingFiles, setExistingFiles] = useState<FileItem[]>([]);
   const [loadingExisting, setLoadingExisting] = useState(false);
-
+  // Newly added files (processed with type NewFileItem)
+  const [newFiles, setNewFiles] = useState<NewFileItem[]>([]);
   // Which existing file paths have been "removed" (in memory) and won't appear
   const [removedPaths, setRemovedPaths] = useState<string[]>([]);
-
-  // Newly added files (already compressed)
-  const [newFiles, setNewFiles] = useState<File[]>([]);
 
   // --- Load existing files if we have an ID ---
   useEffect(() => {
@@ -167,22 +170,44 @@ function UnifiedFileManager({
   const handleFileChange = useCallback(
     async (e: React.ChangeEvent<HTMLInputElement>) => {
       if (!e.target.files || e.target.files.length === 0) return;
-
       const pickedFiles = Array.from(e.target.files);
-      const compressedFiles: File[] = [];
+      const processedFiles: NewFileItem[] = [];
       for (const originalFile of pickedFiles) {
+        const isPdf =
+          originalFile.type === "application/pdf" ||
+          originalFile.name.toLowerCase().endsWith(".pdf");
         try {
-          const compressed = await compressImageFile(originalFile);
-          compressedFiles.push(compressed);
+          if (!isPdf) {
+            // For images, compress and generate an object URL preview
+            const compressed = await compressImageFile(originalFile);
+            const previewUrl = URL.createObjectURL(compressed);
+            processedFiles.push({ file: compressed, previewUrl, isPdf: false });
+          } else {
+            // For PDFs, use a default PDF icon image for preview
+            const previewUrl = "/pdf-icon.png"; // ensure this file exists in your public folder
+            processedFiles.push({
+              file: originalFile,
+              previewUrl,
+              isPdf: true,
+            });
+          }
         } catch (err) {
-          console.error("Error compressing file:", originalFile.name, err);
-          // fallback to original if compression fails
-          compressedFiles.push(originalFile);
+          console.error("Error processing file:", originalFile.name, err);
+          // Fallback: use a default preview (for PDFs, the PDF icon; for images, a fallback object URL)
+          const fallbackUrl = isPdf
+            ? "/pdf-icon.png"
+            : URL.createObjectURL(originalFile);
+          processedFiles.push({
+            file: originalFile,
+            previewUrl: fallbackUrl,
+            isPdf,
+          });
         }
       }
-      setNewFiles((prev) => [...prev, ...compressedFiles]);
+      setNewFiles((prev) => [...prev, ...processedFiles]);
+      onNewFilesChange?.(processedFiles.map((item) => item.file));
     },
-    [],
+    [onNewFilesChange],
   );
 
   // --- Remove a newly added file ---
@@ -195,9 +220,9 @@ function UnifiedFileManager({
     setRemovedPaths((prev) => [...prev, fullPath]);
   }, []);
 
-  // --- useEffect to call callbacks when newFiles or removedPaths change ---
+  // --- Trigger callbacks when newFiles or removedPaths change ---
   useEffect(() => {
-    onNewFilesChange?.(newFiles);
+    onNewFilesChange?.(newFiles.map((item) => item.file));
   }, [newFiles, onNewFilesChange]);
 
   useEffect(() => {
@@ -221,60 +246,71 @@ function UnifiedFileManager({
         >
           {existingFiles
             .filter((f) => !removedPaths.includes(f.fullPath))
-            .map((file, idx) => (
-              <div
-                key={idx}
-                style={{ position: "relative", display: "inline-block" }}
-              >
-                <img
-                  src={file.url}
-                  alt="Existing File"
-                  style={{
-                    width: "100px",
-                    height: "auto",
-                    borderRadius: "4px",
-                    cursor: "pointer",
-                  }}
-                  onClick={() => onSelectImage?.(file.url)}
-                />
-                <Button
-                  variant="light"
-                  size="sm"
-                  style={{
-                    position: "absolute",
-                    top: "0",
-                    right: "0",
-                    transform: "translate(50%, -50%)",
-                    borderRadius: "50%",
-                    width: "24px",
-                    height: "24px",
-                    padding: "0",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                  }}
-                  onClick={() => removeExistingFile(file.fullPath)}
-                  disabled={disabled}
+            .map((file, idx) => {
+              const isPdf = file.url.toLowerCase().includes(".pdf");
+              // If it's a PDF, show the PDF icon; otherwise, show the image.
+              const displayUrl = isPdf ? "/pdf-icon.png" : file.url;
+              return (
+                <div
+                  key={idx}
+                  style={{ position: "relative", display: "inline-block" }}
                 >
-                  <FaTimes />
-                </Button>
-              </div>
-            ))}
+                  <img
+                    src={displayUrl}
+                    alt={isPdf ? "PDF File" : "Existing File"}
+                    style={{
+                      width: "100px",
+                      height: "auto",
+                      borderRadius: "4px",
+                      objectFit: "cover",
+                      cursor: "pointer",
+                    }}
+                    onClick={() =>
+                      onSelectImage?.(
+                        // For PDFs, pass the actual file URL; for images, pass the URL as is.
+                        isPdf ? file.url : file.url,
+                      )
+                    }
+                  />
+                  <Button
+                    variant="light"
+                    size="sm"
+                    style={{
+                      position: "absolute",
+                      top: "0",
+                      right: "0",
+                      transform: "translate(50%, -50%)",
+                      borderRadius: "50%",
+                      width: "24px",
+                      height: "24px",
+                      padding: "0",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                    }}
+                    onClick={() => removeExistingFile(file.fullPath)}
+                    disabled={disabled}
+                  >
+                    <FaTimes />
+                  </Button>
+                </div>
+              );
+            })}
         </div>
       )}
 
-      {/* File input for adding new images */}
+      {/* File input for adding new images/PDFs */}
       <Form.Group controlId="unifiedManagerNewFiles" className="mb-3">
         <Form.Label>{label}</Form.Label>
         <Form.Control
           type="file"
-          accept="image/*;capture=camera"
+          accept="image/*,application/pdf"
           multiple
           disabled={disabled}
           onChange={handleFileChange}
         />
         <Form.Text className="text-muted">
-          Add one image at a time, tap again to add another.
+          Add one image or PDF at a time. Tap again to add another.
         </Form.Text>
       </Form.Group>
 
@@ -288,49 +324,58 @@ function UnifiedFileManager({
             marginBottom: "10px",
           }}
         >
-          {newFiles.map((file, idx) => {
-            const url = URL.createObjectURL(file);
-            return (
-              <div
-                key={idx}
-                style={{ position: "relative", display: "inline-block" }}
+          {newFiles.map((item, idx) => (
+            <div
+              key={idx}
+              style={{ position: "relative", display: "inline-block" }}
+            >
+              <img
+                src={item.previewUrl}
+                alt={item.isPdf ? "PDF Preview" : "Image Preview"}
+                style={{
+                  width: "100px",
+                  height: "auto",
+                  borderRadius: "4px",
+                  objectFit: "cover",
+                  cursor: "pointer",
+                }}
+                onClick={() =>
+                  onSelectImage?.(
+                    // For PDFs, you might choose to create an object URL if needed,
+                    // or simply open the file via a preview component.
+                    item.isPdf
+                      ? URL.createObjectURL(item.file)
+                      : item.previewUrl,
+                  )
+                }
+                onLoad={() => {
+                  // Revoke object URL only for image previews created via URL.createObjectURL
+                  if (!item.isPdf) URL.revokeObjectURL(item.previewUrl);
+                }}
+              />
+              <Button
+                variant="light"
+                size="sm"
+                style={{
+                  position: "absolute",
+                  top: "0",
+                  right: "0",
+                  transform: "translate(50%, -50%)",
+                  borderRadius: "50%",
+                  width: "24px",
+                  height: "24px",
+                  padding: "0",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                }}
+                onClick={() => removeNewFile(idx)}
+                disabled={disabled}
               >
-                <img
-                  src={url}
-                  alt="New File"
-                  style={{
-                    width: "100px",
-                    height: "auto",
-                    borderRadius: "4px",
-                    cursor: "pointer",
-                  }}
-                  onClick={() => onSelectImage?.(url)}
-                  onLoad={() => URL.revokeObjectURL(url)}
-                />
-                <Button
-                  variant="light"
-                  size="sm"
-                  style={{
-                    position: "absolute",
-                    top: "0",
-                    right: "0",
-                    transform: "translate(50%, -50%)",
-                    borderRadius: "50%",
-                    width: "24px",
-                    height: "24px",
-                    padding: "0",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                  }}
-                  onClick={() => removeNewFile(idx)}
-                  disabled={disabled}
-                >
-                  <FaTimes />
-                </Button>
-              </div>
-            );
-          })}
+                <FaTimes />
+              </Button>
+            </div>
+          ))}
         </div>
       )}
     </div>

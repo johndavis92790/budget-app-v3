@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useCallback } from "react";
 import {
   Form,
   Button,
@@ -60,13 +60,12 @@ function AddHistoryPage({
   });
 
   const [category, setCategory] = useState("");
-  const [selectedTags, setSelectedTags] = useState<string[]>([]); // Combined tag state
+  const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const [value, setValue] = useState("");
   const [description, setDescription] = useState("");
   const [selectedImageUrl, setSelectedImageUrl] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-
   const [selectedType, setSelectedType] = useState<"Expense" | "Refund">(
     "Expense",
   );
@@ -74,12 +73,21 @@ function AddHistoryPage({
   const editURLFragment =
     "https://console.firebase.google.com/u/0/project/budget-app-v3/storage/budget-app-v3.firebasestorage.app/files/~2Fimages~2F";
 
+  // ----------------- Memoized Callbacks for File Manager -----------------
+  const handleFileSelect = useCallback((url: string | null) => {
+    setSelectedImageUrl(url);
+  }, []);
+
+  const handleNewFilesChange = useCallback((files: File[]) => {
+    setNewFiles(files);
+  }, []);
+
+  // ------------- Image Management States -------------
+  const [newFiles, setNewFiles] = useState<File[]>([]);
+
   const handleSelectType = (type: "Expense" | "Refund") => {
     setSelectedType(type);
   };
-
-  // ------------- Image Management States -------------
-  const [newFiles, setNewFiles] = useState<File[]>([]); // Files to upload
 
   // ------------- Submit Handler -------------
   const handleSubmit = async (type: "Expense" | "Refund") => {
@@ -91,10 +99,7 @@ function AddHistoryPage({
     setSubmitting(true);
     setError(null);
     try {
-      // Generate unique ID for the new history item
       const uniqueId = String(Date.now());
-
-      // Upload images to Firebase Storage under 'images/{id}/'
       const storageRef = ref(storage, `images/${uniqueId}`);
       const uploadedUrls: string[] = [];
 
@@ -106,8 +111,6 @@ function AddHistoryPage({
       }
 
       const editURL = `${editURLFragment}${uniqueId}`;
-
-      // Validate numeric
       const numericStr = value.replace(/[^0-9.-]/g, "");
       const numericValue = parseFloat(numericStr);
       if (isNaN(numericValue)) {
@@ -130,26 +133,22 @@ function AddHistoryPage({
       };
       console.log("newHistory: ", newHistory);
 
-      // Send to your backend
       const success = await addItem(newHistory);
       if (!success) {
         setError("Failed to add history.");
         return;
       }
 
-      // Reset form fields
       const now = new Date();
       const yyyyNew = now.getFullYear();
       const mmNew = String(now.getMonth() + 1).padStart(2, "0");
       const ddNew = String(now.getDate()).padStart(2, "0");
       setDate(`${yyyyNew}-${mmNew}-${ddNew}`);
-
       setCategory("");
       setSelectedTags([]);
       setValue("");
       setDescription("");
       setNewFiles([]);
-
       navigate("/history");
     } catch (err) {
       console.error("Error adding history:", err);
@@ -231,11 +230,10 @@ function AddHistoryPage({
         <Row>
           <Col md={4}>
             <UnifiedFileManager
-              label="Images"
+              label="Images / PDFs"
               disabled={submitting}
-              onSelectImage={(url) => setSelectedImageUrl(url)}
-              onNewFilesChange={(files) => setNewFiles(files)}
-              // In Add mode, no existing files to remove
+              onSelectImage={handleFileSelect}
+              onNewFilesChange={handleNewFilesChange}
             />
           </Col>
         </Row>
@@ -255,8 +253,6 @@ function AddHistoryPage({
                 selectedType
               )}
             </Button>
-
-            {/* Vertical Divider */}
             <div
               style={{
                 width: "2px",
@@ -265,7 +261,6 @@ function AddHistoryPage({
                 alignSelf: "stretch",
               }}
             ></div>
-
             <Dropdown.Toggle
               split
               variant={selectedType === "Expense" ? "danger" : "success"}
@@ -273,7 +268,6 @@ function AddHistoryPage({
               disabled={submitting}
               className="ps-3 pe-3"
             />
-
             <Dropdown.Menu>
               <Dropdown.Item onClick={() => handleSelectType("Expense")}>
                 Expense

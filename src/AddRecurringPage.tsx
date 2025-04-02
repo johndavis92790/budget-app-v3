@@ -1,4 +1,4 @@
-import { FormEvent, useState } from "react";
+import { FormEvent, useState, useCallback } from "react";
 import { Form, Button, Row, Col, Spinner, Alert } from "react-bootstrap";
 import { storage } from "./firebase";
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
@@ -41,6 +41,15 @@ function AddRecurringPage({
   const editURLFragment =
     "https://console.firebase.google.com/u/0/project/budget-app-v3/storage/budget-app-v3.firebasestorage.app/files/~2Fimages~2F";
 
+  // Memoized callbacks to pass to UnifiedFileManager
+  const handleFileSelect = useCallback((url: string | null) => {
+    setSelectedImageUrl(url);
+  }, []);
+
+  const handleNewFilesChange = useCallback((files: File[]) => {
+    setNewFiles(files);
+  }, []);
+
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
 
@@ -67,7 +76,6 @@ function AddRecurringPage({
       }
 
       const editURL = `${editURLFragment}${updatedId}`;
-
       const numericStr = value.replace(/[^0-9.-]/g, "");
       const numericValue = parseFloat(numericStr);
       if (isNaN(numericValue)) {
@@ -165,10 +173,10 @@ function AddRecurringPage({
         <Row>
           <Col md={4}>
             <UnifiedFileManager
-              label="Images"
+              label="Images / PDFs"
               disabled={submitting}
-              onSelectImage={(url) => setSelectedImageUrl(url)}
-              onNewFilesChange={(files) => setNewFiles(files)}
+              onSelectImage={handleFileSelect}
+              onNewFilesChange={handleNewFilesChange}
             />
           </Col>
         </Row>
