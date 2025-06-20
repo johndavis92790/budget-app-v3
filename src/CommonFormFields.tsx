@@ -179,9 +179,11 @@ export function TagField({
   existingTags,
   disabled,
 }: TagFieldProps) {
-  // Map existing tags to the format required by react-select
+  // Map existing tags to the format required by react-select and sort alphabetically
   const [options, setOptions] = useState(
-    existingTags.map((tag) => ({ label: tag, value: tag })),
+    existingTags
+      .map((tag) => ({ label: tag, value: tag }))
+      .sort((a, b) => a.label.localeCompare(b.label)),
   );
 
   // Handle selection changes
@@ -196,7 +198,11 @@ export function TagField({
   // Handle creating a new tag
   const handleCreate = (inputValue: string) => {
     const newOption = { label: inputValue, value: inputValue };
-    setOptions((prevOptions) => [...prevOptions, newOption]); // Add to available options
+    setOptions((prevOptions) =>
+      [...prevOptions, newOption].sort((a, b) =>
+        a.label.localeCompare(b.label),
+      ),
+    ); // Add to available options and maintain alphabetical order
     setSelectedTags([...selectedTags, inputValue]); // Add to selected tags
   };
 
