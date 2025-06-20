@@ -64,41 +64,47 @@ function HistoryPage({
   // Sort and filter history
   const filteredHistory = showFilters
     ? [...history].filter((item) => {
+        // Date range filter - always apply as AND condition
+        const itemDate = new Date(item.date).toISOString().split("T")[0];
+        const matchesDate =
+          (!startDate || itemDate >= startDate) &&
+          (!endDate || itemDate <= endDate);
+
         // Search filter
         const matchesSearch =
-          searchTerm === "" ||
+          searchTerm === "" || // If no search term, this condition is true
           item.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
           item.category.toLowerCase().includes(searchTerm.toLowerCase()) ||
           item.tags.some((tag) =>
             tag.toLowerCase().includes(searchTerm.toLowerCase()),
           );
 
-        // Category filter
+        // Category filter - OR operation when multiple categories are selected
+        // (If any selected category matches the item's category, include it)
         const matchesCategory =
-          selectedCategories.length === 0 ||
+          selectedCategories.length === 0 || // If no categories selected, this condition is true
           selectedCategories.includes(item.category);
 
-        // Type filter
+        // Type filter - OR operation when multiple types are selected
+        // (If any selected type matches the item's type, include it)
         const matchesType =
-          selectedTypes.length === 0 || selectedTypes.includes(item.type);
+          selectedTypes.length === 0 || // If no types selected, this condition is true
+          selectedTypes.includes(item.type);
 
-        // Tags filter
+        // Tags filter - OR operation when multiple tags are selected
+        // (If any selected tag is in the item's tags array, include it)
         const matchesTags =
-          selectedTags.length === 0 ||
-          selectedTags.every((tag) => item.tags.includes(tag));
+          selectedTags.length === 0 || // If no tags selected, this condition is true
+          selectedTags.some((tag) => item.tags.includes(tag));
 
-        // Date range filter
-        const itemDate = new Date(item.date).toISOString().split("T")[0];
-        const matchesDate =
-          (!startDate || itemDate >= startDate) &&
-          (!endDate || itemDate <= endDate);
-
+        // AND operation between different filter types
+        // (Item must match all active filter types)
         return (
+          matchesDate &&
           matchesSearch &&
           matchesCategory &&
           matchesType &&
-          matchesTags &&
-          matchesDate
+          matchesTags
         );
       })
     : history; // If filters are hidden, display all history items
