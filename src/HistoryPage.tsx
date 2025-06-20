@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { FiscalWeek, History } from "./types";
 import {
   ListGroup,
@@ -56,6 +56,19 @@ function HistoryPage({
   const [endDate, setEndDate] = useState("");
 
   const navigate = useNavigate();
+
+  // Reset pagination when filters change
+  useEffect(() => {
+    setItemsToShow(initialitemsToShow);
+  }, [
+    searchTerm,
+    selectedCategories,
+    selectedTypes,
+    selectedTags,
+    startDate,
+    endDate,
+    initialitemsToShow,
+  ]);
 
   if (loading) {
     return <FullPageSpinner />;
