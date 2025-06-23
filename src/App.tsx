@@ -14,6 +14,7 @@ import RecurringPage from "./RecurringPage";
 import AddHistoryPage from "./AddHistoryPage";
 import HomePage from "./HomePage";
 import GoalsBanner from "./GoalsBanner";
+import BudgetForecastPage from "./BudgetForecastPage";
 import CustomNavBar from "./CustomNavBar";
 import { API_URL, mmddyyyyToYyyyMmDd } from "./helpers";
 import { messaging, db } from "./firebase";
@@ -365,6 +366,17 @@ function App() {
                     addItem={addItem}
                     onUpdateItem={onUpdateItem}
                     deleteItem={deleteItem}
+                  />
+                }
+              />
+              <Route
+                path="/budget-forecast"
+                element={
+                  <BudgetForecastPage
+                    history={history}
+                    recurring={recurring}
+                    fiscalMonths={fiscalMonths}
+                    loading={loading}
                   />
                 }
               />
