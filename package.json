@@ -38,9 +38,9 @@
     "eject": "react-scripts eject",
     "build": "react-scripts build",
     "build:firebase": "env-cmd -f .env.production react-scripts build",
-    "deploy": "npm run pretty && npm run build && firebase deploy",
+    "deploy": "npm run pretty && npm run build && npx firebase-tools deploy",
     "pretty": "prettier --write \"src/**/*.{js,jsx,ts,tsx,json,html,css,scss,md}\"",
-    "cloudDeploy": "cd functions && firebase deploy --only functions && cd .."
+    "cloudDeploy": "cd functions && npx firebase-tools deploy --only functions && cd .."
   },
   "eslintConfig": {
     "extends": [
