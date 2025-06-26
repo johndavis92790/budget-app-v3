@@ -212,7 +212,8 @@ function App() {
         ...newItem,
         userEmail: currentUser?.email || "",
       };
-      
+
+      console.log("addItem: ", itemWithEmail);
       const response = await fetch(API_URL, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -262,6 +263,7 @@ function App() {
         ...item,
         userEmail: currentUser?.email || "",
       };
+      
       console.log("deleteItem: ", itemWithEmail);
       const response = await fetch(API_URL, {
         method: "DELETE",
