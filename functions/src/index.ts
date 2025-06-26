@@ -398,17 +398,57 @@ function getFiscalIDs(
 }
 
 async function isSameFiscalWeekById(fiscalWeekId: string, sheets: any) {
-  const allRows = await getSheetData(sheets, FISCAL_WEEKS_RANGE);
-  const found = allRows.find((row) => row[0] === fiscalWeekId);
-  if (!found) throw new Error("No matching fiscal week found.");
-  return true;
+  // Get the current date
+  const currentDate = new Date();
+  
+  // Find the current fiscal week by checking all weeks
+  const allWeeks = await getSheetData(sheets, FISCAL_WEEKS_RANGE);
+  let currentFiscalWeekId = null;
+  
+  for (const row of allWeeks) {
+    const startDate = new Date(row[2]); // start_date is in column 3
+    const endDate = new Date(row[3]);   // end_date is in column 4
+    
+    if (currentDate >= startDate && currentDate <= endDate) {
+      currentFiscalWeekId = row[0]; // id is in column 1
+      break;
+    }
+  }
+  
+  if (!currentFiscalWeekId) {
+    console.error("Could not determine current fiscal week");
+    return false;
+  }
+  
+  // Compare the item's fiscal week ID with the current fiscal week ID
+  return fiscalWeekId === currentFiscalWeekId;
 }
 
 async function isSameFiscalMonthById(fiscalMonthId: string, sheets: any) {
-  const allRows = await getSheetData(sheets, FISCAL_MONTHS_RANGE);
-  const found = allRows.find((row) => row[0] === fiscalMonthId);
-  if (!found) throw new Error("No matching fiscal month found.");
-  return true;
+  // Get the current date
+  const currentDate = new Date();
+  
+  // Find the current fiscal month by checking all months
+  const allMonths = await getSheetData(sheets, FISCAL_MONTHS_RANGE);
+  let currentFiscalMonthId = null;
+  
+  for (const row of allMonths) {
+    const startDate = new Date(row[1]); // start_date is in column 2
+    const endDate = new Date(row[2]);   // end_date is in column 3
+    
+    if (currentDate >= startDate && currentDate <= endDate) {
+      currentFiscalMonthId = row[0]; // id is in column 1
+      break;
+    }
+  }
+  
+  if (!currentFiscalMonthId) {
+    console.error("Could not determine current fiscal month");
+    return false;
+  }
+  
+  // Compare the item's fiscal month ID with the current fiscal month ID
+  return fiscalMonthId === currentFiscalMonthId;
 }
 
 function convertArrayToObjectById(arr: any[]): Record<string, any> {
