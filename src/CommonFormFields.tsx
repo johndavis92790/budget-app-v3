@@ -258,11 +258,13 @@ export function MultiSelectField({
           disabled={disabled}
           required={required}
         >
-          {availableOptions.map((option, index) => (
-            <option key={index} value={option}>
-              {option}
-            </option>
-          ))}
+          {[...availableOptions]
+            .sort((a, b) => a.localeCompare(b))
+            .map((option, index) => (
+              <option key={index} value={option}>
+                {option}
+              </option>
+            ))}
         </Form.Select>
       </Form.Group>
     </div>
