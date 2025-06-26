@@ -1213,7 +1213,12 @@ export const expenses = onRequest(
     } catch (error: any) {
       console.error("Top-level error:", error);
       // Log major top-level errors as well
-      await logAction(sheets, "TOP_LEVEL_ERROR", {}, error.message);
+      // Try to extract email from the request if possible
+      const logData: Record<string, any> = {};
+      if (req.body && req.body.userEmail) {
+        logData.userEmail = req.body.userEmail;
+      }
+      await logAction(sheets, "TOP_LEVEL_ERROR", logData, error.message);
       res.status(500).json({ error: "Internal Server Error" });
     }
   }

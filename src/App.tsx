@@ -207,10 +207,16 @@ function App() {
   // CRUD actions
   const addItem = async (newItem: History | Recurring) => {
     try {
+      // Add the user email to ensure it's logged properly
+      const itemWithEmail = {
+        ...newItem,
+        userEmail: currentUser?.email || "",
+      };
+      
       const response = await fetch(API_URL, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(newItem),
+        body: JSON.stringify(itemWithEmail),
       });
       if (!response.ok) {
         throw new Error(`Error: ${response.statusText}`);
@@ -227,11 +233,17 @@ function App() {
 
   const onUpdateItem = async (updatedItem: History | Recurring) => {
     try {
-      console.log("updatedItem: ", updatedItem);
+      // Add the user email to ensure it's logged properly
+      const itemWithEmail = {
+        ...updatedItem,
+        userEmail: currentUser?.email || "",
+      };
+
+      console.log("updatedItem: ", itemWithEmail);
       const response = await fetch(API_URL, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(updatedItem),
+        body: JSON.stringify(itemWithEmail),
       });
       if (!response.ok) {
         throw new Error(`Error: ${response.statusText}`);
@@ -245,10 +257,16 @@ function App() {
 
   const deleteItem = async (item: History | Recurring) => {
     try {
+      // Add the user email to the request body
+      const itemWithEmail = {
+        ...item,
+        userEmail: currentUser?.email || "",
+      };
+      console.log("deleteItem: ", itemWithEmail);
       const response = await fetch(API_URL, {
         method: "DELETE",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(item),
+        body: JSON.stringify(itemWithEmail),
       });
       if (!response.ok) {
         throw new Error(`Error deleting item: ${response.statusText}`);
