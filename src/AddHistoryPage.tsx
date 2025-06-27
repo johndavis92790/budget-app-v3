@@ -62,6 +62,7 @@ function AddHistoryPage({
   const [category, setCategory] = useState("");
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const [value, setValue] = useState("");
+  const [hsa, setHsa] = useState<"TRUE" | "FALSE">("FALSE");
   const [description, setDescription] = useState("");
   const [selectedImageUrl, setSelectedImageUrl] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -126,6 +127,7 @@ function AddHistoryPage({
         category,
         tags: selectedTags,
         value: numericValue,
+        hsa,
         description,
         editURL,
         id: uniqueId,
@@ -238,47 +240,64 @@ function AddHistoryPage({
           </Col>
         </Row>
 
-        <div className="d-flex justify-content-end mt-3">
-          <Dropdown as={ButtonGroup}>
-            <Button
-              type="button"
-              variant={selectedType === "Expense" ? "danger" : "success"}
-              onClick={() => handleSubmit(selectedType)}
-              disabled={submitting}
-              className="d-flex align-items-center ps-3 pe-3"
-            >
-              {submitting ? (
-                <Spinner as="span" animation="border" size="sm" />
-              ) : (
-                selectedType
-              )}
-            </Button>
-            <div
-              style={{
-                width: "2px",
-                backgroundColor: "#ccc",
-                margin: "0",
-                alignSelf: "stretch",
-              }}
-            ></div>
-            <Dropdown.Toggle
-              split
-              variant={selectedType === "Expense" ? "danger" : "success"}
-              id="dropdown-split-basic"
-              disabled={submitting}
-              className="ps-3 pe-3"
-            />
-            <Dropdown.Menu>
-              <Dropdown.Item onClick={() => handleSelectType("Expense")}>
-                Expense
-              </Dropdown.Item>
-              <Dropdown.Divider />
-              <Dropdown.Item onClick={() => handleSelectType("Refund")}>
-                Refund
-              </Dropdown.Item>
-            </Dropdown.Menu>
-          </Dropdown>
-        </div>
+        <Row>
+          <Col>
+            <Form.Group controlId="formHsa" className="mb-3">
+              <Form.Check
+                type="switch"
+                id="formHsa"
+                label="HSA"
+                checked={hsa === "TRUE"}
+                onChange={(e) => setHsa(e.target.checked ? "TRUE" : "FALSE")}
+                disabled={submitting}
+              />
+            </Form.Group>
+          </Col>
+          <Col>
+            <div className="d-flex justify-content-end mt-3">
+              <Dropdown as={ButtonGroup}>
+                <Button
+                  type="button"
+                  variant={selectedType === "Expense" ? "danger" : "success"}
+                  onClick={() => handleSubmit(selectedType)}
+                  disabled={submitting}
+                  className="d-flex align-items-center ps-3 pe-3"
+                >
+                  {submitting ? (
+                    <Spinner as="span" animation="border" size="sm" />
+                  ) : (
+                    selectedType
+                  )}
+                </Button>
+                <div
+                  style={{
+                    width: "2px",
+                    backgroundColor: "#ccc",
+                    margin: "0",
+                    alignSelf: "stretch",
+                  }}
+                ></div>
+
+                <Dropdown.Toggle
+                  split
+                  variant={selectedType === "Expense" ? "danger" : "success"}
+                  id="dropdown-split-basic"
+                  disabled={submitting}
+                  className="ps-3 pe-3"
+                />
+                <Dropdown.Menu>
+                  <Dropdown.Item onClick={() => handleSelectType("Expense")}>
+                    Expense
+                  </Dropdown.Item>
+                  <Dropdown.Divider />
+                  <Dropdown.Item onClick={() => handleSelectType("Refund")}>
+                    Refund
+                  </Dropdown.Item>
+                </Dropdown.Menu>
+              </Dropdown>
+            </div>
+          </Col>
+        </Row>
       </Form>
 
       <FullSizeImageModal

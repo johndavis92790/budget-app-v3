@@ -5,6 +5,7 @@ export interface History {
   category: string;
   tags: string[];
   value: number;
+  hsa: "TRUE" | "FALSE";
   description: string;
   editURL: string;
   id: string;

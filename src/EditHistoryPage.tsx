@@ -216,40 +216,57 @@ function EditHistoryPage({
         onNewFilesChange={handleNewFilesChange}
         onRemovedPathsChange={handleRemovedPathsChange}
       />
-
-      <div className="d-flex justify-content-end">
-        <Button
-          variant="danger"
-          onClick={handleDelete}
-          disabled={deleting || submitting}
-        >
-          {deleting ? (
-            <Spinner as="span" animation="border" size="sm" />
-          ) : (
-            "Delete"
-          )}
-        </Button>
-        <Button
-          variant="secondary"
-          onClick={onClose}
-          disabled={submitting}
-          style={{ marginLeft: "10px" }}
-        >
-          Cancel
-        </Button>
-        <Button
-          variant="primary"
-          onClick={handleSave}
-          disabled={submitting}
-          style={{ marginLeft: "10px" }}
-        >
-          {submitting ? (
-            <Spinner as="span" animation="border" size="sm" />
-          ) : (
-            "Save"
-          )}
-        </Button>
-      </div>
+      <Row>
+        <Col>
+          <Form.Group controlId="formHsa" className="mb-3">
+            <Form.Check
+              type="switch"
+              id="formHsa"
+              label="HSA"
+              checked={updatedHistory.hsa === "TRUE"}
+              onChange={(e) =>
+                handleFieldChange("hsa", e.target.checked ? "TRUE" : "FALSE")
+              }
+              disabled={submitting}
+            />
+          </Form.Group>
+        </Col>
+        <Col>
+          <div className="d-flex justify-content-end">
+            <Button
+              variant="danger"
+              onClick={handleDelete}
+              disabled={deleting || submitting}
+            >
+              {deleting ? (
+                <Spinner as="span" animation="border" size="sm" />
+              ) : (
+                "Delete"
+              )}
+            </Button>
+            <Button
+              variant="secondary"
+              onClick={onClose}
+              disabled={submitting}
+              style={{ marginLeft: "10px" }}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="primary"
+              onClick={handleSave}
+              disabled={submitting}
+              style={{ marginLeft: "10px" }}
+            >
+              {submitting ? (
+                <Spinner as="span" animation="border" size="sm" />
+              ) : (
+                "Save"
+              )}
+            </Button>
+          </div>
+        </Col>
+      </Row>
 
       <FullSizeImageModal
         show={selectedImageUrl !== null}

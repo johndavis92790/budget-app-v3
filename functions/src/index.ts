@@ -110,7 +110,7 @@ const SPREADSHEET_ID = "1KROs_Swh-1zeQhLajtRw-E7DcYnJRMHEOXX5ECwTGSI";
 
 const HISTORY_TABLE_NAME = "History";
 const HISTORY_FIRST_COLUMN = "A";
-const HISTORY_LAST_COLUMN = "L";
+const HISTORY_LAST_COLUMN = "M";
 const HISTORY_RANGE = `${HISTORY_TABLE_NAME}!${HISTORY_FIRST_COLUMN}1:${HISTORY_LAST_COLUMN}`;
 
 const RECURRING_TABLE_NAME = "Recurring";
@@ -652,7 +652,7 @@ async function insertItem(
       ],
     ]);
   } else {
-    // columns: date, type, category, tags, value, desc, editURL, hyperlink, id, fy, fm, fw
+    // columns: date, type, category, tags, value, hsa, desc, editURL, hyperlink, id, fy, fm, fw
     await appendDataToSheet(sheets, range, [
       [
         dateFormatted,
@@ -660,6 +660,7 @@ async function insertItem(
         data.category,
         data.tags.join(", "),
         data.value,
+        data.hsa,
         data.description || "",
         data.editURL,
         hyperlinkFormula,
@@ -694,15 +695,15 @@ async function updateItem(
     throw new Error(`${itemType} item not found at rowIndex ${rowIndex}`);
   }
 
-  // For history: ID is col 8; recurring: col 7
-  const idColIndex = isRecurring ? 7 : 8;
+  // For history: ID is col 9; recurring: col 7
+  const idColIndex = isRecurring ? 7 : 9;
   const existingId = existingRow[idColIndex];
   if (!existingId) {
     throw new Error(`ID not found in the existing ${itemType} row.`);
   }
 
   await addMissingTags(sheets, data.tags);
-  const hyperlinkFormula = `=HYPERLINK("${existingRow[isRecurring ? 5 : 6]}", "Edit")`;
+  const hyperlinkFormula = `=HYPERLINK("${existingRow[isRecurring ? 5 : 7]}", "Edit")`;
 
   if (isRecurring) {
     // columns: type, category, tags, value, desc, editURL, hyperlink, id
@@ -720,7 +721,7 @@ async function updateItem(
       ],
     ]);
   } else {
-    // columns: date, type, category, tags, value, desc, editURL, hyperlink, id
+    // columns: date, type, category, tags, value, hsa, desc, editURL, hyperlink, id
     const dateFormatted = convertToMMDDYYYY(data.date);
     const tagsStr = data.tags.join(", ");
     await updateSheetRow(sheets, rowRange, [
@@ -730,8 +731,9 @@ async function updateItem(
         data.category,
         tagsStr,
         data.value,
+        data.hsa,
         data.description || "",
-        existingRow[6],
+        existingRow[7],
         hyperlinkFormula,
         existingId,
       ],
@@ -763,8 +765,8 @@ async function deleteItem(
   const rowsAll = await getSheetData(sheets, rangeAll, false);
   rowsAll.shift(); // remove header row
 
-  // ID col is 8 for history, 7 for recurring
-  const idColIndex = itemType === "history" ? 8 : 7;
+  // ID col is 9 for history, 7 for recurring
+  const idColIndex = itemType === "history" ? 9 : 7;
   const rowIndex = findRowIndexById(rowsAll, id, idColIndex);
   if (rowIndex === -1) {
     throw new Error(`${itemType} item with ID ${id} not found.`);
@@ -795,12 +797,13 @@ async function handleGET(sheets: any, req: Request, res: Response) {
       .map((t: string) => t.trim())
       .filter(Boolean),
     value: parseCellValue(row[4]),
-    description: row[5],
-    editURL: row[6] || "",
-    id: row[8] || "",
-    fiscalYearId: row[9],
-    fiscalMonthId: row[10],
-    fiscalWeekId: row[11],
+    hsa: row[5],
+    description: row[6],
+    editURL: row[7] || "",
+    id: row[9] || "",
+    fiscalYearId: row[10],
+    fiscalMonthId: row[11],
+    fiscalWeekId: row[12],
     itemType: "history",
   }));
 
