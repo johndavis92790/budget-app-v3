@@ -218,7 +218,7 @@ function EditHistoryPage({
       />
       <Row>
         <Col>
-          <Form.Group controlId="formHsa" className="mb-3">
+          <Form.Group controlId="formHsa">
             <Form.Check
               type="switch"
               id="formHsa"
@@ -228,6 +228,10 @@ function EditHistoryPage({
                 handleFieldChange("hsa", e.target.checked ? "TRUE" : "FALSE")
               }
               disabled={submitting}
+              style={{
+                transform: "scale(1.8)",
+                transformOrigin: "left center",
+              }}
             />
           </Form.Group>
         </Col>

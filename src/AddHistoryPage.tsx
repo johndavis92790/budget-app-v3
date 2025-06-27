@@ -242,7 +242,7 @@ function AddHistoryPage({
 
         <Row>
           <Col>
-            <Form.Group controlId="formHsa" className="mb-3">
+            <Form.Group controlId="formHsa">
               <Form.Check
                 type="switch"
                 id="formHsa"
@@ -250,11 +250,15 @@ function AddHistoryPage({
                 checked={hsa === "TRUE"}
                 onChange={(e) => setHsa(e.target.checked ? "TRUE" : "FALSE")}
                 disabled={submitting}
+                style={{
+                  transform: "scale(1.8)",
+                  transformOrigin: "left center",
+                }}
               />
             </Form.Group>
           </Col>
           <Col>
-            <div className="d-flex justify-content-end mt-3">
+            <div className="d-flex justify-content-end">
               <Dropdown as={ButtonGroup}>
                 <Button
                   type="button"
