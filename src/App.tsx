@@ -15,6 +15,7 @@ import AddHistoryPage from "./AddHistoryPage";
 import HomePage from "./HomePage";
 import GoalsBanner from "./GoalsBanner";
 import BudgetForecastPage from "./BudgetForecastPage";
+import HSAExpensesPage from "./HSAExpensesPage";
 import CustomNavBar from "./CustomNavBar";
 import { API_URL, mmddyyyyToYyyyMmDd } from "./helpers";
 import { messaging, db } from "./firebase";
@@ -263,7 +264,7 @@ function App() {
         ...item,
         userEmail: currentUser?.email || "",
       };
-      
+
       console.log("deleteItem: ", itemWithEmail);
       const response = await fetch(API_URL, {
         method: "DELETE",
@@ -397,6 +398,20 @@ function App() {
                     recurring={recurring}
                     fiscalMonths={fiscalMonths}
                     loading={loading}
+                  />
+                }
+              />
+              <Route
+                path="/hsa-expenses"
+                element={
+                  <HSAExpensesPage
+                    history={history}
+                    fiscalWeeks={fiscalWeeks}
+                    loading={loading}
+                    categories={categories}
+                    existingTags={existingTags}
+                    onUpdateItem={onUpdateItem}
+                    deleteItem={deleteItem}
                   />
                 }
               />

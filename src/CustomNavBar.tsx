@@ -92,6 +92,13 @@ function CustomNavBar({ handleSignOut, isAuthorized }: CustomNavBarProps) {
             >
               Budget Forecast
             </Nav.Link>
+            <Nav.Link
+              as={Link}
+              to="/hsa-expenses"
+              onClick={() => setNavExpanded(false)}
+            >
+              HSA Expenses
+            </Nav.Link>
           </Nav>
 
           {/* Right side: Log Out if authorized */}
