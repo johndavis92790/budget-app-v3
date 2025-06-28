@@ -1,0 +1,89 @@
+[debug] [2025-06-28T09:17:03.493Z] ----------------------------------------------------------------------
+[debug] [2025-06-28T09:17:03.495Z] Command:       /usr/local/bin/node /Users/johndavis/.npm/_npx/7750544ccf494d8b/node_modules/.bin/firebase deploy
+[debug] [2025-06-28T09:17:03.495Z] CLI Version:   14.9.0
+[debug] [2025-06-28T09:17:03.495Z] Platform:      darwin
+[debug] [2025-06-28T09:17:03.495Z] Node Version:  v20.14.0
+[debug] [2025-06-28T09:17:03.495Z] Time:          Sat Jun 28 2025 03:17:03 GMT-0600 (Mountain Daylight Time)
+[debug] [2025-06-28T09:17:03.495Z] ----------------------------------------------------------------------
+[debug] 
+[debug] [2025-06-28T09:17:03.588Z] > command requires scopes: ["email","openid","https://www.googleapis.com/auth/cloudplatformprojects.readonly","https://www.googleapis.com/auth/firebase","https://www.googleapis.com/auth/cloud-platform"]
+[debug] [2025-06-28T09:17:03.588Z] > authorizing via signed-in user (john.davis.92790@gmail.com)
+[debug] [2025-06-28T09:17:03.588Z] [iam] checking project budget-app-v3 for permissions ["cloudfunctions.functions.create","cloudfunctions.functions.delete","cloudfunctions.functions.get","cloudfunctions.functions.list","cloudfunctions.functions.update","cloudfunctions.operations.get","firebase.projects.get","firebasehosting.sites.update"]
+[debug] [2025-06-28T09:17:03.589Z] Checked if tokens are valid: true, expires at: 1751103226933
+[debug] [2025-06-28T09:17:03.589Z] Checked if tokens are valid: true, expires at: 1751103226933
+[debug] [2025-06-28T09:17:03.589Z] >>> [apiv2][query] POST https://cloudresourcemanager.googleapis.com/v1/projects/budget-app-v3:testIamPermissions [none]
+[debug] [2025-06-28T09:17:03.590Z] >>> [apiv2][(partial)header] POST https://cloudresourcemanager.googleapis.com/v1/projects/budget-app-v3:testIamPermissions x-goog-quota-user=projects/budget-app-v3
+[debug] [2025-06-28T09:17:03.590Z] >>> [apiv2][body] POST https://cloudresourcemanager.googleapis.com/v1/projects/budget-app-v3:testIamPermissions {"permissions":["cloudfunctions.functions.create","cloudfunctions.functions.delete","cloudfunctions.functions.get","cloudfunctions.functions.list","cloudfunctions.functions.update","cloudfunctions.operations.get","firebase.projects.get","firebasehosting.sites.update"]}
+[debug] [2025-06-28T09:17:03.726Z] <<< [apiv2][status] POST https://cloudresourcemanager.googleapis.com/v1/projects/budget-app-v3:testIamPermissions 200
+[debug] [2025-06-28T09:17:03.726Z] <<< [apiv2][body] POST https://cloudresourcemanager.googleapis.com/v1/projects/budget-app-v3:testIamPermissions {"permissions":["cloudfunctions.functions.create","cloudfunctions.functions.delete","cloudfunctions.functions.get","cloudfunctions.functions.list","cloudfunctions.functions.update","cloudfunctions.operations.get","firebase.projects.get","firebasehosting.sites.update"]}
+[debug] [2025-06-28T09:17:03.726Z] Checked if tokens are valid: true, expires at: 1751103226933
+[debug] [2025-06-28T09:17:03.726Z] Checked if tokens are valid: true, expires at: 1751103226933
+[debug] [2025-06-28T09:17:03.726Z] >>> [apiv2][query] POST https://iam.googleapis.com/v1/projects/budget-app-v3/serviceAccounts/budget-app-v3@appspot.gserviceaccount.com:testIamPermissions [none]
+[debug] [2025-06-28T09:17:03.726Z] >>> [apiv2][body] POST https://iam.googleapis.com/v1/projects/budget-app-v3/serviceAccounts/budget-app-v3@appspot.gserviceaccount.com:testIamPermissions {"permissions":["iam.serviceAccounts.actAs"]}
+[debug] [2025-06-28T09:17:03.945Z] <<< [apiv2][status] POST https://iam.googleapis.com/v1/projects/budget-app-v3/serviceAccounts/budget-app-v3@appspot.gserviceaccount.com:testIamPermissions 200
+[debug] [2025-06-28T09:17:03.945Z] <<< [apiv2][body] POST https://iam.googleapis.com/v1/projects/budget-app-v3/serviceAccounts/budget-app-v3@appspot.gserviceaccount.com:testIamPermissions {"permissions":["iam.serviceAccounts.actAs"]}
+[debug] [2025-06-28T09:17:03.945Z] Checked if tokens are valid: true, expires at: 1751103226933
+[debug] [2025-06-28T09:17:03.946Z] Checked if tokens are valid: true, expires at: 1751103226933
+[debug] [2025-06-28T09:17:03.946Z] >>> [apiv2][query] GET https://firebase.googleapis.com/v1beta1/projects/budget-app-v3 [none]
+[debug] [2025-06-28T09:17:04.337Z] <<< [apiv2][status] GET https://firebase.googleapis.com/v1beta1/projects/budget-app-v3 200
+[debug] [2025-06-28T09:17:04.337Z] <<< [apiv2][body] GET https://firebase.googleapis.com/v1beta1/projects/budget-app-v3 {"projectId":"budget-app-v3","projectNumber":"105746768311","displayName":"budget-app-v3","name":"projects/budget-app-v3","resources":{"hostingSite":"budget-app-v3"},"state":"ACTIVE","etag":"1_3a6ba73c-cf37-4e8c-81d5-948ae830fb66"}
+[info] 
+[info] === Deploying to 'budget-app-v3'...
+[info] 
+[info] i  deploying functions, hosting 
+[info] Running command: npm --prefix "$RESOURCE_DIR" run build
+[info] ✔  functions: Finished running predeploy script. 
+[debug] [2025-06-28T09:17:14.300Z] Checked if tokens are valid: true, expires at: 1751103226933
+[debug] [2025-06-28T09:17:14.300Z] Checked if tokens are valid: true, expires at: 1751103226933
+[debug] [2025-06-28T09:17:14.300Z] >>> [apiv2][query] GET https://cloudresourcemanager.googleapis.com/v1/projects/budget-app-v3 [none]
+[debug] [2025-06-28T09:17:14.508Z] <<< [apiv2][status] GET https://cloudresourcemanager.googleapis.com/v1/projects/budget-app-v3 200
+[debug] [2025-06-28T09:17:14.508Z] <<< [apiv2][body] GET https://cloudresourcemanager.googleapis.com/v1/projects/budget-app-v3 {"projectNumber":"105746768311","projectId":"budget-app-v3","lifecycleState":"ACTIVE","name":"budget-app-v3","labels":{"firebase":"enabled"},"createTime":"2024-12-03T02:50:06.325529Z"}
+[info] i  functions: preparing codebase default for deployment 
+[info] i  functions: ensuring required API cloudfunctions.googleapis.com is enabled... 
+[info] i  functions: ensuring required API cloudbuild.googleapis.com is enabled... 
+[info] i  artifactregistry: ensuring required API artifactregistry.googleapis.com is enabled... 
+[debug] [2025-06-28T09:17:14.510Z] Checked if tokens are valid: true, expires at: 1751103226933
+[debug] [2025-06-28T09:17:14.510Z] Checked if tokens are valid: true, expires at: 1751103226933
+[debug] [2025-06-28T09:17:14.510Z] >>> [apiv2][query] GET https://firebase.googleapis.com/v1beta1/projects/budget-app-v3/adminSdkConfig [none]
+[debug] [2025-06-28T09:17:14.734Z] <<< [apiv2][status] GET https://firebase.googleapis.com/v1beta1/projects/budget-app-v3/adminSdkConfig 200
+[debug] [2025-06-28T09:17:14.734Z] <<< [apiv2][body] GET https://firebase.googleapis.com/v1beta1/projects/budget-app-v3/adminSdkConfig {"projectId":"budget-app-v3","storageBucket":"budget-app-v3.firebasestorage.app"}
+[debug] [2025-06-28T09:17:14.734Z] Checked if tokens are valid: true, expires at: 1751103226933
+[debug] [2025-06-28T09:17:14.734Z] Checked if tokens are valid: true, expires at: 1751103226933
+[debug] [2025-06-28T09:17:14.734Z] >>> [apiv2][query] GET https://runtimeconfig.googleapis.com/v1beta1/projects/budget-app-v3/configs [none]
+[debug] [2025-06-28T09:17:14.916Z] <<< [apiv2][status] GET https://runtimeconfig.googleapis.com/v1beta1/projects/budget-app-v3/configs 200
+[debug] [2025-06-28T09:17:14.917Z] <<< [apiv2][body] GET https://runtimeconfig.googleapis.com/v1beta1/projects/budget-app-v3/configs {}
+[debug] [2025-06-28T09:17:14.919Z] Validating nodejs source
+[warn] ⚠  functions: Runtime Node.js 18 was deprecated on 2025-04-30 and will be decommissioned on 2025-10-30, after which you will not be able to deploy without upgrading. Consider upgrading now to avoid disruption. See https://cloud.google.com/functions/docs/runtime-support for full details on the lifecycle policy 
+[debug] [2025-06-28T09:17:15.272Z] > [functions] package.json contents: {
+  "name": "functions",
+  "scripts": {
+    "build": "tsc",
+    "build:watch": "tsc --watch",
+    "serve": "npm run build && firebase emulators:start --only functions",
+    "shell": "npm run build && firebase functions:shell",
+    "start": "npm run shell",
+    "deploy": "firebase deploy --only functions",
+    "logs": "firebase functions:log"
+  },
+  "engines": {
+    "node": "18"
+  },
+  "main": "lib/index.js",
+  "dependencies": {
+    "firebase-admin": "^12.7.0",
+    "firebase-functions": "^6.3.2",
+    "google-auth-library": "^9.15.0",
+    "googleapis": "^144.0.0"
+  },
+  "devDependencies": {
+    "typescript": "^4.9.0"
+  },
+  "private": true
+}
+[debug] [2025-06-28T09:17:15.272Z] Building nodejs source
+[info] i  functions: Loading and analyzing source code for codebase default to determine what to deploy 
+[debug] [2025-06-28T09:17:15.272Z] Could not find functions.yaml. Must use http discovery
+[debug] [2025-06-28T09:17:15.275Z] Found firebase-functions binary at '/Users/johndavis/side-projects/budget-app-v3/functions/node_modules/.bin/firebase-functions'
+[info] Serving at port 8700
+
+[debug] [2025-06-28T09:17:15.981Z] Got response from /__/functions.yaml {"endpoints":{"expenses":{"availableMemoryMb":null,"timeoutSeconds":null,"minInstances":null,"maxInstances":null,"ingressSettings":null,"concurrency":null,"serviceAccountEmail":null,"vpc":null,"platform":"gcfv2","secretEnvironmentVariables":[{"key":"SERVICE_ACCOUNT_CLIENT_EMAIL"},{"key":"SERVICE_ACCOUNT_PRIVATE_KEY"}],"labels":{},"httpsTrigger":{},"entryPoint":"expenses"},"sendNotification":{"availableMemoryMb":null,"timeoutSeconds":null,"minInstances":null,"maxInstances":null,"ingressSettings":null,"concurrency":null,"serviceAccountEmail":null,"vpc":null,"platform":"gcfv2","labels":{},"httpsTrigger":{},"entryPoint":"sendNotification"}},"specVersion":"v1alpha1","requiredAPIs":[],"extensions":{}}

@@ -217,7 +217,7 @@ function EditHistoryPage({
         onRemovedPathsChange={handleRemovedPathsChange}
       />
       <Row>
-        <Col>
+        <Col xs={2}>
           <Form.Group controlId="formHsa">
             <Form.Check
               type="switch"
@@ -235,7 +235,7 @@ function EditHistoryPage({
             />
           </Form.Group>
         </Col>
-        <Col>
+        <Col xs={10}>
           <div className="d-flex justify-content-end">
             <Button
               variant="danger"

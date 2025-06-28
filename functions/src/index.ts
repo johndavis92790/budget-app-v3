@@ -11,6 +11,206 @@ admin.initializeApp();
 
 const SECRET_TOKEN = "9a7ce018-5796-427d-8a67-3f204d4419af";
 
+const SPREADSHEET_ID = "1KROs_Swh-1zeQhLajtRw-E7DcYnJRMHEOXX5ECwTGSI";
+
+const HISTORY_TABLE_NAME = "History";
+const HISTORY_FIRST_COLUMN = "A";
+const HISTORY_LAST_COLUMN = "M";
+const HISTORY_RANGE = `${HISTORY_TABLE_NAME}!${HISTORY_FIRST_COLUMN}1:${HISTORY_LAST_COLUMN}`;
+
+const RECURRING_TABLE_NAME = "Recurring";
+const RECURRING_FIRST_COLUMN = "A";
+const RECURRING_LAST_COLUMN = "H";
+const RECURRING_RANGE = `${RECURRING_TABLE_NAME}!${RECURRING_FIRST_COLUMN}1:${RECURRING_LAST_COLUMN}`;
+
+const WEEKLY_GOAL_RANGE = "Goals!A2";
+const MONTHLY_GOAL_RANGE = "Goals!B2";
+
+const METADATA_RANGE = "Metadata!A1:B";
+
+// ===== LOGS SHEET CONSTANTS (4 columns: Timestamp, Action, Data, Error) =====
+const LOGS_TABLE_NAME = "Logs";
+const LOGS_FIRST_COLUMN = "A";
+const LOGS_LAST_COLUMN = "D";
+const LOGS_RANGE = `${LOGS_TABLE_NAME}!${LOGS_FIRST_COLUMN}1:${LOGS_LAST_COLUMN}`;
+
+const FISCAL_WEEKS_RANGE = "Fiscal Weeks!A1:F";
+const FISCAL_MONTHS_RANGE = "Fiscal Months!A1:D";
+const FISCAL_YEARS_RANGE = "Fiscal Years!A1:D";
+
+interface FiscalYear {
+  id: string;
+  title: string;
+  start_date: string;
+  end_date: string;
+  itemType: "fiscalYear";
+}
+
+interface FiscalMonth {
+  id: string;
+  start_date: string;
+  end_date: string;
+  year_title: string;
+  itemType: "fiscalMonth";
+}
+
+interface FiscalWeek {
+  id: string;
+  number: string;
+  start_date: string;
+  end_date: string;
+  year_title: string;
+  month_id: string;
+  itemType: "fiscalWeek";
+}
+
+interface IncomingObject {
+  date: string;
+  // ... other fields as needed
+}
+
+let cachedFiscalYears: FiscalYear[] | null = null;
+let cachedFiscalMonths: FiscalMonth[] | null = null;
+let cachedFiscalWeeks: FiscalWeek[] | null = null;
+
+// Define sheet column mapping interfaces
+interface ColumnMapping {
+  [columnName: string]: number;
+}
+
+interface SheetColumnMappings {
+  HISTORY: ColumnMapping;
+  RECURRING: ColumnMapping;
+  FISCAL_WEEKS: ColumnMapping;
+  FISCAL_MONTHS: ColumnMapping;
+  FISCAL_YEARS: ColumnMapping;
+  LOGS: ColumnMapping;
+  METADATA: ColumnMapping;
+}
+
+// Initialize empty column mappings
+let columnMappings: SheetColumnMappings = {
+  HISTORY: {},
+  RECURRING: {},
+  FISCAL_WEEKS: {},
+  FISCAL_MONTHS: {},
+  FISCAL_YEARS: {},
+  LOGS: {},
+  METADATA: {}
+};
+
+// Default column mappings (used as fallback if header row can't be read)
+const defaultColumnMappings: SheetColumnMappings = {
+  HISTORY: {
+    DATE: 0,
+    TYPE: 1,
+    CATEGORY: 2,
+    TAGS: 3,
+    VALUE: 4,
+    HSA: 5,
+    DESCRIPTION: 6,
+    EDIT_URL: 7,
+    HYPERLINK: 8,
+    ID: 9,
+    FISCAL_YEAR_ID: 10,
+    FISCAL_MONTH_ID: 11,
+    FISCAL_WEEK_ID: 12
+  },
+  RECURRING: {
+    TYPE: 0,
+    CATEGORY: 1,
+    TAGS: 2,
+    VALUE: 3,
+    DESCRIPTION: 4,
+    EDIT_URL: 5,
+    HYPERLINK: 6,
+    ID: 7
+  },
+  FISCAL_WEEKS: {
+    ID: 0,
+    NUMBER: 1,
+    START_DATE: 2,
+    END_DATE: 3,
+    YEAR_TITLE: 4,
+    MONTH_ID: 5
+  },
+  FISCAL_MONTHS: {
+    ID: 0,
+    START_DATE: 1,
+    END_DATE: 2,
+    YEAR_TITLE: 3
+  },
+  FISCAL_YEARS: {
+    ID: 0,
+    TITLE: 1,
+    START_DATE: 2,
+    END_DATE: 3
+  },
+  LOGS: {
+    TIMESTAMP: 0,
+    USER_EMAIL: 1,
+    ACTION: 2,
+    DATA: 3,
+    ERROR: 4
+  },
+  METADATA: {
+    CATEGORY: 0,
+    TAG: 1
+  }
+};
+
+// Function to initialize column mappings from header rows
+async function initializeColumnMappings(sheets: any): Promise<void> {
+  try {
+    const historyHeaders = await getSheetData(sheets, `${HISTORY_TABLE_NAME}!${HISTORY_FIRST_COLUMN}1:${HISTORY_LAST_COLUMN}1`, false);
+    const recurringHeaders = await getSheetData(sheets, `${RECURRING_TABLE_NAME}!${RECURRING_FIRST_COLUMN}1:${RECURRING_LAST_COLUMN}1`, false);
+    const fiscalWeeksHeaders = await getSheetData(sheets, `Fiscal Weeks!A1:F1`, false);
+    const fiscalMonthsHeaders = await getSheetData(sheets, `Fiscal Months!A1:D1`, false);
+    const fiscalYearsHeaders = await getSheetData(sheets, `Fiscal Years!A1:D1`, false);
+    const logsHeaders = await getSheetData(sheets, `${LOGS_TABLE_NAME}!${LOGS_FIRST_COLUMN}1:${LOGS_LAST_COLUMN}1`, false);
+    const metadataHeaders = await getSheetData(sheets, `Metadata!A1:B1`, false);
+
+    // Helper function to create mappings from header row
+    function createMappingFromHeaders(headers: any[]): ColumnMapping {
+      if (!headers || !headers[0] || headers[0].length === 0) {
+        return {}; // Return empty mapping if no headers found
+      }
+      
+      const mapping: ColumnMapping = {};
+      headers[0].forEach((header: string, index: number) => {
+        if (header) {
+          // Convert header to uppercase and replace spaces with underscores for naming consistency
+          const normalizedHeader = header.toUpperCase().replace(/\s+/g, '_');
+          mapping[normalizedHeader] = index;
+        }
+      });
+      return mapping;
+    }
+
+    // Create mappings for each sheet
+    columnMappings.HISTORY = createMappingFromHeaders(historyHeaders);
+    columnMappings.RECURRING = createMappingFromHeaders(recurringHeaders);
+    columnMappings.FISCAL_WEEKS = createMappingFromHeaders(fiscalWeeksHeaders);
+    columnMappings.FISCAL_MONTHS = createMappingFromHeaders(fiscalMonthsHeaders);
+    columnMappings.FISCAL_YEARS = createMappingFromHeaders(fiscalYearsHeaders);
+    columnMappings.LOGS = createMappingFromHeaders(logsHeaders);
+    columnMappings.METADATA = createMappingFromHeaders(metadataHeaders);
+
+    // Merge with default mappings for any missing columns
+    for (const sheet in defaultColumnMappings) {
+      const sheetKey = sheet as keyof SheetColumnMappings;
+      columnMappings[sheetKey] = { ...defaultColumnMappings[sheetKey], ...columnMappings[sheetKey] };
+    }
+
+    console.log('Column mappings initialized successfully');
+  } catch (error) {
+    console.error('Failed to initialize column mappings:', error);
+    // Fall back to default mappings
+    columnMappings = { ...defaultColumnMappings };
+    console.log('Using default column mappings as fallback');
+  }
+}
+
 exports.sendNotification = functions.https.onRequest(
   async (req: any, res: any) => {
     // Only allow POST requests
@@ -106,68 +306,6 @@ exports.sendNotification = functions.https.onRequest(
   }
 );
 
-const SPREADSHEET_ID = "1KROs_Swh-1zeQhLajtRw-E7DcYnJRMHEOXX5ECwTGSI";
-
-const HISTORY_TABLE_NAME = "History";
-const HISTORY_FIRST_COLUMN = "A";
-const HISTORY_LAST_COLUMN = "M";
-const HISTORY_RANGE = `${HISTORY_TABLE_NAME}!${HISTORY_FIRST_COLUMN}1:${HISTORY_LAST_COLUMN}`;
-
-const RECURRING_TABLE_NAME = "Recurring";
-const RECURRING_FIRST_COLUMN = "A";
-const RECURRING_LAST_COLUMN = "H";
-const RECURRING_RANGE = `${RECURRING_TABLE_NAME}!${RECURRING_FIRST_COLUMN}1:${RECURRING_LAST_COLUMN}`;
-
-const WEEKLY_GOAL_RANGE = "Goals!A2";
-const MONTHLY_GOAL_RANGE = "Goals!B2";
-
-const METADATA_RANGE = "Metadata!A1:B";
-
-// ===== LOGS SHEET CONSTANTS (4 columns: Timestamp, Action, Data, Error) =====
-const LOGS_TABLE_NAME = "Logs";
-const LOGS_FIRST_COLUMN = "A";
-const LOGS_LAST_COLUMN = "D";
-const LOGS_RANGE = `${LOGS_TABLE_NAME}!${LOGS_FIRST_COLUMN}1:${LOGS_LAST_COLUMN}`;
-
-const FISCAL_WEEKS_RANGE = "Fiscal Weeks!A1:F";
-const FISCAL_MONTHS_RANGE = "Fiscal Months!A1:D";
-const FISCAL_YEARS_RANGE = "Fiscal Years!A1:D";
-
-interface FiscalYear {
-  id: string;
-  title: string;
-  start_date: string;
-  end_date: string;
-  itemType: "fiscalYear";
-}
-
-interface FiscalMonth {
-  id: string;
-  start_date: string;
-  end_date: string;
-  year_title: string;
-  itemType: "fiscalMonth";
-}
-
-interface FiscalWeek {
-  id: string;
-  number: string;
-  start_date: string;
-  end_date: string;
-  year_title: string;
-  month_id: string;
-  itemType: "fiscalWeek";
-}
-
-interface IncomingObject {
-  date: string;
-  // ... other fields as needed
-}
-
-let cachedFiscalYears: FiscalYear[] | null = null;
-let cachedFiscalMonths: FiscalMonth[] | null = null;
-let cachedFiscalWeeks: FiscalWeek[] | null = null;
-
 /** Helper to get MST timestamp in format: 2025-01-03T14:05:06 */
 function getMstTimestamp(): string {
   // 1) Convert local date/time to MST ("America/Denver")
@@ -186,12 +324,12 @@ function getMstTimestamp(): string {
 
 /**
  * LOG ACTION HELPER
- * Appends a row to the Logs sheet with columns:
- * A = Timestamp (MST)
- * B = User Email
- * C = Action
- * D = Data (formatted JSON)
- * E = Error (formatted JSON if any)
+ * Appends a row to the Logs sheet with columns mapped to:
+ * TIMESTAMP = Timestamp (MST)
+ * USER_EMAIL = User Email
+ * ACTION = Action
+ * DATA = Data (formatted JSON)
+ * ERROR = Error (formatted JSON if any)
  */
 async function logAction(
   sheets: any,
@@ -210,15 +348,24 @@ async function logAction(
     Object.keys(data).length > 0 ? JSON.stringify(data, null, 2) : "";
   const errorStr = errorMessage ? JSON.stringify(errorMessage, null, 2) : "";
 
-  // 4) Prepare the row for columns A-E
-  const newRow = [timestamp, userEmail, actionType, dataStr, errorStr];
+  // 4) Create log data object
+  const logData = {
+    TIMESTAMP: timestamp,
+    USER_EMAIL: userEmail,
+    ACTION: actionType,
+    DATA: dataStr,
+    ERROR: errorStr
+  };
+  
+  // 5) Create the row data using our robust helper
+  const rowData = createSheetRow(logData, 'LOGS');
 
-  // 5) Append it to the Logs sheet
+  // 6) Append it to the Logs sheet
   await sheets.spreadsheets.values.append({
     spreadsheetId: SPREADSHEET_ID,
     range: LOGS_RANGE,
     valueInputOption: "USER_ENTERED",
-    requestBody: { values: [newRow] },
+    requestBody: { values: [rowData] },
   });
 }
 
@@ -277,10 +424,17 @@ async function updateSingleCellGoal(
   });
 }
 
+/**
+ * Helper to append data to a sheet by column mappings rather than array positions
+ * @param sheets - The sheets API instance
+ * @param range - Base range for the sheet (e.g. 'History!A:Z')
+ * @param data - An object mapping column names to values
+ * @param sheetType - The type of sheet (must be a key in columnMappings)
+ */
 async function appendDataToSheet(
   sheets: any,
   range: string,
-  rowValues: any[][]
+  rowValues: any[][],
 ) {
   await sheets.spreadsheets.values.append({
     spreadsheetId: SPREADSHEET_ID,
@@ -288,6 +442,33 @@ async function appendDataToSheet(
     valueInputOption: "USER_ENTERED",
     requestBody: { values: rowValues },
   });
+}
+
+/**
+ * Helper to construct a row for a sheet using column mappings
+ * This ensures data is always in the correct column regardless of order
+ * @param data - Data object with values to insert
+ * @param sheetType - The type of sheet (key in columnMappings)
+ * @param valueMapper - Optional function to transform values before insertion
+ */
+function createSheetRow(data: Record<string, any>, sheetType: keyof SheetColumnMappings, valueMapper?: (key: string, val: any) => any): any[] {
+  const colMap = columnMappings[sheetType];
+  
+  // Find the maximum column index to ensure array is large enough
+  const maxColIndex = Math.max(...Object.values(colMap));
+  const row = new Array(maxColIndex + 1).fill("");
+  
+  // Map the data to the correct columns
+  Object.entries(data).forEach(([key, value]) => {
+    const normalizedKey = key.toUpperCase().replace(/\s+/g, '_');
+    const colIndex = colMap[normalizedKey];
+    
+    if (colIndex !== undefined) {
+      row[colIndex] = valueMapper ? valueMapper(key, value) : value;
+    }
+  });
+  
+  return row;
 }
 
 async function updateSheetRow(sheets: any, range: string, rowValues: any[][]) {
@@ -323,29 +504,32 @@ async function fetchAndCacheFiscalData(sheets: any): Promise<void> {
     getSheetData(sheets, FISCAL_WEEKS_RANGE),
   ]);
 
+  const fyMap = columnMappings.FISCAL_YEARS;
   cachedFiscalYears = fyRows.map((row) => ({
-    id: row[0],
-    title: row[1],
-    start_date: row[2],
-    end_date: row[3],
+    id: row[fyMap.ID],
+    title: row[fyMap.TITLE],
+    start_date: row[fyMap.START_DATE],
+    end_date: row[fyMap.END_DATE],
     itemType: "fiscalYear" as const,
   }));
 
+  const fmMap = columnMappings.FISCAL_MONTHS;
   cachedFiscalMonths = fmRows.map((row) => ({
-    id: row[0],
-    start_date: row[1],
-    end_date: row[2],
-    year_title: row[3],
+    id: row[fmMap.ID],
+    start_date: row[fmMap.START_DATE],
+    end_date: row[fmMap.END_DATE],
+    year_title: row[fmMap.YEAR_TITLE],
     itemType: "fiscalMonth" as const,
   }));
 
+  const fwMap = columnMappings.FISCAL_WEEKS;
   cachedFiscalWeeks = fwRows.map((row) => ({
-    id: row[0],
-    number: row[1],
-    start_date: row[2],
-    end_date: row[3],
-    year_title: row[4],
-    month_id: row[5],
+    id: row[fwMap.ID],
+    number: row[fwMap.NUMBER],
+    start_date: row[fwMap.START_DATE],
+    end_date: row[fwMap.END_DATE],
+    year_title: row[fwMap.YEAR_TITLE],
+    month_id: row[fwMap.MONTH_ID],
     itemType: "fiscalWeek" as const,
   }));
 }
@@ -398,19 +582,27 @@ function getFiscalIDs(
 }
 
 async function isSameFiscalWeekById(fiscalWeekId: string, sheets: any) {
-  // Get the current date
+  // Get the current date - set to start of day to avoid time issues
   const currentDate = new Date();
   
   // Find the current fiscal week by checking all weeks
   const allWeeks = await getSheetData(sheets, FISCAL_WEEKS_RANGE);
   let currentFiscalWeekId = null;
   
+  const fwMap = columnMappings.FISCAL_WEEKS;
+  
+  
   for (const row of allWeeks) {
-    const startDate = new Date(row[2]); // start_date is in column 3
-    const endDate = new Date(row[3]);   // end_date is in column 4
+    // Skip header row
+    if (row[fwMap.ID] === 'ID' || !row[fwMap.START_DATE] || !row[fwMap.END_DATE]) continue;
+    
+    const startDate = new Date(row[fwMap.START_DATE]);
+    // Adjust end date to end of day (23:59:59.999) for inclusive comparison
+    const endDate = new Date(row[fwMap.END_DATE]);
+    endDate.setHours(23, 59, 59, 999);
     
     if (currentDate >= startDate && currentDate <= endDate) {
-      currentFiscalWeekId = row[0]; // id is in column 1
+      currentFiscalWeekId = row[fwMap.ID];
       break;
     }
   }
@@ -421,7 +613,8 @@ async function isSameFiscalWeekById(fiscalWeekId: string, sheets: any) {
   }
   
   // Compare the item's fiscal week ID with the current fiscal week ID
-  return fiscalWeekId === currentFiscalWeekId;
+  const result = fiscalWeekId === currentFiscalWeekId;
+  return result;
 }
 
 async function isSameFiscalMonthById(fiscalMonthId: string, sheets: any) {
@@ -432,12 +625,19 @@ async function isSameFiscalMonthById(fiscalMonthId: string, sheets: any) {
   const allMonths = await getSheetData(sheets, FISCAL_MONTHS_RANGE);
   let currentFiscalMonthId = null;
   
+  const fmMap = columnMappings.FISCAL_MONTHS;
+    
   for (const row of allMonths) {
-    const startDate = new Date(row[1]); // start_date is in column 2
-    const endDate = new Date(row[2]);   // end_date is in column 3
+    // Skip header row
+    if (row[fmMap.ID] === 'ID' || !row[fmMap.START_DATE] || !row[fmMap.END_DATE]) continue;
+    
+    const startDate = new Date(row[fmMap.START_DATE]);
+    // Adjust end date to end of day (23:59:59.999) for inclusive comparison
+    const endDate = new Date(row[fmMap.END_DATE]);
+    endDate.setHours(23, 59, 59, 999);
     
     if (currentDate >= startDate && currentDate <= endDate) {
-      currentFiscalMonthId = row[0]; // id is in column 1
+      currentFiscalMonthId = row[fmMap.ID];
       break;
     }
   }
@@ -448,7 +648,8 @@ async function isSameFiscalMonthById(fiscalMonthId: string, sheets: any) {
   }
   
   // Compare the item's fiscal month ID with the current fiscal month ID
-  return fiscalMonthId === currentFiscalMonthId;
+  const result = fiscalMonthId === currentFiscalMonthId;
+  return result;
 }
 
 function convertArrayToObjectById(arr: any[]): Record<string, any> {
@@ -464,17 +665,26 @@ function convertArrayToObjectById(arr: any[]): Record<string, any> {
 
 async function addMissingTags(sheets: any, tags: string[]) {
   if (!tags || tags.length === 0) return;
+  
   const listsRows = await getSheetData(sheets, METADATA_RANGE, false);
   const dataRows = listsRows.slice(1);
-  const colIndex = 1;
+  const metadataMap = columnMappings.METADATA;
+  
+  // Get existing tags from the TAG column using the column mapping
   const existingTags = dataRows
-    .map((row) => (row[colIndex] ? row[colIndex].trim() : ""))
+    .map((row) => (row[metadataMap.TAG] ? row[metadataMap.TAG].trim() : ""))
     .filter(Boolean);
 
   const newTags = tags.filter((tag) => !existingTags.includes(tag));
   if (newTags.length === 0) return;
 
-  const rowsToAppend = newTags.map((tag) => ["", tag]);
+  // Create rows for new tags with empty values for CATEGORY column
+  const rowsToAppend = newTags.map((tag) => {
+    const rowData = new Array(Object.keys(metadataMap).length).fill("");
+    rowData[metadataMap.TAG] = tag;
+    return rowData;
+  });
+  
   await appendDataToSheet(sheets, METADATA_RANGE, rowsToAppend);
 }
 
@@ -632,44 +842,54 @@ async function insertItem(
 ) {
   const isRecurring = itemType === "recurring";
   const range = isRecurring ? RECURRING_RANGE : HISTORY_RANGE;
-
+  // Add any missing tags to the Metadata sheet
   await addMissingTags(sheets, data.tags);
-  const dateFormatted = !isRecurring ? convertToMMDDYYYY(data.date) : "";
-  const hyperlinkFormula = `=HYPERLINK("${data.editURL}", "Edit")`;
 
+  // Build the Google Sheets hyperlink formula: =HYPERLINK(url, "Edit")
+  const hyperlinkFormula = `=HYPERLINK("${data.editURL}", "Edit")`;
+  
+  // Format date as MM/DD/YYYY
+  const dateFormatted = !isRecurring ? convertToMMDDYYYY(data.date) : "";
+  
+  let sheetType = isRecurring ? 'RECURRING' as const : 'HISTORY' as const;
+  
   if (isRecurring) {
-    // columns: type, category, tags, value, desc, editURL, hyperlink, id
-    await appendDataToSheet(sheets, range, [
-      [
-        data.type,
-        data.category,
-        data.tags.join(", "),
-        data.value,
-        data.description || "",
-        data.editURL,
-        hyperlinkFormula,
-        data.id,
-      ],
-    ]);
+    // Create data object for recurring item
+    const recurringData = {
+      TYPE: data.type,
+      CATEGORY: data.category,
+      TAGS: data.tags.join(", "),
+      VALUE: data.value,
+      DESCRIPTION: data.description || "",
+      EDIT_URL: data.editURL,
+      HYPERLINK: hyperlinkFormula,
+      ID: data.id
+    };
+    
+    // Use our robust helper to create the row
+    const rowData = createSheetRow(recurringData, sheetType);
+    await appendDataToSheet(sheets, range, [rowData]);
   } else {
-    // columns: date, type, category, tags, value, hsa, desc, editURL, hyperlink, id, fy, fm, fw
-    await appendDataToSheet(sheets, range, [
-      [
-        dateFormatted,
-        data.type,
-        data.category,
-        data.tags.join(", "),
-        data.value,
-        data.hsa,
-        data.description || "",
-        data.editURL,
-        hyperlinkFormula,
-        data.id,
-        data.fiscalYearId,
-        data.fiscalMonthId,
-        data.fiscalWeekId,
-      ],
-    ]);
+    // Create data object for history item
+    const historyData = {
+      DATE: dateFormatted,
+      TYPE: data.type,
+      CATEGORY: data.category,
+      TAGS: data.tags.join(", "),
+      VALUE: data.value,
+      HSA: data.hsa,
+      DESCRIPTION: data.description || "",
+      EDIT_URL: data.editURL,
+      HYPERLINK: hyperlinkFormula,
+      ID: data.id,
+      FISCAL_YEAR_ID: data.fiscalYearId,
+      FISCAL_MONTH_ID: data.fiscalMonthId,
+      FISCAL_WEEK_ID: data.fiscalWeekId
+    };
+    
+    // Use our robust helper to create the row
+    const rowData = createSheetRow(historyData, sheetType);
+    await appendDataToSheet(sheets, range, [rowData]);
   }
 }
 
@@ -695,50 +915,49 @@ async function updateItem(
     throw new Error(`${itemType} item not found at rowIndex ${rowIndex}`);
   }
 
-  // For history: ID is col 9; recurring: col 7
-  const idColIndex = isRecurring ? 7 : 9;
-  const existingId = existingRow[idColIndex];
+  // Select the appropriate sheet type for our column mappings
+  const sheetType = isRecurring ? 'RECURRING' as const : 'HISTORY' as const;
+  const colMap = columnMappings[sheetType];
+  
+  // Use column mapping to get the ID column index
+  const existingId = existingRow[colMap.ID];
   if (!existingId) {
     throw new Error(`ID not found in the existing ${itemType} row.`);
   }
 
+  // Add any new tags to the metadata sheet
   await addMissingTags(sheets, data.tags);
-  const hyperlinkFormula = `=HYPERLINK("${existingRow[isRecurring ? 5 : 7]}", "Edit")`;
+  
+  // Create hyperlink formula using the existing edit URL
+  const hyperlinkFormula = `=HYPERLINK("${existingRow[colMap.EDIT_URL]}", "Edit")`;
 
-  if (isRecurring) {
-    // columns: type, category, tags, value, desc, editURL, hyperlink, id
-    const tagsStr = data.tags.join(", ");
-    await updateSheetRow(sheets, rowRange, [
-      [
-        data.type,
-        data.category,
-        tagsStr,
-        data.value,
-        data.description,
-        existingRow[5],
-        hyperlinkFormula,
-        existingId,
-      ],
-    ]);
-  } else {
-    // columns: date, type, category, tags, value, hsa, desc, editURL, hyperlink, id
-    const dateFormatted = convertToMMDDYYYY(data.date);
-    const tagsStr = data.tags.join(", ");
-    await updateSheetRow(sheets, rowRange, [
-      [
-        dateFormatted,
-        data.type,
-        data.category,
-        tagsStr,
-        data.value,
-        data.hsa,
-        data.description || "",
-        existingRow[7],
-        hyperlinkFormula,
-        existingId,
-      ],
-    ]);
+  // Common data for both item types
+  const baseData: Record<string, any> = {
+    TYPE: data.type,
+    CATEGORY: data.category,
+    TAGS: data.tags.join(", "),
+    VALUE: data.value,
+    DESCRIPTION: data.description || "",
+    EDIT_URL: existingRow[colMap.EDIT_URL],
+    HYPERLINK: hyperlinkFormula,
+    ID: existingId
+  };
+  
+  // Add type-specific fields
+  if (!isRecurring) {
+    // Add history-specific fields
+    baseData.DATE = convertToMMDDYYYY(data.date);
+    baseData.HSA = data.hsa;
+    baseData.FISCAL_YEAR_ID = data.fiscalYearId || existingRow[colMap.FISCAL_YEAR_ID];
+    baseData.FISCAL_MONTH_ID = data.fiscalMonthId || existingRow[colMap.FISCAL_MONTH_ID];
+    baseData.FISCAL_WEEK_ID = data.fiscalWeekId || existingRow[colMap.FISCAL_WEEK_ID];
   }
+  
+  // Use our robust helper to create the row data
+  const rowData = createSheetRow(baseData, sheetType);
+  
+  // Update the sheet with the new data
+  await updateSheetRow(sheets, rowRange, [rowData]);
 
   return existingRow;
 }
@@ -765,8 +984,11 @@ async function deleteItem(
   const rowsAll = await getSheetData(sheets, rangeAll, false);
   rowsAll.shift(); // remove header row
 
-  // ID col is 9 for history, 7 for recurring
-  const idColIndex = itemType === "history" ? 9 : 7;
+  // Get the ID column index based on sheet type
+  const idColIndex = itemType === "history" 
+    ? columnMappings.HISTORY.ID 
+    : columnMappings.RECURRING.ID;
+  
   const rowIndex = findRowIndexById(rowsAll, id, idColIndex);
   if (rowIndex === -1) {
     throw new Error(`${itemType} item with ID ${id} not found.`);
@@ -788,44 +1010,49 @@ async function deleteItem(
 
 async function handleGET(sheets: any, req: Request, res: Response) {
   const historyRows = await getSheetData(sheets, HISTORY_RANGE);
+  const historyMap = columnMappings.HISTORY;
+  
   const historyData = historyRows.map((row) => ({
-    date: row[0],
-    type: row[1],
-    category: row[2],
-    tags: row[3]
+    date: row[historyMap.DATE],
+    type: row[historyMap.TYPE],
+    category: row[historyMap.CATEGORY],
+    tags: row[historyMap.TAGS]
       ?.split(",")
       .map((t: string) => t.trim())
       .filter(Boolean),
-    value: parseCellValue(row[4]),
-    hsa: row[5],
-    description: row[6],
-    editURL: row[7] || "",
-    id: row[9] || "",
-    fiscalYearId: row[10],
-    fiscalMonthId: row[11],
-    fiscalWeekId: row[12],
+    value: parseCellValue(row[historyMap.VALUE]),
+    hsa: row[historyMap.HSA],
+    description: row[historyMap.DESCRIPTION],
+    editURL: row[historyMap.EDIT_URL] || "",
+    id: row[historyMap.ID] || "",
+    fiscalYearId: row[historyMap.FISCAL_YEAR_ID],
+    fiscalMonthId: row[historyMap.FISCAL_MONTH_ID],
+    fiscalWeekId: row[historyMap.FISCAL_WEEK_ID],
     itemType: "history",
   }));
 
   const recurringRows = await getSheetData(sheets, RECURRING_RANGE);
+  const recurringMap = columnMappings.RECURRING;
+  
   const recurringData = recurringRows.map((row) => ({
-    type: row[0],
-    category: row[1],
-    tags: row[2]
+    type: row[recurringMap.TYPE],
+    category: row[recurringMap.CATEGORY],
+    tags: row[recurringMap.TAGS]
       ?.split(",")
       .map((t: string) => t.trim())
       .filter(Boolean),
-    value: parseCellValue(row[3]),
-    description: row[4],
-    editURL: row[5] || "",
-    id: row[7] || "",
+    value: parseCellValue(row[recurringMap.VALUE]),
+    description: row[recurringMap.DESCRIPTION],
+    editURL: row[recurringMap.EDIT_URL] || "",
+    id: row[recurringMap.ID] || "",
     itemType: "recurring",
   }));
 
   const listsAll = await getSheetData(sheets, METADATA_RANGE, false);
   const listsRows = listsAll.slice(1);
-  const categories = listsRows.map((row) => row[0]).filter(Boolean);
-  const tags = listsRows.map((row) => row[1]).filter(Boolean);
+  const metadataMap = columnMappings.METADATA;
+  const categories = listsRows.map((row) => row[metadataMap.CATEGORY]).filter(Boolean);
+  const tags = listsRows.map((row) => row[metadataMap.TAG]).filter(Boolean);
 
   const [wgResp, mgResp] = await Promise.all([
     sheets.spreadsheets.values.get({
@@ -844,30 +1071,30 @@ async function handleGET(sheets: any, req: Request, res: Response) {
 
   let fiscalWeekData = (await getSheetData(sheets, FISCAL_WEEKS_RANGE)).map(
     (row) => ({
-      id: row[0],
-      number: row[1],
-      start_date: row[2],
-      end_date: row[3],
-      year_title: row[4],
-      month_id: row[5],
+      id: row[columnMappings.FISCAL_WEEKS.ID],
+      number: row[columnMappings.FISCAL_WEEKS.NUMBER],
+      start_date: row[columnMappings.FISCAL_WEEKS.START_DATE],
+      end_date: row[columnMappings.FISCAL_WEEKS.END_DATE],
+      year_title: row[columnMappings.FISCAL_WEEKS.YEAR_TITLE],
+      month_id: row[columnMappings.FISCAL_WEEKS.MONTH_ID],
       itemType: "fiscalWeek",
     })
   );
   let fiscalMonthData = (await getSheetData(sheets, FISCAL_MONTHS_RANGE)).map(
     (row) => ({
-      id: row[0],
-      start_date: row[1],
-      end_date: row[2],
-      year_title: row[3],
+      id: row[columnMappings.FISCAL_MONTHS.ID],
+      start_date: row[columnMappings.FISCAL_MONTHS.START_DATE],
+      end_date: row[columnMappings.FISCAL_MONTHS.END_DATE],
+      year_title: row[columnMappings.FISCAL_MONTHS.YEAR_TITLE],
       itemType: "fiscalMonth",
     })
   );
   let fiscalYearData = (await getSheetData(sheets, FISCAL_YEARS_RANGE)).map(
     (row) => ({
-      id: row[0],
-      title: row[1],
-      start_date: row[2],
-      end_date: row[3],
+      id: row[columnMappings.FISCAL_YEARS.ID],
+      title: row[columnMappings.FISCAL_YEARS.TITLE],
+      start_date: row[columnMappings.FISCAL_YEARS.START_DATE],
+      end_date: row[columnMappings.FISCAL_YEARS.END_DATE],
       itemType: "fiscalYear",
     })
   );
@@ -999,7 +1226,7 @@ async function handlePUT(sheets: any, req: Request, res: Response) {
         }
 
         const existingRow = await updateItem(sheets, data, "history");
-        const rawOriginalValue = existingRow[4];
+        const rawOriginalValue = existingRow[columnMappings.HISTORY.VALUE];
         const originalValue = parseCellValue(rawOriginalValue);
         if (data.value !== originalValue) {
           await adjustGoalIfSameFiscalPeriod(sheets, originalValue, data);
@@ -1194,6 +1421,9 @@ export const expenses = onRequest(
     }
 
     try {
+      // Initialize column mappings for all sheets
+      await initializeColumnMappings(sheets);
+      
       // Ensure we have cached fiscal data
       await fetchAndCacheFiscalData(sheets);
 
