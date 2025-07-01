@@ -70,7 +70,7 @@ function HSAExpensesPage({
   // Calculate HSA totals when history changes
   useEffect(() => {
     // Filter history to only HSA-tagged items
-    const hsaItems = history.filter((item) => item.tags.includes("HSA"));
+    const hsaItems = history.filter((item) => item.hsa === "TRUE");
 
     // Calculate the total expenses
     const total = hsaItems.reduce((sum, item) => {
@@ -90,7 +90,7 @@ function HSAExpensesPage({
   }
 
   // First filter to only show HSA tagged items
-  const hsaHistory = history.filter((item) => item.tags.includes("HSA"));
+  const hsaHistory = history.filter((item) => item.hsa === "TRUE");
 
   // Then apply additional filters if needed
   const filteredHistory = showFilters
