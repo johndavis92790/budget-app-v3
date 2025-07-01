@@ -1,0 +1,1503 @@
+import { onRequest } from "firebase-functions/v2/https";
+import { Request, Response } from "express";
+import { google } from "googleapis";
+
+const functions = require("firebase-functions");
+const admin = require("firebase-admin");
+const { GoogleAuth } = require("google-auth-library");
+const fetch = require("node-fetch");
+
+admin.initializeApp();
+
+const SECRET_TOKEN = "9a7ce018-5796-427d-8a67-3f204d4419af";
+
+const SPREADSHEET_ID = "1KROs_Swh-1zeQhLajtRw-E7DcYnJRMHEOXX5ECwTGSI";
+
+const HISTORY_TABLE_NAME = "History";
+const HISTORY_FIRST_COLUMN = "A";
+const HISTORY_LAST_COLUMN = "M";
+const HISTORY_RANGE = `${HISTORY_TABLE_NAME}!${HISTORY_FIRST_COLUMN}1:${HISTORY_LAST_COLUMN}`;
+
+const RECURRING_TABLE_NAME = "Recurring";
+const RECURRING_FIRST_COLUMN = "A";
+const RECURRING_LAST_COLUMN = "H";
+const RECURRING_RANGE = `${RECURRING_TABLE_NAME}!${RECURRING_FIRST_COLUMN}1:${RECURRING_LAST_COLUMN}`;
+
+const WEEKLY_GOAL_RANGE = "Goals!A2";
+const MONTHLY_GOAL_RANGE = "Goals!B2";
+
+const METADATA_RANGE = "Metadata!A1:B";
+
+// ===== LOGS SHEET CONSTANTS (4 columns: Timestamp, Action, Data, Error) =====
+const LOGS_TABLE_NAME = "Logs";
+const LOGS_FIRST_COLUMN = "A";
+const LOGS_LAST_COLUMN = "D";
+const LOGS_RANGE = `${LOGS_TABLE_NAME}!${LOGS_FIRST_COLUMN}1:${LOGS_LAST_COLUMN}`;
+
+const FISCAL_WEEKS_RANGE = "Fiscal Weeks!A1:F";
+const FISCAL_MONTHS_RANGE = "Fiscal Months!A1:D";
+const FISCAL_YEARS_RANGE = "Fiscal Years!A1:D";
+
+interface FiscalYear {
+  id: string;
+  title: string;
+  start_date: string;
+  end_date: string;
+  itemType: "fiscalYear";
+}
+
+interface FiscalMonth {
+  id: string;
+  start_date: string;
+  end_date: string;
+  year_title: string;
+  itemType: "fiscalMonth";
+}
+
+interface FiscalWeek {
+  id: string;
+  number: string;
+  start_date: string;
+  end_date: string;
+  year_title: string;
+  month_id: string;
+  itemType: "fiscalWeek";
+}
+
+interface IncomingObject {
+  date: string;
+  // ... other fields as needed
+}
+
+let cachedFiscalYears: FiscalYear[] | null = null;
+let cachedFiscalMonths: FiscalMonth[] | null = null;
+let cachedFiscalWeeks: FiscalWeek[] | null = null;
+
+// Define sheet column mapping interfaces
+interface ColumnMapping {
+  [columnName: string]: number;
+}
+
+interface SheetColumnMappings {
+  HISTORY: ColumnMapping;
+  RECURRING: ColumnMapping;
+  FISCAL_WEEKS: ColumnMapping;
+  FISCAL_MONTHS: ColumnMapping;
+  FISCAL_YEARS: ColumnMapping;
+  LOGS: ColumnMapping;
+  METADATA: ColumnMapping;
+}
+
+// Initialize empty column mappings
+let columnMappings: SheetColumnMappings = {
+  HISTORY: {},
+  RECURRING: {},
+  FISCAL_WEEKS: {},
+  FISCAL_MONTHS: {},
+  FISCAL_YEARS: {},
+  LOGS: {},
+  METADATA: {},
+};
+
+// Default column mappings (used as fallback if header row can't be read)
+const defaultColumnMappings: SheetColumnMappings = {
+  HISTORY: {
+    DATE: 0,
+    TYPE: 1,
+    CATEGORY: 2,
+    TAGS: 3,
+    VALUE: 4,
+    HSA: 5,
+    DESCRIPTION: 6,
+    EDIT_URL: 7,
+    HYPERLINK: 8,
+    ID: 9,
+    FISCAL_YEAR_ID: 10,
+    FISCAL_MONTH_ID: 11,
+    FISCAL_WEEK_ID: 12,
+  },
+  RECURRING: {
+    TYPE: 0,
+    CATEGORY: 1,
+    TAGS: 2,
+    VALUE: 3,
+    DESCRIPTION: 4,
+    EDIT_URL: 5,
+    HYPERLINK: 6,
+    ID: 7,
+  },
+  FISCAL_WEEKS: {
+    ID: 0,
+    NUMBER: 1,
+    START_DATE: 2,
+    END_DATE: 3,
+    YEAR_TITLE: 4,
+    MONTH_ID: 5,
+  },
+  FISCAL_MONTHS: {
+    ID: 0,
+    START_DATE: 1,
+    END_DATE: 2,
+    YEAR_TITLE: 3,
+  },
+  FISCAL_YEARS: {
+    ID: 0,
+    TITLE: 1,
+    START_DATE: 2,
+    END_DATE: 3,
+  },
+  LOGS: {
+    TIMESTAMP: 0,
+    USER_EMAIL: 1,
+    ACTION: 2,
+    DATA: 3,
+    ERROR: 4,
+  },
+  METADATA: {
+    CATEGORY: 0,
+    TAG: 1,
+  },
+};
+
+// Function to initialize column mappings from header rows
+async function initializeColumnMappings(sheets: any): Promise<void> {
+  try {
+    const historyHeaders = await getSheetData(
+      sheets,
+      `${HISTORY_TABLE_NAME}!${HISTORY_FIRST_COLUMN}1:${HISTORY_LAST_COLUMN}1`,
+      false,
+    );
+    const recurringHeaders = await getSheetData(
+      sheets,
+      `${RECURRING_TABLE_NAME}!${RECURRING_FIRST_COLUMN}1:${RECURRING_LAST_COLUMN}1`,
+      false,
+    );
+    const fiscalWeeksHeaders = await getSheetData(
+      sheets,
+      `Fiscal Weeks!A1:F1`,
+      false,
+    );
+    const fiscalMonthsHeaders = await getSheetData(
+      sheets,
+      `Fiscal Months!A1:D1`,
+      false,
+    );
+    const fiscalYearsHeaders = await getSheetData(
+      sheets,
+      `Fiscal Years!A1:D1`,
+      false,
+    );
+    const logsHeaders = await getSheetData(
+      sheets,
+      `${LOGS_TABLE_NAME}!${LOGS_FIRST_COLUMN}1:${LOGS_LAST_COLUMN}1`,
+      false,
+    );
+    const metadataHeaders = await getSheetData(sheets, `Metadata!A1:B1`, false);
+
+    // Helper function to create mappings from header row
+    function createMappingFromHeaders(headers: any[]): ColumnMapping {
+      if (!headers || !headers[0] || headers[0].length === 0) {
+        return {}; // Return empty mapping if no headers found
+      }
+
+      const mapping: ColumnMapping = {};
+      headers[0].forEach((header: string, index: number) => {
+        if (header) {
+          // Convert header to uppercase and replace spaces with underscores for naming consistency
+          const normalizedHeader = header.toUpperCase().replace(/\s+/g, "_");
+          mapping[normalizedHeader] = index;
+        }
+      });
+      return mapping;
+    }
+
+    // Create mappings for each sheet
+    columnMappings.HISTORY = createMappingFromHeaders(historyHeaders);
+    columnMappings.RECURRING = createMappingFromHeaders(recurringHeaders);
+    columnMappings.FISCAL_WEEKS = createMappingFromHeaders(fiscalWeeksHeaders);
+    columnMappings.FISCAL_MONTHS =
+      createMappingFromHeaders(fiscalMonthsHeaders);
+    columnMappings.FISCAL_YEARS = createMappingFromHeaders(fiscalYearsHeaders);
+    columnMappings.LOGS = createMappingFromHeaders(logsHeaders);
+    columnMappings.METADATA = createMappingFromHeaders(metadataHeaders);
+
+    // Merge with default mappings for any missing columns
+    for (const sheet in defaultColumnMappings) {
+      const sheetKey = sheet as keyof SheetColumnMappings;
+      columnMappings[sheetKey] = {
+        ...defaultColumnMappings[sheetKey],
+        ...columnMappings[sheetKey],
+      };
+    }
+
+    console.log("Column mappings initialized successfully");
+  } catch (error) {
+    console.error("Failed to initialize column mappings:", error);
+    // Fall back to default mappings
+    columnMappings = { ...defaultColumnMappings };
+    console.log("Using default column mappings as fallback");
+  }
+}
+
+exports.sendNotification = functions.https.onRequest(
+  async (req: any, res: any) => {
+    // Only allow POST requests
+    if (req.method !== "POST") {
+      return res.status(405).send("Method Not Allowed");
+    }
+
+    // Verify secret token
+    const token = req.headers["x-secret-token"];
+    if (token !== SECRET_TOKEN) {
+      return res.status(403).send("Forbidden");
+    }
+
+    const { title, body } = req.body;
+    if (!title || !body) {
+      return res.status(400).send("Missing title or body");
+    }
+
+    try {
+      // Retrieve all tokens from Firestore
+      const tokensSnapshot = await admin
+        .firestore()
+        .collection("fcmTokens")
+        .get();
+      const tokens = tokensSnapshot.docs.map((doc: any) => doc.data().token);
+
+      if (tokens.length === 0) {
+        return res.status(200).send("No tokens found");
+      }
+
+      // Generate an OAuth 2.0 access token
+      const auth = new GoogleAuth({
+        scopes: ["https://www.googleapis.com/auth/firebase.messaging"],
+      });
+      const accessToken = await auth.getAccessToken();
+
+      // Prepare notification payload and send to each token
+      const results = [];
+      for (const token of tokens) {
+        const message = {
+          message: {
+            token: token,
+            data: {
+              title: title,
+              body: body,
+              icon: "/favicon.ico",
+            },
+            android: {
+              priority: "high",
+            },
+            apns: {
+              headers: {
+                "apns-priority": "10",
+              },
+            },
+            webpush: {
+              headers: {
+                Urgency: "high",
+              },
+            },
+          },
+        };
+
+        const response = await fetch(
+          "https://fcm.googleapis.com/v1/projects/budget-app-v3/messages:send",
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${accessToken}`,
+            },
+            body: JSON.stringify(message),
+          },
+        );
+
+        const responseData = await response.json();
+        results.push({
+          token,
+          response: responseData,
+          success: response.ok,
+        });
+      }
+
+      // Log and return the results
+      return res.status(200).send({
+        success: true,
+        results,
+      });
+    } catch (error) {
+      console.error("Error sending notification:", error);
+      return res.status(500).send(error);
+    }
+  },
+);
+
+/** Helper to get MST timestamp in format: 2025-01-03T14:05:06 */
+function getMstTimestamp(): string {
+  // 1) Convert local date/time to MST ("America/Denver")
+  const dateInMst = new Date(
+    new Date().toLocaleString("en-US", { timeZone: "America/Denver" }),
+  );
+  // 2) Build a simple YYYY-MM-DDTHH:mm:ss string
+  const year = dateInMst.getFullYear();
+  const month = String(dateInMst.getMonth() + 1).padStart(2, "0");
+  const day = String(dateInMst.getDate()).padStart(2, "0");
+  const hh = String(dateInMst.getHours()).padStart(2, "0");
+  const mm = String(dateInMst.getMinutes()).padStart(2, "0");
+  const ss = String(dateInMst.getSeconds()).padStart(2, "0");
+  return `${year}-${month}-${day}T${hh}:${mm}:${ss}`;
+}
+
+/**
+ * LOG ACTION HELPER
+ * Appends a row to the Logs sheet with columns mapped to:
+ * TIMESTAMP = Timestamp (MST)
+ * USER_EMAIL = User Email
+ * ACTION = Action
+ * DATA = Data (formatted JSON)
+ * ERROR = Error (formatted JSON if any)
+ */
+async function logAction(
+  sheets: any,
+  actionType: string,
+  data: Record<string, any> = {},
+  errorMessage?: string,
+) {
+  // 1) Generate MST timestamp
+  const timestamp = getMstTimestamp();
+
+  // 2) Extract userEmail from the request body if available
+  const userEmail = data.userEmail || "";
+
+  // 3) Pretty-print data & error as multi-line JSON
+  const dataStr =
+    Object.keys(data).length > 0 ? JSON.stringify(data, null, 2) : "";
+  const errorStr = errorMessage ? JSON.stringify(errorMessage, null, 2) : "";
+
+  // 4) Create log data object
+  const logData = {
+    TIMESTAMP: timestamp,
+    USER_EMAIL: userEmail,
+    ACTION: actionType,
+    DATA: dataStr,
+    ERROR: errorStr,
+  };
+
+  // 5) Create the row data using our robust helper
+  const rowData = createSheetRow(logData, "LOGS");
+
+  // 6) Append it to the Logs sheet
+  await sheets.spreadsheets.values.append({
+    spreadsheetId: SPREADSHEET_ID,
+    range: LOGS_RANGE,
+    valueInputOption: "USER_ENTERED",
+    requestBody: { values: [rowData] },
+  });
+}
+
+async function getSheetData(
+  sheets: any,
+  range: string,
+  removeHeader = true,
+): Promise<any[]> {
+  const resp = await sheets.spreadsheets.values.get({
+    spreadsheetId: SPREADSHEET_ID,
+    range,
+  });
+  const rows = resp.data.values || [];
+  return removeHeader ? rows.slice(1) : rows;
+}
+
+function findRowIndexById(rows: any[], id: string, idColIndex: number): number {
+  return rows.findIndex((row) => row[idColIndex] === id);
+}
+
+async function deleteRow(
+  sheets: any,
+  spreadsheetId: string,
+  sheetId: number,
+  rowIndex: number,
+) {
+  await sheets.spreadsheets.batchUpdate({
+    spreadsheetId,
+    requestBody: {
+      requests: [
+        {
+          deleteDimension: {
+            range: {
+              sheetId,
+              dimension: "ROWS",
+              startIndex: rowIndex - 1,
+              endIndex: rowIndex,
+            },
+          },
+        },
+      ],
+    },
+  });
+}
+
+async function updateSingleCellGoal(
+  sheets: any,
+  range: string,
+  newGoalValue: number,
+) {
+  await sheets.spreadsheets.values.update({
+    spreadsheetId: SPREADSHEET_ID,
+    range,
+    valueInputOption: "USER_ENTERED",
+    requestBody: { values: [[newGoalValue]] },
+  });
+}
+
+/**
+ * Helper to append data to a sheet by column mappings rather than array positions
+ * @param sheets - The sheets API instance
+ * @param range - Base range for the sheet (e.g. 'History!A:Z')
+ */
+async function appendDataToSheet(
+  sheets: any,
+  range: string,
+  rowValues: any[][],
+) {
+  await sheets.spreadsheets.values.append({
+    spreadsheetId: SPREADSHEET_ID,
+    range,
+    valueInputOption: "USER_ENTERED",
+    requestBody: { values: rowValues },
+  });
+}
+
+/**
+ * Helper to construct a row for a sheet using column mappings
+ * This ensures data is always in the correct column regardless of order
+ * @param data - Data object with values to insert
+ * @param sheetType - The type of sheet (key in columnMappings)
+ * @param valueMapper - Optional function to transform values before insertion
+ */
+function createSheetRow(
+  data: Record<string, any>,
+  sheetType: keyof SheetColumnMappings,
+  valueMapper?: (key: string, val: any) => any,
+): any[] {
+  const colMap = columnMappings[sheetType];
+
+  // Find the maximum column index to ensure array is large enough
+  const maxColIndex = Math.max(...Object.values(colMap));
+  const row = new Array(maxColIndex + 1).fill("");
+
+  // Map the data to the correct columns
+  Object.entries(data).forEach(([key, value]) => {
+    const normalizedKey = key.toUpperCase().replace(/\s+/g, "_");
+    const colIndex = colMap[normalizedKey];
+
+    if (colIndex !== undefined) {
+      row[colIndex] = valueMapper ? valueMapper(key, value) : value;
+    }
+  });
+
+  return row;
+}
+
+async function updateSheetRow(sheets: any, range: string, rowValues: any[][]) {
+  await sheets.spreadsheets.values.update({
+    spreadsheetId: SPREADSHEET_ID,
+    range,
+    valueInputOption: "USER_ENTERED",
+    requestBody: { values: rowValues },
+  });
+}
+
+function parseCellValue(cellVal: string | undefined): number {
+  if (!cellVal) return 0;
+  return parseFloat(cellVal.replace(/[^0-9.-]/g, "")) || 0;
+}
+
+function convertToMMDDYYYY(isoDateStr: string): string {
+  const [yyyy, mm, dd] = isoDateStr.split("-");
+  return `${parseInt(mm, 10)}/${parseInt(dd, 10)}/${yyyy}`;
+}
+
+function isExpenseType(type: string) {
+  return type === "Expense" || type === "Recurring Expense";
+}
+
+// Fetch and cache the fiscal data (years, months, weeks)
+async function fetchAndCacheFiscalData(sheets: any): Promise<void> {
+  if (cachedFiscalYears && cachedFiscalMonths && cachedFiscalWeeks) return;
+
+  const [fyRows, fmRows, fwRows] = await Promise.all([
+    getSheetData(sheets, FISCAL_YEARS_RANGE),
+    getSheetData(sheets, FISCAL_MONTHS_RANGE),
+    getSheetData(sheets, FISCAL_WEEKS_RANGE),
+  ]);
+
+  const fyMap = columnMappings.FISCAL_YEARS;
+  cachedFiscalYears = fyRows.map((row) => ({
+    id: row[fyMap.ID],
+    title: row[fyMap.TITLE],
+    start_date: row[fyMap.START_DATE],
+    end_date: row[fyMap.END_DATE],
+    itemType: "fiscalYear" as const,
+  }));
+
+  const fmMap = columnMappings.FISCAL_MONTHS;
+  cachedFiscalMonths = fmRows.map((row) => ({
+    id: row[fmMap.ID],
+    start_date: row[fmMap.START_DATE],
+    end_date: row[fmMap.END_DATE],
+    year_title: row[fmMap.YEAR_TITLE],
+    itemType: "fiscalMonth" as const,
+  }));
+
+  const fwMap = columnMappings.FISCAL_WEEKS;
+  cachedFiscalWeeks = fwRows.map((row) => ({
+    id: row[fwMap.ID],
+    number: row[fwMap.NUMBER],
+    start_date: row[fwMap.START_DATE],
+    end_date: row[fwMap.END_DATE],
+    year_title: row[fwMap.YEAR_TITLE],
+    month_id: row[fwMap.MONTH_ID],
+    itemType: "fiscalWeek" as const,
+  }));
+}
+
+function getFiscalIDs(
+  item: IncomingObject,
+  fiscalYears: FiscalYear[],
+  fiscalMonths: FiscalMonth[],
+  fiscalWeeks: FiscalWeek[],
+) {
+  const date = new Date(item.date);
+  if (isNaN(date.getTime())) {
+    console.error(`Invalid date: ${item.date}`);
+    return null;
+  }
+  const fy = fiscalYears.find((year) => {
+    const start = new Date(year.start_date);
+    const end = new Date(year.end_date);
+    return date >= start && date <= end;
+  });
+  if (!fy) {
+    console.error("No Fiscal Year found for date:", item.date);
+    return null;
+  }
+  const fm = fiscalMonths.find((month) => {
+    if (month.year_title !== fy.title) return false;
+    const start = new Date(month.start_date);
+    const end = new Date(month.end_date);
+    return date >= start && date <= end;
+  });
+  if (!fm) {
+    console.error("No Fiscal Month found for date:", item.date);
+    return null;
+  }
+  const fw = fiscalWeeks.find((week) => {
+    if (week.year_title !== fy.title || week.month_id !== fm.id) return false;
+    const start = new Date(week.start_date);
+    const end = new Date(week.end_date);
+    return date >= start && date <= end;
+  });
+  if (!fw) {
+    console.error("No Fiscal Week found for date:", item.date);
+    return null;
+  }
+  return {
+    fiscalYearId: fy.id,
+    fiscalMonthId: fm.id,
+    fiscalWeekId: fw.id,
+  };
+}
+
+async function isSameFiscalWeekById(fiscalWeekId: string, sheets: any) {
+  // Get the current date - set to start of day to avoid time issues
+  const currentDate = new Date();
+
+  // Find the current fiscal week by checking all weeks
+  const allWeeks = await getSheetData(sheets, FISCAL_WEEKS_RANGE);
+  let currentFiscalWeekId = null;
+
+  const fwMap = columnMappings.FISCAL_WEEKS;
+
+  for (const row of allWeeks) {
+    // Skip header row
+    if (
+      row[fwMap.ID] === "ID" ||
+      !row[fwMap.START_DATE] ||
+      !row[fwMap.END_DATE]
+    )
+      continue;
+
+    const startDate = new Date(row[fwMap.START_DATE]);
+    // Adjust end date to end of day (23:59:59.999) for inclusive comparison
+    const endDate = new Date(row[fwMap.END_DATE]);
+    endDate.setHours(23, 59, 59, 999);
+
+    if (currentDate >= startDate && currentDate <= endDate) {
+      currentFiscalWeekId = row[fwMap.ID];
+      break;
+    }
+  }
+
+  if (!currentFiscalWeekId) {
+    console.error("Could not determine current fiscal week");
+    return false;
+  }
+
+  // Compare the item's fiscal week ID with the current fiscal week ID
+  const result = fiscalWeekId === currentFiscalWeekId;
+  return result;
+}
+
+async function isSameFiscalMonthById(fiscalMonthId: string, sheets: any) {
+  // Get the current date
+  const currentDate = new Date();
+
+  // Find the current fiscal month by checking all months
+  const allMonths = await getSheetData(sheets, FISCAL_MONTHS_RANGE);
+  let currentFiscalMonthId = null;
+
+  const fmMap = columnMappings.FISCAL_MONTHS;
+
+  for (const row of allMonths) {
+    // Skip header row
+    if (
+      row[fmMap.ID] === "ID" ||
+      !row[fmMap.START_DATE] ||
+      !row[fmMap.END_DATE]
+    )
+      continue;
+
+    const startDate = new Date(row[fmMap.START_DATE]);
+    // Adjust end date to end of day (23:59:59.999) for inclusive comparison
+    const endDate = new Date(row[fmMap.END_DATE]);
+    endDate.setHours(23, 59, 59, 999);
+
+    if (currentDate >= startDate && currentDate <= endDate) {
+      currentFiscalMonthId = row[fmMap.ID];
+      break;
+    }
+  }
+
+  if (!currentFiscalMonthId) {
+    console.error("Could not determine current fiscal month");
+    return false;
+  }
+
+  // Compare the item's fiscal month ID with the current fiscal month ID
+  const result = fiscalMonthId === currentFiscalMonthId;
+  return result;
+}
+
+function convertArrayToObjectById(arr: any[]): Record<string, any> {
+  return arr.reduce(
+    (obj, item) => {
+      const { id, ...rest } = item;
+      obj[id] = rest;
+      return obj;
+    },
+    {} as Record<string, any>,
+  );
+}
+
+async function addMissingTags(sheets: any, tags: string[]) {
+  if (!tags || tags.length === 0) return;
+
+  const listsRows = await getSheetData(sheets, METADATA_RANGE, false);
+  const dataRows = listsRows.slice(1);
+  const metadataMap = columnMappings.METADATA;
+
+  // Get existing tags from the TAG column using the column mapping
+  const existingTags = dataRows
+    .map((row) => (row[metadataMap.TAG] ? row[metadataMap.TAG].trim() : ""))
+    .filter(Boolean);
+
+  const newTags = tags.filter((tag) => !existingTags.includes(tag));
+  if (newTags.length === 0) return;
+
+  // Create rows for new tags with empty values for CATEGORY column
+  const rowsToAppend = newTags.map((tag) => {
+    const rowData = new Array(Object.keys(metadataMap).length).fill("");
+    rowData[metadataMap.TAG] = tag;
+    return rowData;
+  });
+
+  await appendDataToSheet(sheets, METADATA_RANGE, rowsToAppend);
+}
+
+// Adjust goals if in the same fiscal period
+async function adjustGoalIfSameFiscalPeriod(
+  sheets: any,
+  oldValue: number,
+  data: any,
+) {
+  if (data.fiscalWeekId) {
+    try {
+      const sameWeek = await isSameFiscalWeekById(data.fiscalWeekId, sheets);
+      if (sameWeek) {
+        const wgData = await sheets.spreadsheets.values.get({
+          spreadsheetId: SPREADSHEET_ID,
+          range: WEEKLY_GOAL_RANGE,
+        });
+        const rawWG = wgData.data.values?.[0]?.[0] || "0";
+        let weeklyGoal = parseFloat(rawWG.replace(/[^0-9.-]/g, ""));
+        let difference = 0;
+
+        if (data.value > oldValue) {
+          difference = data.value - oldValue;
+          weeklyGoal = isExpenseType(data.type)
+            ? weeklyGoal - difference
+            : weeklyGoal + difference;
+        } else if (data.value < oldValue) {
+          difference = oldValue - data.value;
+          weeklyGoal = isExpenseType(data.type)
+            ? weeklyGoal + difference
+            : weeklyGoal - difference;
+        }
+        await updateSingleCellGoal(sheets, WEEKLY_GOAL_RANGE, weeklyGoal);
+        await logAction(sheets, "UPDATE_WEEKLY_GOAL", {
+          itemType: data.itemType,
+          type: data.type,
+          userEmail: data.userEmail,
+          before: parseFloat(rawWG.replace(/[^0-9.-]/g, "")),
+          oldValue: oldValue,
+          newValue: data.value,
+          difference: difference,
+          after: weeklyGoal,
+        });
+      }
+    } catch (err) {
+      console.error("[adjustGoalIfSameFiscalPeriod-week] error:", err);
+    }
+  }
+
+  if (data.fiscalMonthId) {
+    try {
+      const sameMonth = await isSameFiscalMonthById(data.fiscalMonthId, sheets);
+      if (sameMonth) {
+        const mgData = await sheets.spreadsheets.values.get({
+          spreadsheetId: SPREADSHEET_ID,
+          range: MONTHLY_GOAL_RANGE,
+        });
+        const rawMG = mgData.data.values?.[0]?.[0] || "0";
+        let monthlyGoal = parseFloat(rawMG.replace(/[^0-9.-]/g, ""));
+        let difference = 0;
+
+        if (data.value > oldValue) {
+          difference = data.value - oldValue;
+          monthlyGoal = isExpenseType(data.type)
+            ? monthlyGoal - difference
+            : monthlyGoal + difference;
+        } else if (data.value < oldValue) {
+          difference = oldValue - data.value;
+          monthlyGoal = isExpenseType(data.type)
+            ? monthlyGoal + difference
+            : monthlyGoal - difference;
+        }
+        await updateSingleCellGoal(sheets, MONTHLY_GOAL_RANGE, monthlyGoal);
+        await logAction(sheets, "UPDATE_MONTHLY_GOAL", {
+          itemType: data.itemType,
+          type: data.type,
+          userEmail: data.userEmail,
+          before: parseFloat(rawMG.replace(/[^0-9.-]/g, "")),
+          oldValue: oldValue,
+          newValue: data.value,
+          difference: difference,
+          after: monthlyGoal,
+        });
+      }
+    } catch (err) {
+      console.error("[adjustGoalIfSameFiscalPeriod-month] error:", err);
+    }
+  }
+}
+
+// Adjust goals if in the same fiscal period
+async function changeGoalIfSameFiscalPeriod(sheets: any, data: any) {
+  if (data.fiscalWeekId) {
+    try {
+      const sameWeek = await isSameFiscalWeekById(data.fiscalWeekId, sheets);
+      if (sameWeek) {
+        const wgData = await sheets.spreadsheets.values.get({
+          spreadsheetId: SPREADSHEET_ID,
+          range: WEEKLY_GOAL_RANGE,
+        });
+        const rawWG = wgData.data.values?.[0]?.[0] || "0";
+        let weeklyGoal = parseFloat(rawWG.replace(/[^0-9.-]/g, ""));
+        weeklyGoal = isExpenseType(data.type)
+          ? weeklyGoal - data.value
+          : weeklyGoal + data.value;
+        await updateSingleCellGoal(sheets, WEEKLY_GOAL_RANGE, weeklyGoal);
+        await logAction(sheets, "UPDATE_WEEKLY_GOAL", {
+          itemType: data.itemType,
+          type: data.type,
+          userEmail: data.userEmail,
+          before: parseFloat(rawWG.replace(/[^0-9.-]/g, "")),
+          value: data.value,
+          after: weeklyGoal,
+        });
+      }
+    } catch (err) {
+      console.error("[changeGoalIfSameFiscalPeriod-week] error:", err);
+    }
+  }
+
+  if (data.fiscalMonthId) {
+    try {
+      const sameMonth = await isSameFiscalMonthById(data.fiscalMonthId, sheets);
+      if (sameMonth) {
+        const mgData = await sheets.spreadsheets.values.get({
+          spreadsheetId: SPREADSHEET_ID,
+          range: MONTHLY_GOAL_RANGE,
+        });
+        const rawMG = mgData.data.values?.[0]?.[0] || "0";
+        let monthlyGoal = parseFloat(rawMG.replace(/[^0-9.-]/g, ""));
+        monthlyGoal = isExpenseType(data.type)
+          ? monthlyGoal - data.value
+          : monthlyGoal + data.value;
+        await updateSingleCellGoal(sheets, MONTHLY_GOAL_RANGE, monthlyGoal);
+        await logAction(sheets, "UPDATE_MONTHLY_GOAL", {
+          itemType: data.itemType,
+          type: data.type,
+          userEmail: data.userEmail,
+          before: parseFloat(rawMG.replace(/[^0-9.-]/g, "")),
+          value: data.value,
+          after: monthlyGoal,
+        });
+      }
+    } catch (err) {
+      console.error("[changeGoalIfSameFiscalPeriod-month] error:", err);
+    }
+  }
+}
+
+// Insert either a History or Recurring item
+async function insertItem(
+  sheets: any,
+  data: any,
+  itemType: "history" | "recurring",
+) {
+  const isRecurring = itemType === "recurring";
+  const range = isRecurring ? RECURRING_RANGE : HISTORY_RANGE;
+  // Add any missing tags to the Metadata sheet
+  await addMissingTags(sheets, data.tags);
+
+  // Build the Google Sheets hyperlink formula: =HYPERLINK(url, "Edit")
+  const hyperlinkFormula = `=HYPERLINK("${data.editURL}", "Edit")`;
+
+  // Format date as MM/DD/YYYY
+  const dateFormatted = !isRecurring ? convertToMMDDYYYY(data.date) : "";
+
+  let sheetType = isRecurring ? ("RECURRING" as const) : ("HISTORY" as const);
+
+  if (isRecurring) {
+    // Create data object for recurring item
+    const recurringData = {
+      TYPE: data.type,
+      CATEGORY: data.category,
+      TAGS: data.tags.join(", "),
+      VALUE: data.value,
+      DESCRIPTION: data.description || "",
+      EDIT_URL: data.editURL,
+      HYPERLINK: hyperlinkFormula,
+      ID: data.id,
+    };
+
+    // Use our robust helper to create the row
+    const rowData = createSheetRow(recurringData, sheetType);
+    await appendDataToSheet(sheets, range, [rowData]);
+  } else {
+    // Create data object for history item
+    const historyData = {
+      DATE: dateFormatted,
+      TYPE: data.type,
+      CATEGORY: data.category,
+      TAGS: data.tags.join(", "),
+      VALUE: data.value,
+      HSA: data.hsa,
+      DESCRIPTION: data.description || "",
+      EDIT_URL: data.editURL,
+      HYPERLINK: hyperlinkFormula,
+      ID: data.id,
+      FISCAL_YEAR_ID: data.fiscalYearId,
+      FISCAL_MONTH_ID: data.fiscalMonthId,
+      FISCAL_WEEK_ID: data.fiscalWeekId,
+    };
+
+    // Use our robust helper to create the row
+    const rowData = createSheetRow(historyData, sheetType);
+    await appendDataToSheet(sheets, range, [rowData]);
+  }
+}
+
+// Update a History or Recurring item
+async function updateItem(
+  sheets: any,
+  data: any,
+  itemType: "history" | "recurring",
+) {
+  const isRecurring = itemType === "recurring";
+  const rangeBase = isRecurring ? RECURRING_TABLE_NAME : HISTORY_TABLE_NAME;
+  const firstCol = isRecurring ? RECURRING_FIRST_COLUMN : HISTORY_FIRST_COLUMN;
+  const lastCol = isRecurring ? RECURRING_LAST_COLUMN : HISTORY_LAST_COLUMN;
+  const rowIndex = data.rowIndex;
+  const rowRange = `${rangeBase}!${firstCol}${rowIndex}:${lastCol}${rowIndex}`;
+
+  const existingRes = await sheets.spreadsheets.values.get({
+    spreadsheetId: SPREADSHEET_ID,
+    range: rowRange,
+  });
+  const existingRow = existingRes.data.values?.[0];
+  if (!existingRow) {
+    throw new Error(`${itemType} item not found at rowIndex ${rowIndex}`);
+  }
+
+  // Select the appropriate sheet type for our column mappings
+  const sheetType = isRecurring ? ("RECURRING" as const) : ("HISTORY" as const);
+  const colMap = columnMappings[sheetType];
+
+  // Use column mapping to get the ID column index
+  const existingId = existingRow[colMap.ID];
+  if (!existingId) {
+    throw new Error(`ID not found in the existing ${itemType} row.`);
+  }
+
+  // Add any new tags to the metadata sheet
+  await addMissingTags(sheets, data.tags);
+
+  // Create hyperlink formula using the existing edit URL
+  const hyperlinkFormula = `=HYPERLINK("${existingRow[colMap.EDIT_URL]}", "Edit")`;
+
+  // Common data for both item types
+  const baseData: Record<string, any> = {
+    TYPE: data.type,
+    CATEGORY: data.category,
+    TAGS: data.tags.join(", "),
+    VALUE: data.value,
+    DESCRIPTION: data.description || "",
+    EDIT_URL: existingRow[colMap.EDIT_URL],
+    HYPERLINK: hyperlinkFormula,
+    ID: existingId,
+  };
+
+  // Add type-specific fields
+  if (!isRecurring) {
+    // Add history-specific fields
+    baseData.DATE = convertToMMDDYYYY(data.date);
+    baseData.HSA = data.hsa;
+    baseData.FISCAL_YEAR_ID =
+      data.fiscalYearId || existingRow[colMap.FISCAL_YEAR_ID];
+    baseData.FISCAL_MONTH_ID =
+      data.fiscalMonthId || existingRow[colMap.FISCAL_MONTH_ID];
+    baseData.FISCAL_WEEK_ID =
+      data.fiscalWeekId || existingRow[colMap.FISCAL_WEEK_ID];
+  }
+
+  // Use our robust helper to create the row data
+  const rowData = createSheetRow(baseData, sheetType);
+
+  // Update the sheet with the new data
+  await updateSheetRow(sheets, rowRange, [rowData]);
+
+  return existingRow;
+}
+
+// Delete a History or Recurring item by ID
+async function deleteItem(
+  sheets: any,
+  itemType: "history" | "recurring",
+  id: string,
+) {
+  const spreadsheetRes = await sheets.spreadsheets.get({
+    spreadsheetId: SPREADSHEET_ID,
+  });
+  const tableName =
+    itemType === "history" ? HISTORY_TABLE_NAME : RECURRING_TABLE_NAME;
+  const tableSheet = spreadsheetRes.data.sheets?.find(
+    (sh: any) => sh.properties?.title === tableName,
+  );
+  if (!tableSheet || !tableSheet.properties?.sheetId) {
+    throw new Error(`Failed to retrieve sheetId for ${tableName}.`);
+  }
+
+  const rangeAll = itemType === "history" ? HISTORY_RANGE : RECURRING_RANGE;
+  const rowsAll = await getSheetData(sheets, rangeAll, false);
+  rowsAll.shift(); // remove header row
+
+  // Get the ID column index based on sheet type
+  const idColIndex =
+    itemType === "history"
+      ? columnMappings.HISTORY.ID
+      : columnMappings.RECURRING.ID;
+
+  const rowIndex = findRowIndexById(rowsAll, id, idColIndex);
+  if (rowIndex === -1) {
+    throw new Error(`${itemType} item with ID ${id} not found.`);
+  }
+
+  // Convert to 1-based + header
+  const deleteRowIndex = rowIndex + 2;
+  await deleteRow(
+    sheets,
+    SPREADSHEET_ID,
+    tableSheet.properties.sheetId,
+    deleteRowIndex,
+  );
+}
+
+// -------------------------------------
+// Handlers for each HTTP method
+// -------------------------------------
+
+async function handleGET(sheets: any, req: Request, res: Response) {
+  const historyRows = await getSheetData(sheets, HISTORY_RANGE);
+  const historyMap = columnMappings.HISTORY;
+
+  const historyData = historyRows.map((row) => ({
+    date: row[historyMap.DATE],
+    type: row[historyMap.TYPE],
+    category: row[historyMap.CATEGORY],
+    tags: row[historyMap.TAGS]
+      ?.split(",")
+      .map((t: string) => t.trim())
+      .filter(Boolean),
+    value: parseCellValue(row[historyMap.VALUE]),
+    hsa: row[historyMap.HSA],
+    description: row[historyMap.DESCRIPTION],
+    editURL: row[historyMap.EDIT_URL] || "",
+    id: row[historyMap.ID] || "",
+    fiscalYearId: row[historyMap.FISCAL_YEAR_ID],
+    fiscalMonthId: row[historyMap.FISCAL_MONTH_ID],
+    fiscalWeekId: row[historyMap.FISCAL_WEEK_ID],
+    itemType: "history",
+  }));
+
+  const recurringRows = await getSheetData(sheets, RECURRING_RANGE);
+  const recurringMap = columnMappings.RECURRING;
+
+  const recurringData = recurringRows.map((row) => ({
+    type: row[recurringMap.TYPE],
+    category: row[recurringMap.CATEGORY],
+    tags: row[recurringMap.TAGS]
+      ?.split(",")
+      .map((t: string) => t.trim())
+      .filter(Boolean),
+    value: parseCellValue(row[recurringMap.VALUE]),
+    description: row[recurringMap.DESCRIPTION],
+    editURL: row[recurringMap.EDIT_URL] || "",
+    id: row[recurringMap.ID] || "",
+    itemType: "recurring",
+  }));
+
+  const listsAll = await getSheetData(sheets, METADATA_RANGE, false);
+  const listsRows = listsAll.slice(1);
+  const metadataMap = columnMappings.METADATA;
+  const categories = listsRows
+    .map((row) => row[metadataMap.CATEGORY])
+    .filter(Boolean);
+  const tags = listsRows.map((row) => row[metadataMap.TAG]).filter(Boolean);
+
+  const [wgResp, mgResp] = await Promise.all([
+    sheets.spreadsheets.values.get({
+      spreadsheetId: SPREADSHEET_ID,
+      range: WEEKLY_GOAL_RANGE,
+    }),
+    sheets.spreadsheets.values.get({
+      spreadsheetId: SPREADSHEET_ID,
+      range: MONTHLY_GOAL_RANGE,
+    }),
+  ]);
+  const weeklyGoalRaw = wgResp.data.values?.[0]?.[0] || "0";
+  const monthlyGoalRaw = mgResp.data.values?.[0]?.[0] || "0";
+  const weeklyGoal = parseFloat(weeklyGoalRaw.replace(/[^0-9.-]/g, ""));
+  const monthlyGoal = parseFloat(monthlyGoalRaw.replace(/[^0-9.-]/g, ""));
+
+  let fiscalWeekData = (await getSheetData(sheets, FISCAL_WEEKS_RANGE)).map(
+    (row) => ({
+      id: row[columnMappings.FISCAL_WEEKS.ID],
+      number: row[columnMappings.FISCAL_WEEKS.NUMBER],
+      start_date: row[columnMappings.FISCAL_WEEKS.START_DATE],
+      end_date: row[columnMappings.FISCAL_WEEKS.END_DATE],
+      year_title: row[columnMappings.FISCAL_WEEKS.YEAR_TITLE],
+      month_id: row[columnMappings.FISCAL_WEEKS.MONTH_ID],
+      itemType: "fiscalWeek",
+    }),
+  );
+  let fiscalMonthData = (await getSheetData(sheets, FISCAL_MONTHS_RANGE)).map(
+    (row) => ({
+      id: row[columnMappings.FISCAL_MONTHS.ID],
+      start_date: row[columnMappings.FISCAL_MONTHS.START_DATE],
+      end_date: row[columnMappings.FISCAL_MONTHS.END_DATE],
+      year_title: row[columnMappings.FISCAL_MONTHS.YEAR_TITLE],
+      itemType: "fiscalMonth",
+    }),
+  );
+  let fiscalYearData = (await getSheetData(sheets, FISCAL_YEARS_RANGE)).map(
+    (row) => ({
+      id: row[columnMappings.FISCAL_YEARS.ID],
+      title: row[columnMappings.FISCAL_YEARS.TITLE],
+      start_date: row[columnMappings.FISCAL_YEARS.START_DATE],
+      end_date: row[columnMappings.FISCAL_YEARS.END_DATE],
+      itemType: "fiscalYear",
+    }),
+  );
+
+  // Filter to only ±1 year from today
+  const parseDate = (d: string) => {
+    const dt = new Date(d);
+    return isNaN(dt.getTime()) ? null : dt;
+  };
+  const oneYearFromToday = new Date();
+  oneYearFromToday.setDate(oneYearFromToday.getDate() + 365);
+  const oneYearBeforeToday = new Date();
+  oneYearBeforeToday.setDate(oneYearBeforeToday.getDate() - 365);
+
+  const filterByStartDate = (data: any[]) =>
+    data.filter((item) => {
+      const startDate = parseDate(item.start_date);
+      return (
+        startDate &&
+        startDate >= oneYearBeforeToday &&
+        startDate <= oneYearFromToday
+      );
+    });
+
+  fiscalWeekData = filterByStartDate(fiscalWeekData);
+  fiscalMonthData = filterByStartDate(fiscalMonthData);
+  fiscalYearData = filterByStartDate(fiscalYearData);
+
+  const fiscalWeeksObj = convertArrayToObjectById(fiscalWeekData);
+  const fiscalMonthsObj = convertArrayToObjectById(fiscalMonthData);
+  const fiscalYearsObj = convertArrayToObjectById(fiscalYearData);
+
+  res.status(200).json({
+    history: historyData,
+    recurring: recurringData,
+    weeklyGoal,
+    monthlyGoal,
+    categories,
+    tags,
+    fiscalWeeks: fiscalWeeksObj,
+    fiscalMonths: fiscalMonthsObj,
+    fiscalYears: fiscalYearsObj,
+  });
+}
+
+async function handlePOST(sheets: any, req: Request, res: Response) {
+  const data = req.body;
+  const itemType = data.itemType; // "history" or "recurring"
+
+  try {
+    if (itemType === "history") {
+      if (
+        !data.date ||
+        !data.type ||
+        typeof data.category !== "string" ||
+        !Array.isArray(data.tags) ||
+        typeof data.value !== "number" ||
+        !data.id
+      ) {
+        res.status(400).json({ error: "Missing or invalid required fields" });
+        return;
+      }
+
+      const fiscalIDs = getFiscalIDs(
+        data,
+        cachedFiscalYears!,
+        cachedFiscalMonths!,
+        cachedFiscalWeeks!,
+      );
+      if (!fiscalIDs) {
+        res
+          .status(400)
+          .json({ error: "Invalid date or no matching fiscal period." });
+        return;
+      }
+      Object.assign(data, fiscalIDs);
+
+      await insertItem(sheets, data, "history");
+      await logAction(sheets, "ADD_HISTORY", data);
+
+      await changeGoalIfSameFiscalPeriod(sheets, data);
+
+      res.status(200).json({ status: "success", id: data.id, fiscalIDs });
+      return;
+    }
+
+    if (itemType === "recurring") {
+      if (
+        !data.type ||
+        typeof data.category !== "string" ||
+        !Array.isArray(data.tags) ||
+        typeof data.value !== "number" ||
+        !data.id
+      ) {
+        res.status(400).json({ error: "Missing or invalid required fields" });
+        return;
+      }
+
+      await insertItem(sheets, data, "recurring");
+      await logAction(sheets, "ADD_RECURRING", data);
+      res.status(200).json({ status: "success", id: data.id });
+      return;
+    }
+
+    res.status(400).json({ error: "Missing or invalid itemType" });
+  } catch (err: any) {
+    console.error("Error in handlePOST:", err);
+    await logAction(sheets, "POST_ERROR", {}, err.message);
+    res.status(500).json({ error: "Internal Server Error" });
+  }
+}
+
+async function handlePUT(sheets: any, req: Request, res: Response) {
+  const data = req.body;
+  try {
+    switch (data.itemType) {
+      case "history": {
+        if (
+          !data.rowIndex ||
+          !data.date ||
+          !data.type ||
+          typeof data.category !== "string" ||
+          !Array.isArray(data.tags) ||
+          typeof data.value !== "number" ||
+          !data.id
+        ) {
+          res.status(400).json({ error: "Missing or invalid required fields" });
+          return;
+        }
+
+        const existingRow = await updateItem(sheets, data, "history");
+        const rawOriginalValue = existingRow[columnMappings.HISTORY.VALUE];
+        const originalValue = parseCellValue(rawOriginalValue);
+        if (data.value !== originalValue) {
+          await adjustGoalIfSameFiscalPeriod(sheets, originalValue, data);
+        }
+
+        await logAction(sheets, "UPDATE_HISTORY", data);
+        res.status(200).json({ status: "success", id: data.id });
+        break;
+      }
+
+      case "recurring": {
+        if (
+          !data.rowIndex ||
+          !data.type ||
+          typeof data.category !== "string" ||
+          !Array.isArray(data.tags) ||
+          typeof data.value !== "number" ||
+          !data.description ||
+          !data.id
+        ) {
+          res.status(400).json({ error: "Missing or invalid required fields" });
+          return;
+        }
+
+        await updateItem(sheets, data, "recurring");
+        await logAction(sheets, "UPDATE_RECURRING", data);
+        res.status(200).json({ status: "success", id: data.id });
+        break;
+      }
+
+      case "weeklyGoal": {
+        if (typeof data.value !== "number") {
+          res.status(400).json({ error: "Missing or invalid goal" });
+          return;
+        }
+        await updateSingleCellGoal(sheets, WEEKLY_GOAL_RANGE, data.value);
+        await logAction(sheets, "UPDATE_WEEKLY_GOAL", data);
+        res.status(200).json({ status: "success" });
+        break;
+      }
+
+      case "monthlyGoal": {
+        if (typeof data.value !== "number") {
+          res.status(400).json({ error: "Missing or invalid goal" });
+          return;
+        }
+        await updateSingleCellGoal(sheets, MONTHLY_GOAL_RANGE, data.value);
+        await logAction(sheets, "UPDATE_MONTHLY_GOAL", data);
+        res.status(200).json({ status: "success" });
+        break;
+      }
+
+      default:
+        res.status(400).json({ error: "Invalid or missing itemType" });
+        return;
+    }
+  } catch (err: any) {
+    console.error("Error in handlePUT:", err);
+    await logAction(sheets, "PUT_ERROR", data, err.message);
+    res.status(500).json({ error: "Internal Server Error" });
+  }
+}
+
+async function handleDELETE(sheets: any, req: Request, res: Response) {
+  const data = req.body;
+  const id = data.id;
+  if (!id) {
+    res.status(400).json({ error: "Missing id field in request body." });
+    return;
+  }
+
+  try {
+    if (data.itemType === "history") {
+      await deleteItem(sheets, "history", id);
+
+      if (typeof data.value !== "number") {
+        res.status(400).json({ error: "Missing or invalid value" });
+        return;
+      }
+
+      try {
+        const sameWeek = await isSameFiscalWeekById(data.fiscalWeekId, sheets);
+        if (sameWeek) {
+          const wgData = await sheets.spreadsheets.values.get({
+            spreadsheetId: SPREADSHEET_ID,
+            range: WEEKLY_GOAL_RANGE,
+          });
+          const rawWG = wgData.data.values?.[0]?.[0] || "0";
+          let weeklyGoal = parseFloat(rawWG.replace(/[^0-9.-]/g, ""));
+          weeklyGoal = isExpenseType(data.type)
+            ? weeklyGoal + data.value
+            : weeklyGoal - data.value;
+          await updateSingleCellGoal(sheets, WEEKLY_GOAL_RANGE, weeklyGoal);
+          await logAction(sheets, "UPDATE_WEEKLY_GOAL", {
+            itemType: data.itemType,
+            type: data.type,
+            userEmail: data.userEmail,
+            before: parseFloat(rawWG.replace(/[^0-9.-]/g, "")),
+            value: data.value,
+            after: weeklyGoal,
+          });
+        }
+      } catch (err) {
+        console.error("Error adjusting weekly goal in DELETE:", err);
+      }
+
+      try {
+        const sameMonth = await isSameFiscalMonthById(
+          data.fiscalMonthId,
+          sheets,
+        );
+        if (sameMonth) {
+          const mgData = await sheets.spreadsheets.values.get({
+            spreadsheetId: SPREADSHEET_ID,
+            range: MONTHLY_GOAL_RANGE,
+          });
+          const rawMG = mgData.data.values?.[0]?.[0] || "0";
+          let monthlyGoal = parseFloat(rawMG.replace(/[^0-9.-]/g, ""));
+          monthlyGoal = isExpenseType(data.type)
+            ? monthlyGoal + data.value
+            : monthlyGoal - data.value;
+          await updateSingleCellGoal(sheets, MONTHLY_GOAL_RANGE, monthlyGoal);
+          await logAction(sheets, "UPDATE_MONTHLY_GOAL", {
+            itemType: data.itemType,
+            type: data.type,
+            userEmail: data.userEmail,
+            before: parseFloat(rawMG.replace(/[^0-9.-]/g, "")),
+            value: data.value,
+            after: monthlyGoal,
+          });
+        }
+      } catch (err) {
+        console.error("Error adjusting monthly goal in DELETE:", err);
+      }
+
+      await logAction(sheets, "DELETE_HISTORY", data);
+      res.status(200).json({ status: "success", id });
+    } else if (data.itemType === "recurring") {
+      await deleteItem(sheets, "recurring", id);
+      await logAction(sheets, "DELETE_RECURRING", data);
+      res.status(200).json({ status: "success", id });
+    } else {
+      res.status(400).json({ error: "Missing or invalid itemType" });
+    }
+  } catch (error: any) {
+    console.error("Error in handleDELETE:", error);
+    await logAction(sheets, "DELETE_ERROR", data, error.message);
+    res.status(500).json({ error: "Internal Server Error" });
+  }
+}
+
+// -------------------------------------
+// MAIN Cloud Function
+// -------------------------------------
+
+export const expenses = onRequest(
+  {
+    secrets: ["SERVICE_ACCOUNT_CLIENT_EMAIL", "SERVICE_ACCOUNT_PRIVATE_KEY"],
+  },
+  async (req: Request, res: Response) => {
+    const SERVICE_ACCOUNT_EMAIL = process.env.SERVICE_ACCOUNT_CLIENT_EMAIL;
+    const SERVICE_ACCOUNT_PRIVATE_KEY = process.env.SERVICE_ACCOUNT_PRIVATE_KEY;
+
+    if (!SERVICE_ACCOUNT_EMAIL || !SERVICE_ACCOUNT_PRIVATE_KEY) {
+      throw new Error(
+        "Service account credentials are not set in environment variables.",
+      );
+    }
+
+    // Convert escaped newlines in the private key
+    const privateKey = SERVICE_ACCOUNT_PRIVATE_KEY.replace(/\\n/g, "\n");
+    const SCOPES = [
+      "https://www.googleapis.com/auth/spreadsheets",
+      "https://www.googleapis.com/auth/firebase.messaging",
+    ];
+    const jwtClient = new google.auth.JWT(
+      SERVICE_ACCOUNT_EMAIL,
+      undefined,
+      privateKey,
+      SCOPES,
+    );
+    const sheets = google.sheets({ version: "v4", auth: jwtClient });
+
+    // CORS settings
+    res.set("Access-Control-Allow-Origin", "*");
+    res.set("Access-Control-Allow-Methods", "GET, POST, OPTIONS, PUT, DELETE");
+    res.set("Access-Control-Allow-Headers", "Content-Type");
+
+    if (req.method === "OPTIONS") {
+      res.status(204).send("");
+      return;
+    }
+
+    try {
+      // Initialize column mappings for all sheets
+      await initializeColumnMappings(sheets);
+
+      // Ensure we have cached fiscal data
+      await fetchAndCacheFiscalData(sheets);
+
+      switch (req.method) {
+        case "GET":
+          await handleGET(sheets, req, res);
+          break;
+        case "POST":
+          await handlePOST(sheets, req, res);
+          break;
+        case "PUT":
+          await handlePUT(sheets, req, res);
+          break;
+        case "DELETE":
+          await handleDELETE(sheets, req, res);
+          break;
+        default:
+          res.status(405).json({ error: "Method Not Allowed" });
+      }
+    } catch (error: any) {
+      console.error("Top-level error:", error);
+      // Log major top-level errors as well
+      // Try to extract email from the request if possible
+      const logData: Record<string, any> = {};
+      if (req.body && req.body.userEmail) {
+        logData.userEmail = req.body.userEmail;
+      }
+      await logAction(sheets, "TOP_LEVEL_ERROR", logData, error.message);
+      res.status(500).json({ error: "Internal Server Error" });
+    }
+  },
+);
