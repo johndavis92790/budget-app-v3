@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
-import { FiscalWeek, History, Hsa } from "./types";
+import { History, Hsa } from "./types";
 import {
   ListGroup,
   Badge,
@@ -8,6 +8,7 @@ import {
   Button,
   Form,
   InputGroup,
+  Alert,
 } from "react-bootstrap";
 import {
   formatDateFromYYYYMMDD,
@@ -15,7 +16,6 @@ import {
   getCategoryIcon,
 } from "./helpers";
 import FullPageSpinner from "./FullPageSpinner";
-import EditHistoryPage from "./EditHistoryPage";
 import EditHsaPage from "./EditHsaPage";
 import "./HistoryPage.css"; // Reusing the same CSS
 import { DateField, MultiSelectField } from "./CommonFormFields";
@@ -25,7 +25,6 @@ interface HSAExpensesPageProps {
   hsaItems: Hsa[];
   loading: boolean;
   categories: string[];
-  existingTags: string[];
   onUpdateItem: (updatedHistory: History) => Promise<void>;
   deleteItem: (item: History) => Promise<void>;
   onUpdateHsaItem: (updatedHsa: Hsa) => Promise<void>;
@@ -41,7 +40,6 @@ function HSAExpensesPage({
   hsaItems,
   loading,
   categories,
-  existingTags,
   onUpdateItem,
   deleteItem,
   onUpdateHsaItem,
@@ -65,6 +63,7 @@ function HSAExpensesPage({
   // Show HSA summary at the top
   const [totalHSAExpenses, setTotalHSAExpenses] = useState(0);
   const [hsaItemCount, setHsaItemCount] = useState(0);
+  const [error, setError] = useState<string | null>(null);
 
   // Reset pagination when filters change
   useEffect(() => {
@@ -87,39 +86,62 @@ function HSAExpensesPage({
     [hsaItems],
   );
 
-  // Calculate HSA totals when history changes
-  useEffect(() => {
-    // Filter history to only HSA-tagged items
-    const historyItems = history.filter((item) => item.hsa === true);
-    const hsaHistoryItems: HistoryWithHsa[] = historyItems.map((item) => ({
+  // Create memoized function to get filtered HSA items to avoid duplicate code
+  const getFilteredHsaItems = useCallback((): HistoryWithHsa[] => {
+    // Filter history to only HSA-tagged items (expenses only)
+    const filteredItems = history.filter(
+      (item) =>
+        item.hsa === true &&
+        (item.type === "Expense" || item.type === "Recurring Expense"),
+    );
+
+    // Map to include HSA objects
+    return filteredItems.map((item) => ({
       ...item,
       hsaObject: getHsaItem(item.id),
     }));
+  }, [history, getHsaItem]);
+
+  // Calculate HSA totals when relevant data changes
+  useEffect(() => {
+    // Get the filtered HSA items using our memoized function
+    const hsaHistoryItems = getFilteredHsaItems();
     console.log("hsaHistoryItems", hsaHistoryItems);
 
-    // Calculate the total expenses
-    const total = hsaHistoryItems.reduce((sum, item) => {
-      // Only include expenses
-      if (item.type === "Expense" || item.type === "Recurring Expense") {
-        return sum + (item.hsaObject?.reimbursementAmount || item.value);
-      }
-      return sum;
-    }, 0);
+    // Check if any HSA history item is missing its HSA object
+    const missingHsaObjects = hsaHistoryItems.filter((item) => !item.hsaObject);
+    if (missingHsaObjects.length > 0) {
+      const missingIds = missingHsaObjects.map((item) => item.id).join(", ");
+      setError(
+        `Missing HSA data for ${missingHsaObjects.length} expense(s). IDs: ${missingIds}`,
+      );
+      console.error(
+        "Missing HSA objects for history items:",
+        missingHsaObjects,
+      );
+    } else {
+      setError(null);
 
-    setTotalHSAExpenses(total);
-    setHsaItemCount(hsaHistoryItems.length);
-  }, [history, getHsaItem, hsaItems]);
+      // Calculate the total expenses - we know hsaObject exists from our check above
+      const total = hsaHistoryItems.reduce((sum, item) => {
+        // TypeScript needs us to be explicit since it doesn't recognize our filter
+        return sum + (item.hsaObject!.reimbursementAmount || item.value);
+      }, 0);
+
+      setTotalHSAExpenses(total);
+      setHsaItemCount(hsaHistoryItems.length);
+    }
+  }, [getFilteredHsaItems, hsaItems]);
 
   if (loading) {
     return <FullPageSpinner />;
   }
 
-  // First filter to only show HSA tagged items
-  const historyItems = history.filter((item) => item.hsa === true);
-  const hsaHistoryItems: HistoryWithHsa[] = historyItems.map((item) => ({
-    ...item,
-    hsaObject: getHsaItem(item.id),
-  }));
+  // Display error at the top of the page if any missing HSA objects are detected
+  // This is important for admins to see and fix data integrity issues
+
+  // Get the filtered HSA history items using our memoized function
+  const hsaHistoryItems = getFilteredHsaItems();
 
   // Then apply additional filters if needed
   const filteredHistory = showFilters
@@ -231,6 +253,12 @@ function HSAExpensesPage({
           </Col>
         </Row>
       </div>
+
+      {error && (
+        <Alert variant="danger" className="mt-2 mb-3">
+          <strong>Data Integrity Error:</strong> {error}
+        </Alert>
+      )}
 
       <div className="mb-3 d-flex justify-content-between align-items-center">
         <Button
@@ -416,7 +444,7 @@ function HSAExpensesPage({
                           className="text-muted"
                           style={{ fontSize: "0.9em" }}
                         >
-                          {hist.type}
+                          Reimbursement Amount:
                         </div>
                         <div
                           className={valueColor}

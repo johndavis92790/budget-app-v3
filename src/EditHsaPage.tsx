@@ -4,6 +4,15 @@ import { Form, Button, Spinner, Row, Col, Alert } from "react-bootstrap";
 import { DateField } from "./CommonFormFields";
 import CurrencyInput from "./CurrencyInput";
 import { yyyymmddToMmddyyyy } from "./helpers";
+import UnifiedFileManager from "./UnifiedFileManager";
+import FullSizeImageModal from "./FullSizeImageModal";
+import {
+  ref,
+  uploadBytes,
+  getDownloadURL,
+  deleteObject,
+} from "firebase/storage";
+import { storage } from "./firebase";
 
 interface EditHsaPageProps {
   selectedHsa: Hsa;
@@ -28,6 +37,26 @@ function EditHsaPage({
   const [submitting, setSubmitting] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [newFiles, setNewFiles] = useState<File[]>([]);
+  const [removedPaths, setRemovedPaths] = useState<string[]>([]);
+  const [selectedImageUrl, setSelectedImageUrl] = useState<string | null>(null);
+
+  // ----------------- Memoized Callbacks for File Manager -----------------
+  const handleFileSelect = useCallback((url: string | null) => {
+    setSelectedImageUrl(url);
+  }, []);
+
+  const handleNewFilesChange = useCallback((files: File[]) => {
+    setNewFiles(files);
+  }, []);
+
+  const handleRemovedPathsChange = useCallback((paths: string[]) => {
+    setRemovedPaths(paths);
+  }, []);
+
+  const handleError = useCallback((error: string | null) => {
+    setError(error);
+  }, []);
 
   useEffect(() => {
     setUpdatedHsa(selectedHsa);
@@ -53,6 +82,23 @@ function EditHsaPage({
           : "",
       };
 
+      // Handle file uploads and deletions
+      const uploadedUrls: string[] = [];
+      for (const file of newFiles) {
+        const fileRef = ref(
+          storage,
+          `images/${associatedHistory.id}/${file.name}`,
+        );
+        await uploadBytes(fileRef, file);
+        const downloadURL = await getDownloadURL(fileRef);
+        uploadedUrls.push(downloadURL);
+      }
+
+      for (const path of removedPaths) {
+        const fileRef = ref(storage, path);
+        await deleteObject(fileRef);
+      }
+
       // Update HSA item using the provided callback
       await onUpdateHsaItem(hsaToUpdate);
 
@@ -64,7 +110,14 @@ function EditHsaPage({
     } finally {
       setSubmitting(false);
     }
-  }, [updatedHsa, onClose, onUpdateHsaItem]);
+  }, [
+    updatedHsa,
+    newFiles,
+    removedPaths,
+    associatedHistory.id,
+    onClose,
+    onUpdateHsaItem,
+  ]);
 
   const handleDelete = useCallback(async () => {
     const confirmDelete = window.confirm(
@@ -96,6 +149,14 @@ function EditHsaPage({
       setDeleting(false);
     }
   }, [selectedHsa, associatedHistory, onUpdateItem, onClose, deleteHsaItem]);
+
+  const formattedOriginalAmount = associatedHistory.value.toLocaleString(
+    "en-US",
+    {
+      style: "currency",
+      currency: "USD",
+    },
+  );
 
   return (
     <div>
@@ -132,6 +193,9 @@ function EditHsaPage({
                   );
                 }}
               />
+              <Form.Label>
+                Original Amount: {formattedOriginalAmount}
+              </Form.Label>
             </Form.Group>
           </Col>
         </Row>
@@ -151,6 +215,18 @@ function EditHsaPage({
           </Col>
         </Row>
       </Form>
+
+      <hr />
+      <UnifiedFileManager
+        id={associatedHistory.id}
+        label="Images / PDFs"
+        folderName="images"
+        disabled={submitting}
+        onSetError={handleError}
+        onSelectImage={handleFileSelect}
+        onNewFilesChange={handleNewFilesChange}
+        onRemovedPathsChange={handleRemovedPathsChange}
+      />
 
       <Row className="mt-4">
         <Col>
@@ -189,6 +265,11 @@ function EditHsaPage({
           </div>
         </Col>
       </Row>
+      <FullSizeImageModal
+        show={selectedImageUrl !== null}
+        imageUrl={selectedImageUrl}
+        onClose={() => setSelectedImageUrl(null)}
+      />
     </div>
   );
 }

@@ -472,7 +472,6 @@ function App() {
                     hsaItems={hsaItems}
                     loading={loading}
                     categories={categories}
-                    existingTags={existingTags}
                     onUpdateItem={onUpdateItem}
                     deleteItem={deleteItem}
                     onUpdateHsaItem={onUpdateHsaItem}
