@@ -71,7 +71,7 @@ function EditHistoryPage({
   }, [selectedHistory]);
 
   const handleFieldChange = useCallback(
-    (field: keyof History, value: string | number | string[]) => {
+    (field: keyof History, value: string | number | string[] | boolean) => {
       setUpdatedHistory({ ...updatedHistory, [field]: value });
     },
     [updatedHistory],
@@ -223,10 +223,8 @@ function EditHistoryPage({
               type="switch"
               id="formHsa"
               label="HSA"
-              checked={updatedHistory.hsa === "TRUE"}
-              onChange={(e) =>
-                handleFieldChange("hsa", e.target.checked ? "TRUE" : "FALSE")
-              }
+              checked={updatedHistory.hsa}
+              onChange={(e) => handleFieldChange("hsa", e.target.checked)}
               disabled={submitting}
               style={{
                 transform: "scale(1.8)",

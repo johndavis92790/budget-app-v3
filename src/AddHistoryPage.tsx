@@ -62,7 +62,7 @@ function AddHistoryPage({
   const [category, setCategory] = useState("");
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const [value, setValue] = useState("");
-  const [hsa, setHsa] = useState<"TRUE" | "FALSE">("FALSE");
+  const [hsa, setHsa] = useState<boolean>(false);
   const [description, setDescription] = useState("");
   const [selectedImageUrl, setSelectedImageUrl] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -247,8 +247,8 @@ function AddHistoryPage({
                 type="switch"
                 id="formHsa"
                 label="HSA"
-                checked={hsa === "TRUE"}
-                onChange={(e) => setHsa(e.target.checked ? "TRUE" : "FALSE")}
+                checked={hsa}
+                onChange={(e) => setHsa(e.target.checked)}
                 disabled={submitting}
                 style={{
                   transform: "scale(1.8)",

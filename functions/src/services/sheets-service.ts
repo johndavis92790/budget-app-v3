@@ -69,7 +69,7 @@ export async function insertItem(
       CATEGORY: data.category,
       TAGS: data.tags.join(", "),
       VALUE: data.value,
-      HSA: data.hsa,
+      HSA: data.hsa === true ? "TRUE" : "FALSE",
       DESCRIPTION: data.description || "",
       EDIT_URL: data.editURL,
       HYPERLINK: hyperlinkFormula,
@@ -144,7 +144,7 @@ export async function updateItem(
   if (!isRecurring) {
     // Add history-specific fields
     baseData.DATE = convertToMMDDYYYY(data.date);
-    baseData.HSA = data.hsa;
+    baseData.HSA = data.hsa === true ? "TRUE" : "FALSE";
     baseData.FISCAL_YEAR_ID =
       data.fiscalYearId || existingRow[colMap.FISCAL_YEAR_ID];
     baseData.FISCAL_MONTH_ID =

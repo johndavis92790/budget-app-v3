@@ -1,5 +1,5 @@
-import { useState, useEffect } from "react";
-import { FiscalWeek, History } from "./types";
+import { useState, useEffect, useCallback } from "react";
+import { FiscalWeek, History, Hsa } from "./types";
 import {
   ListGroup,
   Badge,
@@ -16,27 +16,36 @@ import {
 } from "./helpers";
 import FullPageSpinner from "./FullPageSpinner";
 import EditHistoryPage from "./EditHistoryPage";
+import EditHsaPage from "./EditHsaPage";
 import "./HistoryPage.css"; // Reusing the same CSS
 import { DateField, MultiSelectField } from "./CommonFormFields";
 
 interface HSAExpensesPageProps {
   history: History[];
-  fiscalWeeks: Record<string, FiscalWeek>;
+  hsaItems: Hsa[];
   loading: boolean;
   categories: string[];
   existingTags: string[];
   onUpdateItem: (updatedHistory: History) => Promise<void>;
   deleteItem: (item: History) => Promise<void>;
+  onUpdateHsaItem: (updatedHsa: Hsa) => Promise<void>;
+  deleteHsaItem: (hsaItem: Hsa) => Promise<void>;
+}
+
+interface HistoryWithHsa extends History {
+  hsaObject: Hsa | undefined;
 }
 
 function HSAExpensesPage({
   history,
-  fiscalWeeks,
+  hsaItems,
   loading,
   categories,
   existingTags,
   onUpdateItem,
   deleteItem,
+  onUpdateHsaItem,
+  deleteHsaItem,
 }: HSAExpensesPageProps) {
   const initialitemsToShow = 100;
   const itemsToRevealOnClick = 30;
@@ -48,8 +57,10 @@ function HSAExpensesPage({
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
   const [selectedTypes, setSelectedTypes] = useState<string[]>([]);
-  const [startDate, setStartDate] = useState("");
-  const [endDate, setEndDate] = useState("");
+  const [purchaseStartDate, setPurchaseStartDate] = useState("");
+  const [purchaseEndDate, setPurchaseEndDate] = useState("");
+  const [reimbursementStartDate, setReimbursementStartDate] = useState("");
+  const [reimbursementEndDate, setReimbursementEndDate] = useState("");
 
   // Show HSA summary at the top
   const [totalHSAExpenses, setTotalHSAExpenses] = useState(0);
@@ -62,44 +73,70 @@ function HSAExpensesPage({
     searchTerm,
     selectedCategories,
     selectedTypes,
-    startDate,
-    endDate,
+    purchaseStartDate,
+    purchaseEndDate,
+    reimbursementStartDate,
+    reimbursementEndDate,
     initialitemsToShow,
   ]);
+
+  const getHsaItem = useCallback(
+    (historyId: string) => {
+      return hsaItems.find((hsa) => hsa.historyId === historyId);
+    },
+    [hsaItems],
+  );
 
   // Calculate HSA totals when history changes
   useEffect(() => {
     // Filter history to only HSA-tagged items
-    const hsaItems = history.filter((item) => item.hsa === "TRUE");
+    const historyItems = history.filter((item) => item.hsa === true);
+    const hsaHistoryItems: HistoryWithHsa[] = historyItems.map((item) => ({
+      ...item,
+      hsaObject: getHsaItem(item.id),
+    }));
+    console.log("hsaHistoryItems", hsaHistoryItems);
 
     // Calculate the total expenses
-    const total = hsaItems.reduce((sum, item) => {
+    const total = hsaHistoryItems.reduce((sum, item) => {
       // Only include expenses
       if (item.type === "Expense" || item.type === "Recurring Expense") {
-        return sum + item.value;
+        return sum + (item.hsaObject?.reimbursementAmount || item.value);
       }
       return sum;
     }, 0);
 
     setTotalHSAExpenses(total);
-    setHsaItemCount(hsaItems.length);
-  }, [history]);
+    setHsaItemCount(hsaHistoryItems.length);
+  }, [history, getHsaItem, hsaItems]);
 
   if (loading) {
     return <FullPageSpinner />;
   }
 
   // First filter to only show HSA tagged items
-  const hsaHistory = history.filter((item) => item.hsa === "TRUE");
+  const historyItems = history.filter((item) => item.hsa === true);
+  const hsaHistoryItems: HistoryWithHsa[] = historyItems.map((item) => ({
+    ...item,
+    hsaObject: getHsaItem(item.id),
+  }));
 
   // Then apply additional filters if needed
   const filteredHistory = showFilters
-    ? hsaHistory.filter((item) => {
-        // Date range filter - always apply as AND condition
-        const itemDate = new Date(item.date).toISOString().split("T")[0];
+    ? hsaHistoryItems.filter((item) => {
+        // History date range filter - always apply as AND condition
+        const historyDate = new Date(item.date).toISOString().split("T")[0];
         const matchesDate =
-          (!startDate || itemDate >= startDate) &&
-          (!endDate || itemDate <= endDate);
+          (!purchaseStartDate || historyDate >= purchaseStartDate) &&
+          (!purchaseEndDate || historyDate <= purchaseEndDate);
+
+        // HSA reimbursement date range filter - always apply as AND condition
+        const hsaDate = new Date(item.hsaObject?.reimbursementDate || item.date)
+          .toISOString()
+          .split("T")[0];
+        const matchesHsaDate =
+          (!reimbursementStartDate || hsaDate >= reimbursementStartDate) &&
+          (!reimbursementEndDate || hsaDate <= reimbursementEndDate);
 
         // Search filter
         const matchesSearch =
@@ -118,9 +155,15 @@ function HSAExpensesPage({
           selectedTypes.includes(item.type);
 
         // AND operation between different filter types
-        return matchesDate && matchesSearch && matchesCategory && matchesType;
+        return (
+          matchesDate &&
+          matchesHsaDate &&
+          matchesSearch &&
+          matchesCategory &&
+          matchesType
+        );
       })
-    : hsaHistory; // If filters are hidden, display all HSA history items
+    : hsaHistoryItems; // If filters are hidden, display all HSA history items
 
   // Sort by date, most recent first
   const sortedHistory = [...filteredHistory].sort(
@@ -143,8 +186,10 @@ function HSAExpensesPage({
     setSearchTerm("");
     setSelectedCategories([]);
     setSelectedTypes([]);
-    setStartDate("");
-    setEndDate("");
+    setPurchaseStartDate("");
+    setPurchaseEndDate("");
+    setReimbursementStartDate("");
+    setReimbursementEndDate("");
   };
 
   return (
@@ -222,23 +267,45 @@ function HSAExpensesPage({
           <Row>
             <Col md={6}>
               <Form.Group className="mb-3">
-                <Form.Label>Date Range</Form.Label>
+                <Form.Label>Purchase Date Range</Form.Label>
                 <Row>
                   <Col>
                     <DateField
-                      value={startDate}
-                      onChange={(date) => setStartDate(date)}
+                      value={purchaseStartDate}
+                      onChange={(date) => setPurchaseStartDate(date)}
                     />
                   </Col>
                   <Col>
                     <DateField
-                      value={endDate}
-                      onChange={(date) => setEndDate(date)}
+                      value={purchaseEndDate}
+                      onChange={(date) => setPurchaseEndDate(date)}
                     />
                   </Col>
                 </Row>
               </Form.Group>
             </Col>
+            <Col md={6}>
+              <Form.Group className="mb-3">
+                <Form.Label>Reimbursement Date Range</Form.Label>
+                <Row>
+                  <Col>
+                    <DateField
+                      value={reimbursementStartDate}
+                      onChange={(date) => setReimbursementStartDate(date)}
+                    />
+                  </Col>
+                  <Col>
+                    <DateField
+                      value={reimbursementEndDate}
+                      onChange={(date) => setReimbursementEndDate(date)}
+                    />
+                  </Col>
+                </Row>
+              </Form.Group>
+            </Col>
+          </Row>
+
+          <Row>
             <Col md={6}>
               <Form.Group className="mb-3">
                 <Form.Label>Categories</Form.Label>
@@ -249,9 +316,6 @@ function HSAExpensesPage({
                 />
               </Form.Group>
             </Col>
-          </Row>
-
-          <Row>
             <Col md={6}>
               <Form.Group className="mb-3">
                 <Form.Label>Types</Form.Label>
@@ -297,9 +361,10 @@ function HSAExpensesPage({
               const isExpense =
                 hist.type === "Expense" || hist.type === "Recurring Expense";
               const valueColor = isExpense ? "text-danger" : "text-success";
+              const value = hist.hsaObject?.reimbursementAmount || hist.value;
               const formattedValue =
                 (isExpense ? "-" : "+") +
-                hist.value.toLocaleString("en-US", {
+                value.toLocaleString("en-US", {
                   style: "currency",
                   currency: "USD",
                 });
@@ -363,7 +428,16 @@ function HSAExpensesPage({
                           className="text-muted"
                           style={{ fontSize: "0.9em" }}
                         >
-                          {formatDateFromYYYYMMDD(hist.date)}
+                          Purchased: {formatDateFromYYYYMMDD(hist.date)}
+                          <br />
+                          {hist.hsaObject?.reimbursementDate && (
+                            <span>
+                              Reimbursed:{" "}
+                              {formatDateFromYYYYMMDD(
+                                hist.hsaObject?.reimbursementDate,
+                              )}
+                            </span>
+                          )}
                         </div>
                       </Col>
                     </Row>
@@ -377,14 +451,25 @@ function HSAExpensesPage({
                         borderRadius: "5px",
                       }}
                     >
-                      <EditHistoryPage
-                        categories={categories}
-                        existingTags={existingTags}
-                        onUpdateItem={onUpdateItem}
-                        deleteItem={deleteItem}
-                        selectedHistory={hist}
-                        onClose={handleClose}
-                      />
+                      {hist.hsaObject ? (
+                        <EditHsaPage
+                          selectedHsa={hist.hsaObject}
+                          associatedHistory={hist}
+                          onUpdateItem={onUpdateItem}
+                          deleteItem={deleteItem}
+                          onUpdateHsaItem={onUpdateHsaItem}
+                          deleteHsaItem={deleteHsaItem}
+                          onClose={handleClose}
+                        />
+                      ) : (
+                        <div className="p-3">
+                          <p>
+                            This expense is marked as an HSA expense but has no
+                            HSA details.
+                          </p>
+                          <p>You can add details by updating the HSA record.</p>
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>

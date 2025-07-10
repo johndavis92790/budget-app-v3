@@ -34,6 +34,12 @@ export const FISCAL_WEEKS_RANGE = "Fiscal Weeks!A1:F";
 export const FISCAL_MONTHS_RANGE = "Fiscal Months!A1:D";
 export const FISCAL_YEARS_RANGE = "Fiscal Years!A1:D";
 
+// HSA sheet constants
+export const HSA_TABLE_NAME = "HSA";
+export const HSA_FIRST_COLUMN = "A";
+export const HSA_LAST_COLUMN = "D";
+export const HSA_RANGE = `${HSA_TABLE_NAME}!${HSA_FIRST_COLUMN}1:${HSA_LAST_COLUMN}`;
+
 // Default column mappings (used as fallback if header row can't be read)
 export const defaultColumnMappings = {
   HISTORY: {
@@ -91,5 +97,11 @@ export const defaultColumnMappings = {
   METADATA: {
     CATEGORY: 0,
     TAG: 1,
+  },
+  HSA: {
+    HISTORY_ID: 0,
+    REIMBURSEMENT_AMOUNT: 1,
+    REIMBURSEMENT_DATE: 2,
+    NOTES: 3,
   },
 };

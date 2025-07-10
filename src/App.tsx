@@ -6,6 +6,7 @@ import {
   FiscalMonth,
   FiscalWeek,
   History,
+  Hsa,
   NotificationPayload,
   Recurring,
 } from "./types";
@@ -35,6 +36,7 @@ import { AuthContext } from "./authContext";
 
 function App() {
   const [history, setHistory] = useState<History[]>([]);
+  const [hsaItems, setHsaItems] = useState<Hsa[]>([]);
   const [recurring, setRecurring] = useState<Recurring[]>([]);
   const [categories, setCategories] = useState<string[]>([]);
   const [existingTags, setExistingTags] = useState<string[]>([]);
@@ -178,6 +180,17 @@ function App() {
         })),
       );
 
+      setHsaItems(
+        data.hsaItems.map((hsa: Hsa, index: number) => ({
+          ...hsa,
+          reimbursementAmount: Math.round(hsa.reimbursementAmount * 100) / 100,
+          rowIndex: index + 2,
+          reimbursementDate: hsa.reimbursementDate
+            ? mmddyyyyToYyyyMmDd(hsa.reimbursementDate)
+            : "",
+        })),
+      );
+
       setRecurring(
         data.recurring.map((rec: Recurring, index: number) => ({
           ...rec,
@@ -278,6 +291,56 @@ function App() {
     } catch (error) {
       console.error(`Error deleting ${item.itemType} item:`, error);
       alert(`An error occurred while deleting the ${item.itemType} item.`);
+    }
+  };
+
+  const onUpdateHsaItem = async (updatedHsa: Hsa) => {
+    try {
+      // Add the user email to ensure it's logged properly
+      const hsaWithEmail = {
+        ...updatedHsa,
+        itemType: "hsa",
+        userEmail: currentUser?.email || "",
+      };
+
+      console.log("updatedHsa: ", hsaWithEmail);
+      const response = await fetch(`${API_URL}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(hsaWithEmail),
+      });
+      if (!response.ok) {
+        throw new Error(`Error: ${response.statusText}`);
+      }
+      console.log("HSA item updated with historyId: ", updatedHsa.historyId);
+      fetchData();
+    } catch (error) {
+      console.error("Error updating HSA item:", error);
+    }
+  };
+
+  const deleteHsaItem = async (hsaItem: Hsa) => {
+    try {
+      // Add the user email to the request body
+      const hsaWithEmail = {
+        ...hsaItem,
+        itemType: "hsa",
+        userEmail: currentUser?.email || "",
+      };
+
+      console.log("deleteHsaItem: ", hsaWithEmail);
+      const response = await fetch(`${API_URL}`, {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(hsaWithEmail),
+      });
+      if (!response.ok) {
+        throw new Error(`Error deleting HSA item: ${response.statusText}`);
+      }
+      await fetchData();
+    } catch (error) {
+      console.error(`Error deleting HSA item:`, error);
+      alert(`An error occurred while deleting the HSA item.`);
     }
   };
 
@@ -406,12 +469,14 @@ function App() {
                 element={
                   <HSAExpensesPage
                     history={history}
-                    fiscalWeeks={fiscalWeeks}
+                    hsaItems={hsaItems}
                     loading={loading}
                     categories={categories}
                     existingTags={existingTags}
                     onUpdateItem={onUpdateItem}
                     deleteItem={deleteItem}
+                    onUpdateHsaItem={onUpdateHsaItem}
+                    deleteHsaItem={deleteHsaItem}
                   />
                 }
               />

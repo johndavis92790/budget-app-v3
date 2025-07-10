@@ -5,7 +5,6 @@ export interface History {
   category: string;
   tags: string[];
   value: number;
-  hsa: "TRUE" | "FALSE";
   description: string;
   editURL: string;
   id: string;
@@ -13,6 +12,15 @@ export interface History {
   fiscalMonthId?: string;
   fiscalWeekId?: string;
   itemType: "history";
+  hsa: boolean;
+}
+
+export interface Hsa {
+  historyId: string;
+  reimbursementAmount: number;
+  reimbursementDate?: string;
+  notes?: string;
+  itemType: "hsa";
 }
 
 export interface Recurring {
