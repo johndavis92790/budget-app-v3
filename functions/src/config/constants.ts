@@ -26,7 +26,7 @@ export const METADATA_RANGE = "Metadata!A1:B";
 // Logs sheet constants
 export const LOGS_TABLE_NAME = "Logs";
 export const LOGS_FIRST_COLUMN = "A";
-export const LOGS_LAST_COLUMN = "D";
+export const LOGS_LAST_COLUMN = "E";
 export const LOGS_RANGE = `${LOGS_TABLE_NAME}!${LOGS_FIRST_COLUMN}1:${LOGS_LAST_COLUMN}`;
 
 // Fiscal data ranges
@@ -38,27 +38,27 @@ export const FISCAL_YEARS_RANGE = "Fiscal Years!A1:D";
 export const defaultColumnMappings = {
   HISTORY: {
     DATE: 0,
+    ID: 1,
+    TYPE: 2,
+    CATEGORY: 3,
+    TAGS: 4,
+    VALUE: 5,
+    DESCRIPTION: 6,
+    HSA: 7,
+    HSA_AMOUNT: 8,
+    HSA_DATE: 9,
+    HSA_NOTES: 10,
+    FISCAL_YEAR_ID: 11,
+    FISCAL_MONTH_ID: 12,
+    FISCAL_WEEK_ID: 13,
+  },
+  RECURRING: {
+    ID: 0,
     TYPE: 1,
     CATEGORY: 2,
     TAGS: 3,
     VALUE: 4,
-    HSA: 5,
-    DESCRIPTION: 6,
-    ID: 7,
-    FISCAL_YEAR_ID: 8,
-    FISCAL_MONTH_ID: 9,
-    FISCAL_WEEK_ID: 10,
-    HSA_AMOUNT: 11,
-    HSA_DATE: 12,
-    HSA_NOTES: 13,
-  },
-  RECURRING: {
-    TYPE: 0,
-    CATEGORY: 1,
-    TAGS: 2,
-    VALUE: 3,
-    DESCRIPTION: 4,
-    ID: 5,
+    DESCRIPTION: 5,
   },
   FISCAL_WEEKS: {
     ID: 0,

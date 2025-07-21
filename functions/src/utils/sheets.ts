@@ -30,25 +30,25 @@ export async function initializeColumnMappings(sheets: any): Promise<void> {
     );
     const fiscalWeeksHeaders = await getSheetData(
       sheets,
-      `Fiscal Weeks!A1:F1`,
+      constants.FISCAL_WEEKS_RANGE,
       false,
     );
     const fiscalMonthsHeaders = await getSheetData(
       sheets,
-      `Fiscal Months!A1:D1`,
+      constants.FISCAL_MONTHS_RANGE,
       false,
     );
     const fiscalYearsHeaders = await getSheetData(
       sheets,
-      `Fiscal Years!A1:D1`,
+      constants.FISCAL_YEARS_RANGE,
       false,
     );
     const logsHeaders = await getSheetData(
       sheets,
-      `${constants.LOGS_TABLE_NAME}!${constants.LOGS_FIRST_COLUMN}1:${constants.LOGS_LAST_COLUMN}1`,
+      constants.LOGS_RANGE,
       false,
     );
-    const metadataHeaders = await getSheetData(sheets, `Metadata!A1:B1`, false);
+    const metadataHeaders = await getSheetData(sheets, constants.METADATA_RANGE, false);
 
     if (historyHeaders && historyHeaders.length > 0) {
       columnMappings.HISTORY = createMappingFromHeaders(historyHeaders[0]);
