@@ -83,7 +83,7 @@ function HSAExpensesPage({
     (historyId: string) => {
       return hsaItems.find((hsa) => hsa.historyId === historyId);
     },
-    [hsaItems]
+    [hsaItems],
   );
 
   // Create memoized function to get filtered HSA items to avoid duplicate code
@@ -92,7 +92,7 @@ function HSAExpensesPage({
     const filteredItems = history.filter(
       (item) =>
         item.hsa === true &&
-        (item.type === "Expense" || item.type === "Recurring Expense")
+        (item.type === "Expense" || item.type === "Recurring Expense"),
     );
 
     // Map to include HSA objects
@@ -113,11 +113,11 @@ function HSAExpensesPage({
     if (missingHsaObjects.length > 0) {
       const missingIds = missingHsaObjects.map((item) => item.id).join(", ");
       setError(
-        `Missing HSA data for ${missingHsaObjects.length} expense(s). IDs: ${missingIds}`
+        `Missing HSA data for ${missingHsaObjects.length} expense(s). IDs: ${missingIds}`,
       );
       console.error(
         "Missing HSA objects for history items:",
-        missingHsaObjects
+        missingHsaObjects,
       );
     } else {
       setError(null);
@@ -148,12 +148,12 @@ function HSAExpensesPage({
     (item) =>
       item.hsaObject &&
       item.hsaObject.reimbursementAmount > 0 &&
-      !!item.hsaObject.reimbursementDate
+      !!item.hsaObject.reimbursementDate,
   );
   const reimbursedCount = reimbursedItems.length;
   const totalReimbursedAmount = reimbursedItems.reduce(
     (sum, item) => sum + (item.hsaObject?.reimbursementAmount || 0),
-    0
+    0,
   );
 
   // Then apply additional filters if needed
@@ -202,7 +202,7 @@ function HSAExpensesPage({
 
   // Sort by date, most recent first
   const sortedHistory = [...filteredHistory].sort(
-    (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()
+    (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime(),
   );
 
   const toggleRow = (id: string) => {
@@ -506,7 +506,7 @@ function HSAExpensesPage({
                             <span>
                               Reimbursed:{" "}
                               {formatDateFromYYYYMMDD(
-                                hist.hsaObject?.reimbursementDate
+                                hist.hsaObject?.reimbursementDate,
                               )}
                             </span>
                           )}
