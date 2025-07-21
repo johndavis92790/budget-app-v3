@@ -37,9 +37,6 @@ export async function insertItem(
   // Add any missing tags to the Metadata sheet
   await addMissingTags(sheets, data.tags);
 
-  // Format date as MM/DD/YYYY
-  const dateFormatted = !isRecurring ? convertToMMDDYYYY(data.date) : "";
-
   let sheetType = isRecurring ? ("RECURRING" as const) : ("HISTORY" as const);
 
   if (isRecurring) {
@@ -57,6 +54,10 @@ export async function insertItem(
     const rowData = createSheetRow(recurringData, sheetType);
     await appendDataToSheet(sheets, range, [rowData]);
   } else {
+    // Format date as MM/DD/YYYY
+    const dateFormatted = convertToMMDDYYYY(data.date);
+    const hsaDateFormatted = data.hsaDate ? convertToMMDDYYYY(data.hsaDate) : "";
+    
     // Create data object for history item
     const historyData = {
       DATE: dateFormatted,
@@ -71,7 +72,7 @@ export async function insertItem(
       FISCAL_MONTH_ID: data.fiscalMonthId,
       FISCAL_WEEK_ID: data.fiscalWeekId,
       HSA_AMOUNT: data.hsaAmount,
-      HSA_DATE: data.hsaDate,
+      HSA_DATE: hsaDateFormatted,
       HSA_NOTES: data.hsaNotes,
     };
 

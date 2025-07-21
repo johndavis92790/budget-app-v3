@@ -62,8 +62,11 @@ function AddHistoryPage({
   const [category, setCategory] = useState("");
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const [value, setValue] = useState("");
-  const [hsa, setHsa] = useState<boolean>(false);
   const [description, setDescription] = useState("");
+  const [hsa, setHsa] = useState<boolean>(false);
+  const [hsaAmount, setHsaAmount] = useState<number>(0);
+  const [hsaDate, setHsaDate] = useState("");
+  const [hsaNotes, setHsaNotes] = useState("");
   const [selectedImageUrl, setSelectedImageUrl] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -124,6 +127,9 @@ function AddHistoryPage({
         tags: selectedTags,
         value: numericValue,
         hsa,
+        hsaAmount,
+        hsaDate,
+        hsaNotes,
         description,
         id: uniqueId,
         itemType: "history",
@@ -145,6 +151,10 @@ function AddHistoryPage({
       setSelectedTags([]);
       setValue("");
       setDescription("");
+      setHsa(false);
+      setHsaAmount(0);
+      setHsaDate("");
+      setHsaNotes("");
       setNewFiles([]);
       navigate("/history");
     } catch (err) {
@@ -224,19 +234,9 @@ function AddHistoryPage({
         </Row>
 
         <hr />
-        <Row>
-          <Col md={4}>
-            <UnifiedFileManager
-              label="Images / PDFs"
-              disabled={submitting}
-              onSelectImage={handleFileSelect}
-              onNewFilesChange={handleNewFilesChange}
-            />
-          </Col>
-        </Row>
 
         <Row>
-          <Col>
+          <Col xs={6}>
             <Form.Group controlId="formHsa">
               <Form.Check
                 type="switch"
@@ -252,52 +252,114 @@ function AddHistoryPage({
               />
             </Form.Group>
           </Col>
-          <Col>
-            <div className="d-flex justify-content-end">
-              <Dropdown as={ButtonGroup}>
-                <Button
-                  type="button"
-                  variant={selectedType === "Expense" ? "danger" : "success"}
-                  onClick={() => handleSubmit(selectedType)}
-                  disabled={submitting}
-                  className="d-flex align-items-center ps-3 pe-3"
-                >
-                  {submitting ? (
-                    <Spinner as="span" animation="border" size="sm" />
-                  ) : (
-                    selectedType
-                  )}
-                </Button>
-                <div
-                  style={{
-                    width: "2px",
-                    backgroundColor: "#ccc",
-                    margin: "0",
-                    alignSelf: "stretch",
-                  }}
-                ></div>
-
-                <Dropdown.Toggle
-                  split
-                  variant={selectedType === "Expense" ? "danger" : "success"}
-                  id="dropdown-split-basic"
-                  disabled={submitting}
-                  className="ps-3 pe-3"
-                />
-                <Dropdown.Menu>
-                  <Dropdown.Item onClick={() => handleSelectType("Expense")}>
-                    Expense
-                  </Dropdown.Item>
-                  <Dropdown.Divider />
-                  <Dropdown.Item onClick={() => handleSelectType("Refund")}>
-                    Refund
-                  </Dropdown.Item>
-                </Dropdown.Menu>
-              </Dropdown>
-            </div>
-          </Col>
+          {hsa && (
+            <>
+              <Col xs={6}>
+                <Form.Group controlId="formValue" className="mb-3">
+                  <div className="text-muted" style={{ fontSize: "0.9em" }}>
+                    Reimbursement Amount:
+                  </div>
+                  <CurrencyInput
+                    value={String(hsaAmount || value || 0)}
+                    placeholder="$0.00"
+                    style={{ width: "100%" }}
+                    disabled={submitting}
+                    onChange={(e) => {
+                      const maskedVal = e.target.value;
+                      const numericStr = maskedVal.replace(/[^0-9.-]/g, "");
+                      const parsed = parseFloat(numericStr);
+                      setHsaAmount(isNaN(parsed) ? 0 : parsed);
+                    }}
+                  />
+                </Form.Group>
+              </Col>
+            </>
+          )}
         </Row>
+        {hsa && (
+          <Row>
+            <Col xs={6}>
+              <div className="text-muted" style={{ fontSize: "0.9em" }}>
+                Reimbursement Notes:
+              </div>
+              <DescriptionField
+                value={hsaNotes || ""}
+                onChange={(val) => setHsaNotes(val)}
+                disabled={submitting}
+              />
+            </Col>
+            <Col xs={6}>
+              <div className="text-muted" style={{ fontSize: "0.9em" }}>
+                Reimbursement Date:
+              </div>
+              <DateField
+                value={hsaDate || ""}
+                onChange={(val) => setHsaDate(val)}
+                disabled={submitting}
+              />
+            </Col>
+          </Row>
+        )}
       </Form>
+
+      <hr />
+      <Row>
+        <Col md={4}>
+          <UnifiedFileManager
+            label="Images / PDFs"
+            disabled={submitting}
+            onSelectImage={handleFileSelect}
+            onNewFilesChange={handleNewFilesChange}
+          />
+        </Col>
+      </Row>
+
+      <Row>
+        <Col>
+          <div className="d-flex justify-content-end">
+            <Dropdown as={ButtonGroup}>
+              <Button
+                type="button"
+                variant={selectedType === "Expense" ? "danger" : "success"}
+                onClick={() => handleSubmit(selectedType)}
+                disabled={submitting}
+                className="d-flex align-items-center ps-3 pe-3"
+              >
+                {submitting ? (
+                  <Spinner as="span" animation="border" size="sm" />
+                ) : (
+                  selectedType
+                )}
+              </Button>
+              <div
+                style={{
+                  width: "2px",
+                  backgroundColor: "#ccc",
+                  margin: "0",
+                  alignSelf: "stretch",
+                }}
+              ></div>
+
+              <Dropdown.Toggle
+                split
+                variant={selectedType === "Expense" ? "danger" : "success"}
+                id="dropdown-split-basic"
+                disabled={submitting}
+                className="ps-3 pe-3"
+              />
+              <Dropdown.Menu>
+                <Dropdown.Item onClick={() => handleSelectType("Expense")}>
+                  Expense
+                </Dropdown.Item>
+                <Dropdown.Divider />
+                <Dropdown.Item onClick={() => handleSelectType("Refund")}>
+                  Refund
+                </Dropdown.Item>
+              </Dropdown.Menu>
+            </Dropdown>
+          </div>
+        </Col>
+      </Row>
 
       <FullSizeImageModal
         show={selectedImageUrl !== null}
