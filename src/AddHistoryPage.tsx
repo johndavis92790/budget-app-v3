@@ -71,9 +71,6 @@ function AddHistoryPage({
     "Expense",
   );
 
-  const editURLFragment =
-    "https://console.firebase.google.com/u/0/project/budget-app-v3/storage/budget-app-v3.firebasestorage.app/files/~2Fimages~2F";
-
   // ----------------- Memoized Callbacks for File Manager -----------------
   const handleFileSelect = useCallback((url: string | null) => {
     setSelectedImageUrl(url);
@@ -111,7 +108,6 @@ function AddHistoryPage({
         uploadedUrls.push(downloadURL);
       }
 
-      const editURL = `${editURLFragment}${uniqueId}`;
       const numericStr = value.replace(/[^0-9.-]/g, "");
       const numericValue = parseFloat(numericStr);
       if (isNaN(numericValue)) {
@@ -129,7 +125,6 @@ function AddHistoryPage({
         value: numericValue,
         hsa,
         description,
-        editURL,
         id: uniqueId,
         itemType: "history",
       };

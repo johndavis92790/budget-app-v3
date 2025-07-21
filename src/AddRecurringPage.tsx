@@ -38,9 +38,6 @@ function AddRecurringPage({
   const [newFiles, setNewFiles] = useState<File[]>([]);
   const [selectedImageUrl, setSelectedImageUrl] = useState<string | null>(null);
 
-  const editURLFragment =
-    "https://console.firebase.google.com/u/0/project/budget-app-v3/storage/budget-app-v3.firebasestorage.app/files/~2Fimages~2F";
-
   // Memoized callbacks to pass to UnifiedFileManager
   const handleFileSelect = useCallback((url: string | null) => {
     setSelectedImageUrl(url);
@@ -75,7 +72,6 @@ function AddRecurringPage({
         uploadedUrls.push(downloadURL);
       }
 
-      const editURL = `${editURLFragment}${updatedId}`;
       const numericStr = value.replace(/[^0-9.-]/g, "");
       const numericValue = parseFloat(numericStr);
       if (isNaN(numericValue)) {
@@ -91,7 +87,6 @@ function AddRecurringPage({
         description,
         tags: selectedTags,
         value: numericValue,
-        editURL,
         id: updatedId,
         itemType: "recurring",
       };

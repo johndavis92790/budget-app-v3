@@ -6,7 +6,6 @@ export interface History {
   tags: string[];
   value: number;
   description: string;
-  editURL: string;
   id: string;
   fiscalYearId?: string;
   fiscalMonthId?: string;
@@ -25,7 +24,6 @@ export interface Recurring {
   tags: string[];
   value: number;
   description: string;
-  editURL: string;
   id: string;
   itemType: "recurring";
 }

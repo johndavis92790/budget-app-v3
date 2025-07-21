@@ -37,9 +37,6 @@ export async function insertItem(
   // Add any missing tags to the Metadata sheet
   await addMissingTags(sheets, data.tags);
 
-  // Build the Google Sheets hyperlink formula: =HYPERLINK(url, "Edit")
-  const hyperlinkFormula = `=HYPERLINK("${data.editURL}", "Edit")`;
-
   // Format date as MM/DD/YYYY
   const dateFormatted = !isRecurring ? convertToMMDDYYYY(data.date) : "";
 
@@ -53,8 +50,6 @@ export async function insertItem(
       TAGS: data.tags.join(", "),
       VALUE: data.value,
       DESCRIPTION: data.description || "",
-      EDIT_URL: data.editURL,
-      HYPERLINK: hyperlinkFormula,
       ID: data.id,
     };
 
@@ -71,8 +66,6 @@ export async function insertItem(
       VALUE: data.value,
       HSA: data.hsa === true ? "TRUE" : "FALSE",
       DESCRIPTION: data.description || "",
-      EDIT_URL: data.editURL,
-      HYPERLINK: hyperlinkFormula,
       ID: data.id,
       FISCAL_YEAR_ID: data.fiscalYearId,
       FISCAL_MONTH_ID: data.fiscalMonthId,
@@ -128,9 +121,6 @@ export async function updateItem(
   // Add any new tags to the metadata sheet
   await addMissingTags(sheets, data.tags);
 
-  // Create hyperlink formula using the existing edit URL
-  const hyperlinkFormula = `=HYPERLINK("${existingRow[colMap.EDIT_URL]}", "Edit")`;
-
   // Common data for both item types
   const baseData: Record<string, any> = {
     TYPE: data.type,
@@ -138,8 +128,6 @@ export async function updateItem(
     TAGS: data.tags.join(", "),
     VALUE: data.value,
     DESCRIPTION: data.description || "",
-    EDIT_URL: existingRow[colMap.EDIT_URL],
-    HYPERLINK: hyperlinkFormula,
     ID: existingId,
   };
 

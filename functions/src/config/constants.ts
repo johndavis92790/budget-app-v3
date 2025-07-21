@@ -7,13 +7,13 @@ export const SPREADSHEET_ID = "1KROs_Swh-1zeQhLajtRw-E7DcYnJRMHEOXX5ECwTGSI";
 // History sheet constants
 export const HISTORY_TABLE_NAME = "History";
 export const HISTORY_FIRST_COLUMN = "A";
-export const HISTORY_LAST_COLUMN = "P";
+export const HISTORY_LAST_COLUMN = "N";
 export const HISTORY_RANGE = `${HISTORY_TABLE_NAME}!${HISTORY_FIRST_COLUMN}1:${HISTORY_LAST_COLUMN}`;
 
 // Recurring sheet constants
 export const RECURRING_TABLE_NAME = "Recurring";
 export const RECURRING_FIRST_COLUMN = "A";
-export const RECURRING_LAST_COLUMN = "H";
+export const RECURRING_LAST_COLUMN = "F";
 export const RECURRING_RANGE = `${RECURRING_TABLE_NAME}!${RECURRING_FIRST_COLUMN}1:${RECURRING_LAST_COLUMN}`;
 
 // Goals constants
@@ -44,15 +44,13 @@ export const defaultColumnMappings = {
     VALUE: 4,
     HSA: 5,
     DESCRIPTION: 6,
-    EDIT_URL: 7,
-    HYPERLINK: 8,
-    ID: 9,
-    FISCAL_YEAR_ID: 10,
-    FISCAL_MONTH_ID: 11,
-    FISCAL_WEEK_ID: 12,
-    HSA_AMOUNT: 13,
-    HSA_DATE: 14,
-    HSA_NOTES: 15,
+    ID: 7,
+    FISCAL_YEAR_ID: 8,
+    FISCAL_MONTH_ID: 9,
+    FISCAL_WEEK_ID: 10,
+    HSA_AMOUNT: 11,
+    HSA_DATE: 12,
+    HSA_NOTES: 13,
   },
   RECURRING: {
     TYPE: 0,
@@ -60,9 +58,7 @@ export const defaultColumnMappings = {
     TAGS: 2,
     VALUE: 3,
     DESCRIPTION: 4,
-    EDIT_URL: 5,
-    HYPERLINK: 6,
-    ID: 7,
+    ID: 5,
   },
   FISCAL_WEEKS: {
     ID: 0,

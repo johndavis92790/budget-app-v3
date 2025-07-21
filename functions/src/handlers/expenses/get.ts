@@ -33,7 +33,6 @@ export async function handleGET(sheets: any, req: Request, res: Response) {
     value: parseCellValue(row[historyMap.VALUE]),
     hsa: row[historyMap.HSA] === "TRUE",
     description: row[historyMap.DESCRIPTION],
-    editURL: row[historyMap.EDIT_URL] || "",
     id: row[historyMap.ID] || "",
     fiscalYearId: row[historyMap.FISCAL_YEAR_ID],
     fiscalMonthId: row[historyMap.FISCAL_MONTH_ID],
@@ -56,7 +55,6 @@ export async function handleGET(sheets: any, req: Request, res: Response) {
       .filter(Boolean),
     value: parseCellValue(row[recurringMap.VALUE]),
     description: row[recurringMap.DESCRIPTION],
-    editURL: row[recurringMap.EDIT_URL] || "",
     id: row[recurringMap.ID] || "",
     itemType: "recurring",
   }));
