@@ -44,5 +44,4 @@ export interface SheetColumnMappings {
   FISCAL_YEARS: ColumnMapping;
   LOGS: ColumnMapping;
   METADATA: ColumnMapping;
-  HSA: ColumnMapping;
 }

@@ -7,7 +7,7 @@ export const SPREADSHEET_ID = "1KROs_Swh-1zeQhLajtRw-E7DcYnJRMHEOXX5ECwTGSI";
 // History sheet constants
 export const HISTORY_TABLE_NAME = "History";
 export const HISTORY_FIRST_COLUMN = "A";
-export const HISTORY_LAST_COLUMN = "M";
+export const HISTORY_LAST_COLUMN = "P";
 export const HISTORY_RANGE = `${HISTORY_TABLE_NAME}!${HISTORY_FIRST_COLUMN}1:${HISTORY_LAST_COLUMN}`;
 
 // Recurring sheet constants
@@ -34,12 +34,6 @@ export const FISCAL_WEEKS_RANGE = "Fiscal Weeks!A1:F";
 export const FISCAL_MONTHS_RANGE = "Fiscal Months!A1:D";
 export const FISCAL_YEARS_RANGE = "Fiscal Years!A1:D";
 
-// HSA sheet constants
-export const HSA_TABLE_NAME = "HSA";
-export const HSA_FIRST_COLUMN = "A";
-export const HSA_LAST_COLUMN = "D";
-export const HSA_RANGE = `${HSA_TABLE_NAME}!${HSA_FIRST_COLUMN}1:${HSA_LAST_COLUMN}`;
-
 // Default column mappings (used as fallback if header row can't be read)
 export const defaultColumnMappings = {
   HISTORY: {
@@ -56,6 +50,9 @@ export const defaultColumnMappings = {
     FISCAL_YEAR_ID: 10,
     FISCAL_MONTH_ID: 11,
     FISCAL_WEEK_ID: 12,
+    HSA_AMOUNT: 13,
+    HSA_DATE: 14,
+    HSA_NOTES: 15,
   },
   RECURRING: {
     TYPE: 0,
@@ -97,11 +94,5 @@ export const defaultColumnMappings = {
   METADATA: {
     CATEGORY: 0,
     TAG: 1,
-  },
-  HSA: {
-    HISTORY_ID: 0,
-    REIMBURSEMENT_AMOUNT: 1,
-    REIMBURSEMENT_DATE: 2,
-    NOTES: 3,
   },
 };

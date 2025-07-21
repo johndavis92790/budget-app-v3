@@ -9,7 +9,6 @@ import {
   FISCAL_YEARS_RANGE,
   MONTHLY_GOAL_RANGE,
   WEEKLY_GOAL_RANGE,
-  HSA_RANGE,
 } from "../../config/constants";
 import { getSheetData, columnMappings, convertArrayToObjectById, parseCellValue } from "../../utils/sheets";
 
@@ -39,6 +38,9 @@ export async function handleGET(sheets: any, req: Request, res: Response) {
     fiscalYearId: row[historyMap.FISCAL_YEAR_ID],
     fiscalMonthId: row[historyMap.FISCAL_MONTH_ID],
     fiscalWeekId: row[historyMap.FISCAL_WEEK_ID],
+    hsaAmount: parseCellValue(row[historyMap.HSA_AMOUNT]),
+    hsaDate: row[historyMap.HSA_DATE],
+    hsaNotes: row[historyMap.HSA_NOTES],
     itemType: "history",
   }));
 
@@ -140,18 +142,6 @@ export async function handleGET(sheets: any, req: Request, res: Response) {
   const fiscalMonthsObj = convertArrayToObjectById(fiscalMonthData);
   const fiscalYearsObj = convertArrayToObjectById(fiscalYearData);
 
-  // Get HSA data
-  const hsaRows = await getSheetData(sheets, HSA_RANGE);
-  const hsaMap = columnMappings.HSA;
-
-  const hsaData = hsaRows.map((row) => ({
-    historyId: row[hsaMap.HISTORY_ID],
-    reimbursementAmount: parseCellValue(row[hsaMap.REIMBURSEMENT_AMOUNT]),
-    reimbursementDate: row[hsaMap.REIMBURSEMENT_DATE],
-    notes: row[hsaMap.NOTES],
-    itemType: "hsa",
-  }));
-
   res.status(200).json({
     history: historyData,
     recurring: recurringData,
@@ -162,6 +152,5 @@ export async function handleGET(sheets: any, req: Request, res: Response) {
     fiscalWeeks: fiscalWeeksObj,
     fiscalMonths: fiscalMonthsObj,
     fiscalYears: fiscalYearsObj,
-    hsaItems: hsaData, 
   });
 }

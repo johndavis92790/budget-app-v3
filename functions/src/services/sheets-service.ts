@@ -77,6 +77,9 @@ export async function insertItem(
       FISCAL_YEAR_ID: data.fiscalYearId,
       FISCAL_MONTH_ID: data.fiscalMonthId,
       FISCAL_WEEK_ID: data.fiscalWeekId,
+      HSA_AMOUNT: data.hsaAmount,
+      HSA_DATE: data.hsaDate,
+      HSA_NOTES: data.hsaNotes,
     };
 
     // Use our robust helper to create the row
@@ -151,6 +154,16 @@ export async function updateItem(
       data.fiscalMonthId || existingRow[colMap.FISCAL_MONTH_ID];
     baseData.FISCAL_WEEK_ID =
       data.fiscalWeekId || existingRow[colMap.FISCAL_WEEK_ID];
+  }
+
+  if (baseData.HSA === "TRUE") {
+    baseData.HSA_AMOUNT = data.hsaAmount;
+    if (data.hsaDate) {
+      baseData.HSA_DATE = convertToMMDDYYYY(data.hsaDate);
+    }
+    if (data.hsaNotes) {
+      baseData.HSA_NOTES = data.hsaNotes;
+    }
   }
 
   // Use our robust helper to create the row data

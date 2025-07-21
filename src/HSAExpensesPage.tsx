@@ -1,5 +1,5 @@
-import { useState, useEffect, useCallback } from "react";
-import { History, Hsa } from "./types";
+import { useState, useEffect } from "react";
+import { FiscalWeek, History } from "./types";
 import {
   ListGroup,
   Badge,
@@ -8,7 +8,6 @@ import {
   Button,
   Form,
   InputGroup,
-  Alert,
 } from "react-bootstrap";
 import {
   formatDateFromYYYYMMDD,
@@ -16,34 +15,30 @@ import {
   getCategoryIcon,
 } from "./helpers";
 import FullPageSpinner from "./FullPageSpinner";
-import EditHsaPage from "./EditHsaPage";
-import "./HistoryPage.css"; // Reusing the same CSS
+import EditHistoryPage from "./EditHistoryPage";
+import "./HistoryPage.css";
 import { DateField, MultiSelectField } from "./CommonFormFields";
+import FiscalCalendar from "./FiscalCalendar";
+import { useNavigate } from "react-router-dom";
 
 interface HSAExpensesPageProps {
   history: History[];
-  hsaItems: Hsa[];
+  fiscalWeeks: Record<string, FiscalWeek>;
   loading: boolean;
   categories: string[];
+  existingTags: string[];
   onUpdateItem: (updatedHistory: History) => Promise<void>;
   deleteItem: (item: History) => Promise<void>;
-  onUpdateHsaItem: (updatedHsa: Hsa) => Promise<void>;
-  deleteHsaItem: (hsaItem: Hsa) => Promise<void>;
-}
-
-interface HistoryWithHsa extends History {
-  hsaObject: Hsa | undefined;
 }
 
 function HSAExpensesPage({
   history,
-  hsaItems,
+  fiscalWeeks,
   loading,
   categories,
+  existingTags,
   onUpdateItem,
   deleteItem,
-  onUpdateHsaItem,
-  deleteHsaItem,
 }: HSAExpensesPageProps) {
   const initialitemsToShow = 100;
   const itemsToRevealOnClick = 30;
@@ -55,15 +50,12 @@ function HSAExpensesPage({
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
   const [selectedTypes, setSelectedTypes] = useState<string[]>([]);
-  const [purchaseStartDate, setPurchaseStartDate] = useState("");
-  const [purchaseEndDate, setPurchaseEndDate] = useState("");
-  const [reimbursementStartDate, setReimbursementStartDate] = useState("");
-  const [reimbursementEndDate, setReimbursementEndDate] = useState("");
+  const [selectedTags, setSelectedTags] = useState<string[]>([]);
 
-  // Show HSA summary at the top
-  const [totalHSAExpenses, setTotalHSAExpenses] = useState(0);
-  const [hsaItemCount, setHsaItemCount] = useState(0);
-  const [error, setError] = useState<string | null>(null);
+  const [startDate, setStartDate] = useState("");
+  const [endDate, setEndDate] = useState("");
+
+  const navigate = useNavigate();
 
   // Reset pagination when filters change
   useEffect(() => {
@@ -72,238 +64,118 @@ function HSAExpensesPage({
     searchTerm,
     selectedCategories,
     selectedTypes,
-    purchaseStartDate,
-    purchaseEndDate,
-    reimbursementStartDate,
-    reimbursementEndDate,
+    selectedTags,
+    startDate,
+    endDate,
     initialitemsToShow,
   ]);
-
-  const getHsaItem = useCallback(
-    (historyId: string) => {
-      return hsaItems.find((hsa) => hsa.historyId === historyId);
-    },
-    [hsaItems],
-  );
-
-  // Create memoized function to get filtered HSA items to avoid duplicate code
-  const getFilteredHsaItems = useCallback((): HistoryWithHsa[] => {
-    // Filter history to only HSA-tagged items (expenses only)
-    const filteredItems = history.filter(
-      (item) =>
-        item.hsa === true &&
-        (item.type === "Expense" || item.type === "Recurring Expense"),
-    );
-
-    // Map to include HSA objects
-    return filteredItems.map((item) => ({
-      ...item,
-      hsaObject: getHsaItem(item.id),
-    }));
-  }, [history, getHsaItem]);
-
-  // Calculate HSA totals when relevant data changes
-  useEffect(() => {
-    // Get the filtered HSA items using our memoized function
-    const hsaHistoryItems = getFilteredHsaItems();
-    console.log("hsaHistoryItems", hsaHistoryItems);
-
-    // Check if any HSA history item is missing its HSA object
-    const missingHsaObjects = hsaHistoryItems.filter((item) => !item.hsaObject);
-    if (missingHsaObjects.length > 0) {
-      const missingIds = missingHsaObjects.map((item) => item.id).join(", ");
-      setError(
-        `Missing HSA data for ${missingHsaObjects.length} expense(s). IDs: ${missingIds}`,
-      );
-      console.error(
-        "Missing HSA objects for history items:",
-        missingHsaObjects,
-      );
-    } else {
-      setError(null);
-
-      // Calculate the total expenses - we know hsaObject exists from our check above
-      const total = hsaHistoryItems.reduce((sum, item) => {
-        // TypeScript needs us to be explicit since it doesn't recognize our filter
-        return sum + (item.hsaObject!.reimbursementAmount || item.value);
-      }, 0);
-
-      setTotalHSAExpenses(total);
-      setHsaItemCount(hsaHistoryItems.length);
-    }
-  }, [getFilteredHsaItems, hsaItems]);
 
   if (loading) {
     return <FullPageSpinner />;
   }
 
-  // Display error at the top of the page if any missing HSA objects are detected
-  // This is important for admins to see and fix data integrity issues
+  // Sort and filter history
+  const filteredHistory = history.filter((item) => {
+    const isHSAExpense = item.type === "Expense" && item.hsa === true;
 
-  // Get the filtered HSA history items using our memoized function
-  const hsaHistoryItems = getFilteredHsaItems();
+    // Date range filter - always apply as AND condition
+    const itemDate = new Date(item.date).toISOString().split("T")[0];
+    const matchesDate =
+      (!startDate || itemDate >= startDate) &&
+      (!endDate || itemDate <= endDate);
 
-  // Calculate reimbursed HSA stats
-  const reimbursedItems = hsaHistoryItems.filter(
-    (item) =>
-      item.hsaObject &&
-      item.hsaObject.reimbursementAmount > 0 &&
-      !!item.hsaObject.reimbursementDate,
-  );
-  const reimbursedCount = reimbursedItems.length;
-  const totalReimbursedAmount = reimbursedItems.reduce(
-    (sum, item) => sum + (item.hsaObject?.reimbursementAmount || 0),
-    0,
-  );
+    // Search filter
+    const matchesSearch =
+      searchTerm === "" || // If no search term, this condition is true
+      item.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      item.category.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      item.tags.some((tag) =>
+        tag.toLowerCase().includes(searchTerm.toLowerCase()),
+      );
 
-  // Then apply additional filters if needed
-  const filteredHistory = showFilters
-    ? hsaHistoryItems.filter((item) => {
-        // History date range filter - always apply as AND condition
-        const historyDate = new Date(item.date).toISOString().split("T")[0];
-        const matchesDate =
-          (!purchaseStartDate || historyDate >= purchaseStartDate) &&
-          (!purchaseEndDate || historyDate <= purchaseEndDate);
+    // Category filter - OR operation when multiple categories are selected
+    // (If any selected category matches the item's category, include it)
+    const matchesCategory =
+      selectedCategories.length === 0 || // If no categories selected, this condition is true
+      selectedCategories.includes(item.category);
 
-        // HSA reimbursement date range filter - always apply as AND condition
-        const hsaDate = new Date(item.hsaObject?.reimbursementDate || item.date)
-          .toISOString()
-          .split("T")[0];
-        const matchesHsaDate =
-          (!reimbursementStartDate || hsaDate >= reimbursementStartDate) &&
-          (!reimbursementEndDate || hsaDate <= reimbursementEndDate);
+    // Type filter - OR operation when multiple types are selected
+    // (If any selected type matches the item's type, include it)
+    const matchesType =
+      selectedTypes.length === 0 || // If no types selected, this condition is true
+      selectedTypes.includes(item.type);
 
-        // Search filter
-        const matchesSearch =
-          searchTerm === "" || // If no search term, this condition is true
-          item.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          item.category.toLowerCase().includes(searchTerm.toLowerCase());
+    // Tags filter - OR operation when multiple tags are selected
+    // (If any selected tag is in the item's tags array, include it)
+    const matchesTags =
+      selectedTags.length === 0 || // If no tags selected, this condition is true
+      selectedTags.some((tag) => item.tags.includes(tag));
 
-        // Category filter - OR operation when multiple categories are selected
-        const matchesCategory =
-          selectedCategories.length === 0 || // If no categories selected, this condition is true
-          selectedCategories.includes(item.category);
+    // AND operation between different filter types
+    // (Item must match all active filter types)
+    return (
+      isHSAExpense &&
+      matchesDate &&
+      matchesSearch &&
+      matchesCategory &&
+      matchesType &&
+      matchesTags
+    );
+  });
 
-        // Type filter - OR operation when multiple types are selected
-        const matchesType =
-          selectedTypes.length === 0 || // If no types selected, this condition is true
-          selectedTypes.includes(item.type);
+  const sortedHistory = filteredHistory.sort((a, b) => {
+    const dateA = new Date(a.date);
+    const dateB = new Date(b.date);
 
-        // AND operation between different filter types
-        return (
-          matchesDate &&
-          matchesHsaDate &&
-          matchesSearch &&
-          matchesCategory &&
-          matchesType
-        );
-      })
-    : hsaHistoryItems; // If filters are hidden, display all HSA history items
+    // First: Compare by date (latest dates first)
+    const dateComparison = dateB.getTime() - dateA.getTime();
+    if (dateComparison !== 0) {
+      return dateComparison;
+    }
 
-  // Sort by date, most recent first
-  const sortedHistory = [...filteredHistory].sort(
-    (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime(),
-  );
+    // Second: Compare by type (alphabetically, ascending order)
+    const typeComparison = a.type.localeCompare(b.type);
+    if (typeComparison !== 0) {
+      return typeComparison;
+    }
+
+    // Third: Compare by value (lowest value first)
+    return a.value - b.value;
+  });
 
   const toggleRow = (id: string) => {
     setExpandedRowId(expandedRowId === id ? null : id);
   };
 
   const handleClose = () => {
-    setExpandedRowId(null);
+    setExpandedRowId(null); // Collapse the expanded row
   };
 
   const handleLoadMore = () => {
-    setItemsToShow((prev) => prev + itemsToRevealOnClick);
+    setItemsToShow(itemsToShow + itemsToRevealOnClick); // Load more items
   };
 
   const handleRemoveFilters = () => {
     setSearchTerm("");
     setSelectedCategories([]);
     setSelectedTypes([]);
-    setPurchaseStartDate("");
-    setPurchaseEndDate("");
-    setReimbursementStartDate("");
-    setReimbursementEndDate("");
+    setSelectedTags([]);
+    setStartDate("");
+    setEndDate("");
   };
 
   return (
-    <div className="pt-3">
-      <h2>HSA Expenses</h2>
-
-      {/* HSA Summary */}
-      <div
-        className="mb-4 p-3"
-        style={{ backgroundColor: "#f8f9fa", borderRadius: "8px" }}
-      >
-        <h4>HSA Summary</h4>
-        <Row>
-          <Col xs={6}>
-            <div className="mb-2">
-              <strong>Total HSA Expenses:</strong>
-            </div>
-            <div
-              style={{
-                fontSize: "1.5em",
-                fontWeight: "bold",
-                color: "#dc3545",
-              }}
-            >
-              $
-              {totalHSAExpenses.toLocaleString("en-US", {
-                minimumFractionDigits: 2,
-                maximumFractionDigits: 2,
-              })}
-            </div>
-          </Col>
-          <Col xs={6}>
-            <div className="mb-2">
-              <strong>Number of HSA Items:</strong>
-            </div>
-            <div style={{ fontSize: "1.5em", fontWeight: "bold" }}>
-              {hsaItemCount}
-            </div>
-          </Col>
-        </Row>
-        <Row className="mt-3">
-          <Col xs={6}>
-            <div className="mb-2">
-              <strong>Total Reimbursed:</strong>
-            </div>
-            <div
-              style={{
-                fontSize: "1.5em",
-                fontWeight: "bold",
-                color: "#198754",
-              }}
-            >
-              $
-              {totalReimbursedAmount.toLocaleString("en-US", {
-                minimumFractionDigits: 2,
-                maximumFractionDigits: 2,
-              })}
-            </div>
-          </Col>
-          <Col xs={6}>
-            <div className="mb-2">
-              <strong>Number Reimbursed:</strong>
-            </div>
-            <div style={{ fontSize: "1.5em", fontWeight: "bold" }}>
-              {reimbursedCount}
-            </div>
-          </Col>
-        </Row>
+    <div>
+      <div className="d-flex justify-content-center mb-4">
+        <Button onClick={() => navigate(`/add-history`)}>
+          Add Expense/Refund
+        </Button>
       </div>
 
-      {error && (
-        <Alert variant="danger" className="mt-2 mb-3">
-          <strong>Data Integrity Error:</strong> {error}
-        </Alert>
-      )}
-
-      <div className="mb-3 d-flex justify-content-end">
+      <div className="d-flex justify-content-between mb-4">
+        <h2>HSA Expenses</h2>
         <Button
-          variant="outline-secondary"
+          variant="secondary"
           onClick={() => setShowFilters(!showFilters)}
         >
           {showFilters ? "Hide Filters" : "Show Filters"}
@@ -312,251 +184,261 @@ function HSAExpensesPage({
 
       {showFilters && (
         <div
-          className="mb-4 p-3"
-          style={{ backgroundColor: "#f8f9fa", borderRadius: "8px" }}
+          className="filters mb-4 p-3"
+          style={{ border: "1px solid #ddd", borderRadius: "5px" }}
         >
-          <Form.Group className="mb-3">
-            <Form.Label>Search</Form.Label>
-            <InputGroup>
-              <Form.Control
-                type="text"
-                placeholder="Search description or category"
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-              />
-              <Button
-                variant="outline-secondary"
-                onClick={() => setSearchTerm("")}
-              >
-                Clear
-              </Button>
-            </InputGroup>
-          </Form.Group>
-
-          <Row>
-            <Col md={6}>
-              <Form.Group className="mb-3">
-                <Form.Label>Purchase Date Range</Form.Label>
-                <Row>
-                  <Col>
-                    <DateField
-                      value={purchaseStartDate}
-                      onChange={(date) => setPurchaseStartDate(date)}
-                    />
-                  </Col>
-                  <Col>
-                    <DateField
-                      value={purchaseEndDate}
-                      onChange={(date) => setPurchaseEndDate(date)}
-                    />
-                  </Col>
-                </Row>
-              </Form.Group>
-            </Col>
-            <Col md={6}>
-              <Form.Group className="mb-3">
-                <Form.Label>Reimbursement Date Range</Form.Label>
-                <Row>
-                  <Col>
-                    <DateField
-                      value={reimbursementStartDate}
-                      onChange={(date) => setReimbursementStartDate(date)}
-                    />
-                  </Col>
-                  <Col>
-                    <DateField
-                      value={reimbursementEndDate}
-                      onChange={(date) => setReimbursementEndDate(date)}
-                    />
-                  </Col>
-                </Row>
-              </Form.Group>
-            </Col>
-          </Row>
-
-          <Row>
-            <Col md={6}>
-              <Form.Group className="mb-3">
-                <Form.Label>Categories</Form.Label>
-                <MultiSelectField
-                  selectedOptions={selectedCategories}
-                  setSelectedOptions={setSelectedCategories}
-                  availableOptions={categories}
-                />
-              </Form.Group>
-            </Col>
-            <Col md={6}>
-              <Form.Group className="mb-3">
-                <Form.Label>Types</Form.Label>
-                <MultiSelectField
-                  selectedOptions={selectedTypes}
-                  setSelectedOptions={setSelectedTypes}
-                  availableOptions={[
-                    "Expense",
-                    "Income",
-                    "Recurring Expense",
-                    "Recurring Income",
-                  ]}
-                />
-              </Form.Group>
-            </Col>
-          </Row>
-
           <Form.Group>
+            <Row>
+              <Col>
+                <label>Start Date</label>
+                <DateField
+                  value={startDate}
+                  onChange={(date) => setStartDate(date)}
+                />
+                <Form.Group className="mb-3">
+                  <label>Tags</label>
+                  <MultiSelectField
+                    selectedOptions={selectedTags}
+                    setSelectedOptions={setSelectedTags}
+                    availableOptions={existingTags}
+                  />
+                </Form.Group>
+              </Col>
+              <Col>
+                <label>End Date</label>
+                <DateField
+                  value={endDate}
+                  onChange={(date) => setEndDate(date)}
+                />
+                <Form.Group className="mb-3">
+                  <label>Categories</label>
+                  <MultiSelectField
+                    selectedOptions={selectedCategories}
+                    setSelectedOptions={setSelectedCategories}
+                    availableOptions={categories}
+                  />
+                </Form.Group>
+                <Form.Group className="mb-3">
+                  <label>Search</label>
+                  <InputGroup>
+                    <Form.Control
+                      type="text"
+                      value={searchTerm}
+                      onChange={(e) => setSearchTerm(e.target.value)}
+                    />
+                  </InputGroup>
+                </Form.Group>
+              </Col>
+            </Row>
             <div className="d-flex justify-content-end">
-              <Button
-                variant="secondary"
-                onClick={handleRemoveFilters}
-                className="me-2"
-              >
-                Clear All Filters
+              <Button variant="outline-danger" onClick={handleRemoveFilters}>
+                Clear Filters
               </Button>
             </div>
           </Form.Group>
         </div>
       )}
 
-      {sortedHistory.length === 0 ? (
-        <div className="text-center mt-5">
-          <p>
-            No HSA expenses found. Add transactions with the "HSA" tag to see
-            them here.
-          </p>
-        </div>
-      ) : (
-        <>
-          <ListGroup variant="flush">
-            {sortedHistory.slice(0, itemsToShow).map((hist, index) => {
-              const isExpense =
-                hist.type === "Expense" || hist.type === "Recurring Expense";
-              const valueColor = isExpense ? "text-danger" : "text-success";
-              const value = hist.hsaObject?.reimbursementAmount || hist.value;
-              const formattedValue =
-                (isExpense ? "-" : "+") +
-                value.toLocaleString("en-US", {
-                  style: "currency",
-                  currency: "USD",
-                });
-              const backgroundColorClass =
-                index % 2 === 0 ? "row-light" : "row-white";
-
-              return (
-                <div key={`${hist.id}${generateRandom10DigitNumber()}`}>
-                  <ListGroup.Item
-                    className={`py-3 ${backgroundColorClass}`}
-                    onClick={() => toggleRow(hist.id)}
-                    style={{ cursor: "pointer" }}
-                  >
-                    <Row>
-                      <Col xs={7}>
-                        <div style={{ fontSize: "1em" }}>
-                          <Badge
-                            pill
-                            bg="info"
-                            className="mb-1"
-                            style={{
-                              fontSize: "1em",
-                              display: "inline-flex",
-                              alignItems: "center",
-                              gap: "0.5rem",
-                            }}
-                          >
-                            {getCategoryIcon(hist.category)}
-                            {hist.category}
-                          </Badge>
-                        </div>
-                        <div className="mb-1 ms-2" style={{ fontSize: "1em" }}>
-                          {hist.description}
-                        </div>
-                        <div className="mb-1 ms-2">
-                          {hist.tags.map((tag, i) => (
-                            <Badge
-                              key={`hsa-tag-${hist.id}-${i}-${generateRandom10DigitNumber()}`}
-                              bg="secondary"
-                              className="me-1"
-                            >
-                              {tag}
-                            </Badge>
-                          ))}
-                        </div>
-                        <div className="mb-1 ms-2" style={{ fontSize: "1em" }}>
-                          {hist.hsaObject?.notes}
-                        </div>
-                      </Col>
-                      <Col xs={5} className="text-end">
-                        <div
-                          className="text-muted"
-                          style={{ fontSize: "0.9em" }}
-                        >
-                          Reimbursement Amount:
-                        </div>
-                        <div
-                          className={valueColor}
-                          style={{ fontSize: "1.1em", fontWeight: "bold" }}
-                        >
-                          {formattedValue}
-                        </div>
-                        <div
-                          className="text-muted"
-                          style={{ fontSize: "0.9em" }}
-                        >
-                          Purchased: {formatDateFromYYYYMMDD(hist.date)}
-                          <br />
-                          {hist.hsaObject?.reimbursementDate && (
-                            <span>
-                              Reimbursed:{" "}
-                              {formatDateFromYYYYMMDD(
-                                hist.hsaObject?.reimbursementDate,
-                              )}
-                            </span>
-                          )}
-                        </div>
-                      </Col>
-                    </Row>
-                  </ListGroup.Item>
-                  {expandedRowId === hist.id && (
-                    <div
-                      className="p-3 mt-2 mb-2"
-                      style={{
-                        backgroundColor: "#fff",
-                        border: "1px solid #ddd",
-                        borderRadius: "5px",
-                      }}
-                    >
-                      {hist.hsaObject ? (
-                        <EditHsaPage
-                          selectedHsa={hist.hsaObject}
-                          associatedHistory={hist}
-                          onUpdateItem={onUpdateItem}
-                          deleteItem={deleteItem}
-                          onUpdateHsaItem={onUpdateHsaItem}
-                          deleteHsaItem={deleteHsaItem}
-                          onClose={handleClose}
-                        />
-                      ) : (
-                        <div className="p-3">
-                          <p>
-                            This expense is marked as an HSA expense but has no
-                            HSA details.
-                          </p>
-                          <p>You can add details by updating the HSA record.</p>
-                        </div>
-                      )}
-                    </div>
-                  )}
+      {/* HSA Summary Calculations */}
+      {(() => {
+        // Only consider filteredHistory items (already filtered for HSA expenses)
+        const hsaItems = filteredHistory;
+        const totalHSAExpenses = hsaItems.reduce(
+          (sum, item) => sum + (item.hsaAmount || 0),
+          0,
+        );
+        const hsaItemCount = hsaItems.length;
+        const reimbursedItems = hsaItems.filter((item) => !!item.hsaDate);
+        const totalReimbursedAmount = reimbursedItems.reduce(
+          (sum, item) => sum + (item.hsaAmount || 0),
+          0,
+        );
+        const reimbursedCount = reimbursedItems.length;
+        return (
+          <div
+            className="mb-4 p-3"
+            style={{ backgroundColor: "#f8f9fa", borderRadius: "8px" }}
+          >
+            <h4>Summary</h4>
+            <Row>
+              <Col xs={6}>
+                <div className="mb-2">
+                  <strong>Total HSA Expenses:</strong>
                 </div>
-              );
-            })}
-          </ListGroup>
-          {itemsToShow < sortedHistory.length && (
-            <div className="text-center mt-3">
-              <Button variant="primary" onClick={handleLoadMore}>
-                Load More
-              </Button>
+                <div
+                  style={{
+                    fontSize: "1.5em",
+                    fontWeight: "bold",
+                    color: "#dc3545",
+                  }}
+                >
+                  $
+                  {totalHSAExpenses.toLocaleString("en-US", {
+                    minimumFractionDigits: 2,
+                    maximumFractionDigits: 2,
+                  })}
+                </div>
+              </Col>
+              <Col xs={6}>
+                <div className="mb-2">
+                  <strong>Number of HSA Items:</strong>
+                </div>
+                <div style={{ fontSize: "1.5em", fontWeight: "bold" }}>
+                  {hsaItemCount}
+                </div>
+              </Col>
+            </Row>
+            <Row className="mt-3">
+              <Col xs={6}>
+                <div className="mb-2">
+                  <strong>Total Reimbursed:</strong>
+                </div>
+                <div
+                  style={{
+                    fontSize: "1.5em",
+                    fontWeight: "bold",
+                    color: "#198754",
+                  }}
+                >
+                  $
+                  {totalReimbursedAmount.toLocaleString("en-US", {
+                    minimumFractionDigits: 2,
+                    maximumFractionDigits: 2,
+                  })}
+                </div>
+              </Col>
+              <Col xs={6}>
+                <div className="mb-2">
+                  <strong>Number Reimbursed:</strong>
+                </div>
+                <div style={{ fontSize: "1.5em", fontWeight: "bold" }}>
+                  {reimbursedCount}
+                </div>
+              </Col>
+            </Row>
+          </div>
+        );
+      })()}
+
+      <ListGroup variant="flush">
+        {sortedHistory.slice(0, itemsToShow).map((hist, index) => {
+          const hsaAmount = hist.hsaAmount || hist.value || 0;
+          const formattedValue = hsaAmount.toLocaleString("en-US", {
+            style: "currency",
+            currency: "USD",
+          });
+          const backgroundColorClass =
+            index % 2 === 0 ? "row-light" : "row-white";
+
+          return (
+            <div key={`${hist.id}${generateRandom10DigitNumber()}`}>
+              <ListGroup.Item
+                className={`py-3 ${backgroundColorClass}`}
+                onClick={() => toggleRow(hist.id)}
+                style={{ cursor: "pointer" }}
+              >
+                <Row>
+                  <Col xs={7}>
+                    <div style={{ fontSize: "1em" }}>
+                      <Badge
+                        pill
+                        bg="info"
+                        className="mb-1"
+                        style={{
+                          fontSize: "1em",
+                          display: "inline-flex",
+                          alignItems: "center",
+                          gap: "0.5rem",
+                        }}
+                      >
+                        {getCategoryIcon(hist.category)}
+                        {hist.category}
+                      </Badge>
+                    </div>
+                    <div className="mb-1 ms-2" style={{ fontSize: "1em" }}>
+                      {hist.description}
+                    </div>
+                    {hist.tags.length > 0 && (
+                      <div className="mb-1 ms-2">
+                        {hist.tags.map((tag, i) => (
+                          <Badge
+                            key={`history-tag-${hist.id}-${i}-${generateRandom10DigitNumber()}`}
+                            bg="secondary"
+                            className="me-1"
+                          >
+                            {tag}
+                          </Badge>
+                        ))}
+                      </div>
+                    )}
+                    <div className="mb-1 ms-2" style={{ fontSize: "1em" }}>
+                      {hist.hsaNotes}
+                    </div>
+                  </Col>
+                  <Col xs={5} className="text-end">
+                    <div
+                      className="text-danger"
+                      style={{ fontSize: "1.1em", fontWeight: "bold" }}
+                    >
+                      {formattedValue}
+                    </div>
+                    <div className="text-muted" style={{ fontSize: "0.9em" }}>
+                      Purchase Date:
+                    </div>
+                    <div className="text-danger" style={{ fontSize: "0.9em" }}>
+                      {formatDateFromYYYYMMDD(hist.date)}
+                    </div>
+                    {hist.hsaDate && (
+                      <>
+                        <div
+                          className="text-muted"
+                          style={{ fontSize: "0.9em" }}
+                        >
+                          Reimbursement Date:
+                        </div>
+                        <div
+                          className="text-success"
+                          style={{ fontSize: "0.9em" }}
+                        >
+                          {formatDateFromYYYYMMDD(hist.hsaDate)}
+                        </div>
+                      </>
+                    )}
+                  </Col>
+                </Row>
+              </ListGroup.Item>
+              {expandedRowId === hist.id && (
+                <div
+                  className="p-3 mt-2 mb-2"
+                  style={{
+                    backgroundColor: "#fff",
+                    border: "1px solid #ddd",
+                    borderRadius: "5px",
+                  }}
+                >
+                  <EditHistoryPage
+                    categories={categories}
+                    existingTags={existingTags}
+                    onUpdateItem={onUpdateItem}
+                    deleteItem={deleteItem}
+                    selectedHistory={hist}
+                    onClose={handleClose}
+                  />
+                </div>
+              )}
             </div>
-          )}
-        </>
+          );
+        })}
+      </ListGroup>
+      {itemsToShow < sortedHistory.length && (
+        <div className="text-center mt-3">
+          <Button variant="primary" onClick={handleLoadMore}>
+            Load More
+          </Button>
+        </div>
       )}
+
+      <FiscalCalendar fiscalWeeks={fiscalWeeks} history={history} />
     </div>
   );
 }

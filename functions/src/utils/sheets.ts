@@ -10,7 +10,6 @@ export let columnMappings: SheetColumnMappings = {
   FISCAL_YEARS: {},
   LOGS: {},
   METADATA: {},
-  HSA: {},
 };
 
 /**
@@ -22,11 +21,6 @@ export async function initializeColumnMappings(sheets: any): Promise<void> {
     const historyHeaders = await getSheetData(
       sheets,
       `${constants.HISTORY_TABLE_NAME}!${constants.HISTORY_FIRST_COLUMN}1:${constants.HISTORY_LAST_COLUMN}1`,
-      false,
-    );
-    const hsaHeaders = await getSheetData(
-      sheets,
-      `${constants.HSA_TABLE_NAME}!${constants.HSA_FIRST_COLUMN}1:${constants.HSA_LAST_COLUMN}1`,
       false,
     );
     const recurringHeaders = await getSheetData(
@@ -60,12 +54,6 @@ export async function initializeColumnMappings(sheets: any): Promise<void> {
       columnMappings.HISTORY = createMappingFromHeaders(historyHeaders[0]);
     } else {
       columnMappings.HISTORY = { ...constants.defaultColumnMappings.HISTORY };
-    }
-
-    if (hsaHeaders && hsaHeaders.length > 0) {
-      columnMappings.HSA = createMappingFromHeaders(hsaHeaders[0]);
-    } else {
-      columnMappings.HSA = { ...constants.defaultColumnMappings.HSA };
     }
 
     if (recurringHeaders && recurringHeaders.length > 0) {

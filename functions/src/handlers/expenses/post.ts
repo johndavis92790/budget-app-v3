@@ -1,10 +1,13 @@
 import { Request, Response } from "express";
 import { logAction } from "../../utils/logging";
 import { insertItem } from "../../services/sheets-service";
-import { cachedFiscalMonths, cachedFiscalWeeks, cachedFiscalYears, getFiscalIDs } from "../../utils/fiscal";
+import {
+  cachedFiscalMonths,
+  cachedFiscalWeeks,
+  cachedFiscalYears,
+  getFiscalIDs,
+} from "../../utils/fiscal";
 import { changeGoalIfSameFiscalPeriod } from "../../utils/goals";
-import { HSA_RANGE } from "../../config/constants";
-import { appendDataToSheet, createSheetRow } from "../../utils/sheets";
 
 /**
  * Handles POST requests for expense data
@@ -26,15 +29,19 @@ export async function handlePOST(sheets: any, req: Request, res: Response) {
         typeof data.value !== "number" ||
         !data.id
       ) {
-        res.status(400).json({ error: "Missing or invalid required fields" });
-        return;
+        if (data.hsa === true) {
+          if (!data.hsaAmount) {
+            res.status(400).json({ error: "Missing or invalid required fields" });
+            return;
+          }
+        }
       }
 
       const fiscalIDs = getFiscalIDs(
         data,
         cachedFiscalYears!,
         cachedFiscalMonths!,
-        cachedFiscalWeeks!,
+        cachedFiscalWeeks!
       );
       if (!fiscalIDs) {
         res
@@ -46,26 +53,6 @@ export async function handlePOST(sheets: any, req: Request, res: Response) {
 
       await insertItem(sheets, data, "history");
       await logAction(sheets, "ADD_HISTORY", data);
-
-      // If HSA is true, automatically create an HSA item
-      if (data.hsa === true) {
-        // Create a new HSA item using the history item's data
-        const hsaItemData = {
-          HISTORY_ID: data.id,
-          REIMBURSEMENT_AMOUNT: data.value, // Default to history item value
-          REIMBURSEMENT_DATE: "", // Empty by default
-          NOTES: "" // Empty by default
-        };
-
-        // Create the row data for the HSA item
-        const hsaRowData = createSheetRow(hsaItemData, "HSA");
-        
-        // Add the HSA item to the HSA sheet
-        await appendDataToSheet(sheets, HSA_RANGE, [hsaRowData]);
-        
-        // Log the HSA item creation
-        await logAction(sheets, "ADD_HSA_AUTO", { historyId: data.id, reimbursementAmount: data.value });
-      }
 
       await changeGoalIfSameFiscalPeriod(sheets, data);
 

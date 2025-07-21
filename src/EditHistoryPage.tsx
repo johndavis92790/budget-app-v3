@@ -203,6 +203,79 @@ function EditHistoryPage({
             />
           </Col>
         </Row>
+
+        <hr />
+
+        <Row>
+          <Col xs={6}>
+            <Form.Group controlId="formHsa" className="py-3">
+              <Form.Check
+                type="switch"
+                id="formHsa"
+                label="HSA"
+                checked={updatedHistory.hsa}
+                onChange={(e) => handleFieldChange("hsa", e.target.checked)}
+                disabled={submitting}
+                style={{
+                  transform: "scale(1.8)",
+                  transformOrigin: "left center",
+                }}
+              />
+            </Form.Group>
+          </Col>
+          {updatedHistory.hsa && (
+            <>
+              <Col xs={6}>
+                <Form.Group controlId="formValue" className="mb-3">
+                  <div className="text-muted" style={{ fontSize: "0.9em" }}>
+                    Reimbursement Amount:
+                  </div>
+                  <CurrencyInput
+                    value={String(
+                      updatedHistory.hsaAmount || updatedHistory.value || 0,
+                    )}
+                    placeholder="$0.00"
+                    style={{ width: "100%" }}
+                    disabled={submitting}
+                    onChange={(e) => {
+                      const maskedVal = e.target.value;
+                      const numericStr = maskedVal.replace(/[^0-9.-]/g, "");
+                      const parsed = parseFloat(numericStr);
+                      handleFieldChange(
+                        "hsaAmount",
+                        isNaN(parsed) ? 0 : parsed,
+                      );
+                    }}
+                  />
+                </Form.Group>
+              </Col>
+            </>
+          )}
+        </Row>
+        {updatedHistory.hsa && (
+          <Row>
+            <Col xs={6}>
+              <div className="text-muted" style={{ fontSize: "0.9em" }}>
+                Reimbursement Notes:
+              </div>
+              <DescriptionField
+                value={updatedHistory.hsaNotes || ""}
+                onChange={(val) => handleFieldChange("hsaNotes", val)}
+                disabled={submitting}
+              />
+            </Col>
+            <Col xs={6}>
+              <div className="text-muted" style={{ fontSize: "0.9em" }}>
+                Reimbursement Date:
+              </div>
+              <DateField
+                value={updatedHistory.hsaDate || ""}
+                onChange={(val) => handleFieldChange("hsaDate", val)}
+                disabled={submitting}
+              />
+            </Col>
+          </Row>
+        )}
       </Form>
 
       <hr />
@@ -216,24 +289,9 @@ function EditHistoryPage({
         onNewFilesChange={handleNewFilesChange}
         onRemovedPathsChange={handleRemovedPathsChange}
       />
+
       <Row>
-        <Col xs={2}>
-          <Form.Group controlId="formHsa">
-            <Form.Check
-              type="switch"
-              id="formHsa"
-              label="HSA"
-              checked={updatedHistory.hsa}
-              onChange={(e) => handleFieldChange("hsa", e.target.checked)}
-              disabled={submitting}
-              style={{
-                transform: "scale(1.8)",
-                transformOrigin: "left center",
-              }}
-            />
-          </Form.Group>
-        </Col>
-        <Col xs={10}>
+        <Col>
           <div className="d-flex justify-content-end">
             <Button
               variant="danger"

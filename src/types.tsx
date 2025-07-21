@@ -13,14 +13,9 @@ export interface History {
   fiscalWeekId?: string;
   itemType: "history";
   hsa: boolean;
-}
-
-export interface Hsa {
-  historyId: string;
-  reimbursementAmount: number;
-  reimbursementDate?: string;
-  notes?: string;
-  itemType: "hsa";
+  hsaAmount?: number;
+  hsaDate?: string;
+  hsaNotes?: string;
 }
 
 export interface Recurring {
