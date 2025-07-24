@@ -17,7 +17,8 @@ import GoalsBanner from "./GoalsBanner";
 import BudgetForecastPage from "./BudgetForecastPage";
 import HSAExpensesPage from "./HSAExpensesPage";
 import CustomNavBar from "./CustomNavBar";
-import { API_URL, mmddyyyyToYyyyMmDd } from "./helpers";
+
+import { ApiService } from "./api";
 import { messaging, db } from "./firebase";
 import { getToken, onMessage } from "firebase/messaging";
 import { collection, doc, setDoc } from "firebase/firestore";
@@ -56,14 +57,14 @@ function App() {
     null,
   );
 
-  // Emails allowed to access the app
-  const ALLOWED_EMAILS = [
-    process.env.REACT_APP_GOOGLE_ACCOUNT_1,
-    process.env.REACT_APP_GOOGLE_ACCOUNT_2,
-  ];
-
   // Listen for Firebase Auth state changes
   useEffect(() => {
+    // Emails allowed to access the app
+    const ALLOWED_EMAILS = [
+      process.env.REACT_APP_GOOGLE_ACCOUNT_1,
+      process.env.REACT_APP_GOOGLE_ACCOUNT_2,
+    ];
+
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       if (!user?.email) {
         setCurrentUser(null);
@@ -80,7 +81,7 @@ function App() {
       }
     });
     return unsubscribe;
-  }, [ALLOWED_EMAILS]);
+  }, []);
 
   // Google Sign-In (popup)
   const handleSignInWithGoogle = async () => {
@@ -158,80 +159,47 @@ function App() {
     }
   };
 
-  // Fetch data only AFTER authorized
-  const fetchData = async () => {
-    setLoading(true);
-    try {
-      const response = await fetch(API_URL);
-      if (!response.ok) {
-        throw new Error(`Error: ${response.statusText}`);
-      }
-      const data = await response.json();
-      console.log(data);
-
-      setHistory(
-        data.history.map((hist: History, index: number) => ({
-          ...hist,
-          value: Math.round(hist.value * 100) / 100,
-          rowIndex: index + 2,
-          date: mmddyyyyToYyyyMmDd(hist.date),
-          hsaAmount: hist.hsaAmount
-            ? Math.round(hist.hsaAmount * 100) / 100
-            : Math.round(hist.value * 100) / 100,
-          hsaDate: hist.hsaDate ? mmddyyyyToYyyyMmDd(hist.hsaDate) : null,
-          hsaNotes: hist.hsaNotes || null,
-        })),
-      );
-
-      setRecurring(
-        data.recurring.map((rec: Recurring, index: number) => ({
-          ...rec,
-          value: Math.round(rec.value * 100) / 100,
-          rowIndex: index + 2,
-        })),
-      );
-
-      setCategories(data.categories || []);
-      setExistingTags(data.tags || []);
-      setWeeklyGoal(data.weeklyGoal);
-      setMonthlyGoal(data.monthlyGoal);
-      setFiscalWeeks(data.fiscalWeeks || {});
-      setFiscalMonths(data.fiscalMonths || {});
-    } catch (error) {
-      console.error("Error fetching data:", error);
-    }
-    setLoading(false);
-  };
-
   // Only fetch data once the user is authorized
   useEffect(() => {
-    if (isAuthorized) {
-      fetchData();
+    const loadData = async () => {
+      if (!currentUser?.email) return;
+
+      setLoading(true);
+      try {
+        const apiService = new ApiService(currentUser.email);
+        const data = await apiService.fetchData();
+        console.log(data);
+
+        setHistory(data.history);
+        setRecurring(data.recurring);
+        setCategories(data.categories);
+        setExistingTags(data.tags);
+        setWeeklyGoal(data.weeklyGoal);
+        setMonthlyGoal(data.monthlyGoal);
+        setFiscalWeeks(data.fiscalWeeks);
+        setFiscalMonths(data.fiscalMonths);
+      } catch (error) {
+        console.error("Error fetching data:", error);
+      }
+      setLoading(false);
+    };
+
+    if (isAuthorized && currentUser?.email) {
+      loadData();
     }
-  }, [isAuthorized]);
+  }, [isAuthorized, currentUser?.email]);
 
   // CRUD actions
   const addItem = async (newItem: History | Recurring) => {
-    try {
-      // Add the user email to ensure it's logged properly
-      const itemWithEmail = {
-        ...newItem,
-        userEmail: currentUser?.email || "",
-      };
+    if (!currentUser?.email) return false;
 
-      console.log("addItem: ", itemWithEmail);
-      const response = await fetch(API_URL, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(itemWithEmail),
-      });
-      if (!response.ok) {
-        throw new Error(`Error: ${response.statusText}`);
+    try {
+      const apiService = new ApiService(currentUser.email);
+      const success = await apiService.addItem(newItem);
+      if (success) {
+        await refreshData();
       }
-      const result = await response.json();
-      console.log("Item added with ID:", result.id);
-      fetchData();
-      return true;
+      return success;
     } catch (error) {
       console.error("Error adding item:", error);
       return false;
@@ -239,47 +207,24 @@ function App() {
   };
 
   const onUpdateItem = async (updatedItem: History | Recurring) => {
-    try {
-      // Add the user email to ensure it's logged properly
-      const itemWithEmail = {
-        ...updatedItem,
-        userEmail: currentUser?.email || "",
-      };
+    if (!currentUser?.email) return;
 
-      console.log("updatedItem: ", itemWithEmail);
-      const response = await fetch(API_URL, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(itemWithEmail),
-      });
-      if (!response.ok) {
-        throw new Error(`Error: ${response.statusText}`);
-      }
-      console.log("Item updated with ID: ", updatedItem.id);
-      fetchData();
+    try {
+      const apiService = new ApiService(currentUser.email);
+      await apiService.updateItem(updatedItem);
+      await refreshData();
     } catch (error) {
       console.error("Error updating item:", error);
     }
   };
 
   const deleteItem = async (item: History | Recurring) => {
-    try {
-      // Add the user email to the request body
-      const itemWithEmail = {
-        ...item,
-        userEmail: currentUser?.email || "",
-      };
+    if (!currentUser?.email) return;
 
-      console.log("deleteItem: ", itemWithEmail);
-      const response = await fetch(API_URL, {
-        method: "DELETE",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(itemWithEmail),
-      });
-      if (!response.ok) {
-        throw new Error(`Error deleting item: ${response.statusText}`);
-      }
-      await fetchData();
+    try {
+      const apiService = new ApiService(currentUser.email);
+      await apiService.deleteItem(item);
+      await refreshData();
     } catch (error) {
       console.error(`Error deleting ${item.itemType} item:`, error);
       alert(`An error occurred while deleting the ${item.itemType} item.`);
@@ -323,6 +268,29 @@ function App() {
     );
   }
 
+  // Helper function to refresh all data
+  const refreshData = async () => {
+    if (!currentUser?.email) return;
+
+    const apiService = new ApiService(currentUser.email);
+    const data = await apiService.fetchData();
+
+    setHistory(data.history);
+    setRecurring(data.recurring);
+    setCategories(data.categories);
+    setExistingTags(data.tags);
+    setWeeklyGoal(data.weeklyGoal);
+    setMonthlyGoal(data.monthlyGoal);
+    setFiscalWeeks(data.fiscalWeeks);
+    setFiscalMonths(data.fiscalMonths);
+  };
+
+  // Update goals callback
+  const handleUpdateGoal = (newWeeklyGoal: number, newMonthlyGoal: number) => {
+    setWeeklyGoal(newWeeklyGoal);
+    setMonthlyGoal(newMonthlyGoal);
+  };
+
   // If authorized, show the main app
   return (
     <AuthContext.Provider value={{ currentUser, isAuthorized }}>
@@ -335,7 +303,11 @@ function App() {
           />
 
           {/* GoalsBanner can remain if it displays current goals */}
-          <GoalsBanner weeklyGoal={weeklyGoal} monthlyGoal={monthlyGoal} />
+          <GoalsBanner
+            weeklyGoal={weeklyGoal}
+            monthlyGoal={monthlyGoal}
+            onUpdateGoal={handleUpdateGoal}
+          />
 
           <Container>
             <Routes>
