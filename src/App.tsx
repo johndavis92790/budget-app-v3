@@ -17,6 +17,7 @@ import GoalsBanner from "./GoalsBanner";
 import BudgetForecastPage from "./BudgetForecastPage";
 import HSAExpensesPage from "./HSAExpensesPage";
 import CustomNavBar from "./CustomNavBar";
+import NotificationSettings from "./NotificationSettings";
 
 import { ApiService } from "./api";
 import { messaging, db } from "./firebase";
@@ -123,23 +124,41 @@ function App() {
 
     initializeMessaging();
 
-    // Register the onMessage listener
+    // Register the onMessage listener for foreground messages
+    // Note: Service worker handles all notification display to prevent duplicates
     const unsubscribe = onMessage(messaging, (payload) => {
-      console.log("Foreground notification payload received: ", payload);
+      console.log("Foreground FCM message received: ", payload);
 
       if (payload.data) {
         const { title, body } = payload.data;
 
-        // Show the notification explicitly
-        new Notification(title || "Default Title", {
-          body: body || "Default Body",
-          icon: payload.data.icon || "/favicon.ico",
-        });
+        // Show notification in foreground (Firebase SDK doesn't auto-show when app is active)
+        // Service worker handles background notifications automatically
+        if ("serviceWorker" in navigator) {
+          navigator.serviceWorker.getRegistration().then((registration) => {
+            if (registration) {
+              registration.showNotification(title || "Budget App", {
+                body: body || "New notification",
+                icon: "/favicon.ico",
+                tag: "foreground-notification",
+                data: { url: window.location.origin },
+              });
+            }
+          });
+        } else {
+          // Fallback for browsers without service worker support
+          new Notification(title || "Budget App", {
+            body: body || "New notification",
+            icon: "/favicon.ico",
+          });
+        }
 
-        // Optional: Update app UI
+        // Also update app UI
         setNotification({ title, body });
+
+        console.log("Foreground notification displayed:", { title, body });
       } else {
-        console.warn("Notification payload missing 'data' field.");
+        console.warn("FCM payload missing 'data' field.");
       }
     });
 
@@ -391,6 +410,10 @@ function App() {
                     deleteItem={deleteItem}
                   />
                 }
+              />
+              <Route
+                path="/notifications"
+                element={<NotificationSettings className="m-3" />}
               />
             </Routes>
           </Container>

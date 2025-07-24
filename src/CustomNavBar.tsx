@@ -99,6 +99,13 @@ function CustomNavBar({ handleSignOut, isAuthorized }: CustomNavBarProps) {
             >
               HSA Expenses
             </Nav.Link>
+            <Nav.Link
+              as={Link}
+              to="/notifications"
+              onClick={() => setNavExpanded(false)}
+            >
+              Notifications
+            </Nav.Link>
           </Nav>
 
           {/* Right side: Log Out if authorized */}

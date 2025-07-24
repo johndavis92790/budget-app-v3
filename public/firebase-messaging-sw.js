@@ -1,4 +1,5 @@
-/* global self, clients */
+/* global self, clients, importScripts, firebase */
+
 // Import Firebase scripts for messaging
 importScripts('https://www.gstatic.com/firebasejs/9.17.2/firebase-app-compat.js');
 importScripts('https://www.gstatic.com/firebasejs/9.17.2/firebase-messaging-compat.js');
@@ -13,36 +14,11 @@ firebase.initializeApp({
   appId: "1:105746768311:web:fbf3d17496b3c7bf5bc832"
 });
 
-// Retrieve an instance of Firebase Messaging
-const messaging = firebase.messaging();
+// Initialize Firebase Messaging for background notifications
+// Firebase SDK automatically handles background push notifications
+firebase.messaging();
 
-// Handle background push notifications
-self.addEventListener('push', function (event) {
-  console.log('[firebase-messaging-sw.js] Push event received:', event);
-
-  if (event.data) {
-    // Parse the data payload
-    const data = event.data.json();
-    console.log('[firebase-messaging-sw.js] Push event data:', data);
-
-    // Notification options
-    const options = {
-      body: data.data.body || "Default Body 2",
-      icon: data.data.icon || '/favicon.ico',
-      // Additional options for further customization
-      data: {
-        url: data.click_action || "/", // Add a URL to open when the notification is clicked
-      }
-    };
-
-    // Show the notification
-    event.waitUntil(
-      self.registration.showNotification(data.data.title || "Default Title", options)
-    );
-  } else {
-    console.warn('[firebase-messaging-sw.js] Push event but no data.');
-  }
-});
+console.log('[firebase-messaging-sw.js] Firebase Messaging initialized for background notifications');
 
 // Handle notification click
 self.addEventListener('notificationclick', function (event) {

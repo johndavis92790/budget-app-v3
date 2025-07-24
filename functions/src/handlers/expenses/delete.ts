@@ -1,6 +1,7 @@
 import { Request, Response } from "express";
 import { logAction } from "../../utils/logging";
 import { deleteItem } from "../../services/sheets-service";
+import { sendExpenseNotification } from "../../utils/notificationHelper";
 import {
   WEEKLY_GOAL_RANGE,
   MONTHLY_GOAL_RANGE,
@@ -109,6 +110,12 @@ export async function handleDELETE(sheets: any, req: Request, res: Response) {
       }
 
       await logAction(sheets, "DELETE_HISTORY", data);
+      
+      // Send notification for deleted expense (don't await to avoid blocking response)
+      sendExpenseNotification(data, "deleted").catch((error) => {
+        console.error("Failed to send expense deletion notification:", error);
+      });
+      
       res.status(200).json({ status: "success", id });
     } else if (data.itemType === "recurring") {
       try {

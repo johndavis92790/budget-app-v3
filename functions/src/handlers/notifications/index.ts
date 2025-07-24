@@ -73,7 +73,7 @@ export const sendNotificationHandler = async (
         // Send to FCM server
         try {
           const response = await fetch(
-            "https://fcm.googleapis.com/v1/projects/budget-app-a32fa/messages:send",
+            "https://fcm.googleapis.com/v1/projects/budget-app-v3/messages:send",
             {
               method: "POST",
               headers: {

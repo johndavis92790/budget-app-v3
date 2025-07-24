@@ -8,6 +8,7 @@ import {
   getFiscalIDs,
 } from "../../utils/fiscal";
 import { changeGoalIfSameFiscalPeriod } from "../../utils/goals";
+import { sendExpenseNotification } from "../../utils/notificationHelper";
 
 /**
  * Handles POST requests for expense data
@@ -55,6 +56,11 @@ export async function handlePOST(sheets: any, req: Request, res: Response) {
       await logAction(sheets, "ADD_HISTORY", data);
 
       await changeGoalIfSameFiscalPeriod(sheets, data);
+
+      // Send notification for new expense (don't await to avoid blocking response)
+      sendExpenseNotification(data, "added").catch((error) => {
+        console.error("Failed to send expense notification:", error);
+      });
 
       res.status(200).json({ status: "success", id: data.id, fiscalIDs });
       return;

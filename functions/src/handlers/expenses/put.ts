@@ -1,7 +1,11 @@
 import { Request, Response } from "express";
 import { logAction } from "../../utils/logging";
 import { updateItem } from "../../services/sheets-service";
-import { WEEKLY_GOAL_RANGE, MONTHLY_GOAL_RANGE } from "../../config/constants";
+import {
+  WEEKLY_GOAL_RANGE,
+  MONTHLY_GOAL_RANGE,
+} from "../../config/constants";
+import { sendExpenseNotification } from "../../utils/notificationHelper";
 import { adjustGoalIfSameFiscalPeriod } from "../../utils/goals";
 import {
   columnMappings,
@@ -67,6 +71,12 @@ export async function handlePUT(sheets: any, req: Request, res: Response) {
         }
 
         await logAction(sheets, "UPDATE_HISTORY", data);
+        
+        // Send notification for updated expense (don't await to avoid blocking response)
+        sendExpenseNotification(data, "updated").catch((error) => {
+          console.error("Failed to send expense update notification:", error);
+        });
+        
         res.status(200).json({ status: "success", id: data.id });
         break;
       }
