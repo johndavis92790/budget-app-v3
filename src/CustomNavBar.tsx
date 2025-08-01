@@ -106,6 +106,13 @@ function CustomNavBar({ handleSignOut, isAuthorized }: CustomNavBarProps) {
             >
               Notifications
             </Nav.Link>
+            <Nav.Link
+              as={Link}
+              to="/debug"
+              onClick={() => setNavExpanded(false)}
+            >
+              🔧 Debug
+            </Nav.Link>
           </Nav>
 
           {/* Right side: Log Out if authorized */}

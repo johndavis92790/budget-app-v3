@@ -18,6 +18,7 @@ import BudgetForecastPage from "./BudgetForecastPage";
 import HSAExpensesPage from "./HSAExpensesPage";
 import CustomNavBar from "./CustomNavBar";
 import NotificationSettings from "./NotificationSettings";
+import NotificationDebug from "./NotificationDebug";
 
 import { ApiService } from "./api";
 import { messaging, db } from "./firebase";
@@ -415,6 +416,7 @@ function App() {
                 path="/notifications"
                 element={<NotificationSettings className="m-3" />}
               />
+              <Route path="/debug" element={<NotificationDebug />} />
             </Routes>
           </Container>
         </Router>

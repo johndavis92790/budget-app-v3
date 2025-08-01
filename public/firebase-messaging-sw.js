@@ -15,8 +15,39 @@ firebase.initializeApp({
 });
 
 // Initialize Firebase Messaging for background notifications
-// Firebase SDK automatically handles background push notifications
-firebase.messaging();
+const messaging = firebase.messaging();
+
+// Handle background FCM messages and display rich notifications
+messaging.onBackgroundMessage((payload) => {
+  console.log('[firebase-messaging-sw.js] 📨 Received background FCM message:', payload);
+  
+  // Extract notification details
+  const notificationTitle = payload.notification?.title || 'Budget App';
+  const notificationBody = payload.notification?.body || 'New notification';
+  
+  console.log('[firebase-messaging-sw.js] 🔔 Displaying notification:', {
+    title: notificationTitle,
+    body: notificationBody
+  });
+  
+  if (payload.data) {
+    console.log('[firebase-messaging-sw.js] 📦 Data payload:', payload.data);
+  }
+  
+  // Create rich notification options
+  const notificationOptions = {
+    body: notificationBody,
+    data: payload.data || {},
+    requireInteraction: false,
+    silent: false,
+    tag: payload.data?.expenseId ? `expense-${payload.data.expenseId}` : 'budget-notification',
+    timestamp: Date.now(),
+    vibrate: [200, 100, 200]
+  };
+  
+  // Show the custom notification
+  return self.registration.showNotification(notificationTitle, notificationOptions);
+});
 
 console.log('[firebase-messaging-sw.js] Firebase Messaging initialized for background notifications');
 

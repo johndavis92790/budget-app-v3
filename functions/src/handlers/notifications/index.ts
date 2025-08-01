@@ -15,7 +15,7 @@ export const sendNotificationHandler = async (
     // CORS settings
     res.set("Access-Control-Allow-Origin", "*");
     res.set("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
-    res.set("Access-Control-Allow-Headers", "Content-Type, x-secret-token");
+    res.set("Access-Control-Allow-Headers", "Content-Type, X-Notification-Secret");
 
     if (req.method === "OPTIONS") {
       res.status(204).send("");
@@ -28,7 +28,7 @@ export const sendNotificationHandler = async (
     }
 
     // Verify secret token
-    const token = req.headers["x-secret-token"];
+    const token = req.headers["x-notification-secret"];
     if (token !== SECRET_TOKEN) {
       return res.status(403).send("Forbidden");
     }

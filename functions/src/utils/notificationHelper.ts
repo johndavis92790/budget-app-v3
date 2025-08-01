@@ -76,28 +76,52 @@ export const sendExpenseNotification = async (
     }
 
     // Create notification content
-    const title = getNotificationTitle(expense, actionType);
-    const body = getNotificationBody(expense, actionType);
-
-
+    console.log('[NotificationHelper] Creating notification for expense:', expense);
+    const title = getNotificationTitle(expense);
+    console.log('[NotificationHelper] Generated title:', title);
+    const body = getNotificationBody(expense);
+    console.log('[NotificationHelper] Generated body:', body);
 
     // Send notification to each token
     const promises = tokens.map(async (token: string) => {
       const message = {
-        message: {
-          token: token,
-          data: {
-            title: title,
-            body: body,
-            icon: "/favicon.ico",
-            expenseId: expense.id?.toString() || "",
-            actionType: actionType,
-          },
-          // Add notification object for better display on Android
+        token,
+        notification: {
+          title,
+          body,
+        },
+        android: {
           notification: {
-            title: title,
-            body: body,
+            title,
+            body,
+            icon: "ic_notification", // Custom notification icon
+            color: "#2E7D32", // Rich green accent color for money/budget theme
+            priority: "high",
+            default_sound: true,
+            channel_id: "budget_expenses",
+            tag: `expense_${expense.category}_${Date.now()}`, // Prevent grouping of different expenses
           },
+          priority: "high",
+        },
+        webpush: {
+          notification: {
+            title,
+            body,
+            icon: "/icon-192x192.png", // PWA icon
+            badge: "/badge-72x72.png", // Small badge icon
+            requireInteraction: false, // Don't require user interaction to dismiss
+            silent: false,
+          },
+          headers: {
+            Urgency: "high",
+          },
+        },
+        data: {
+          title: title,
+          body: body,
+          icon: "/favicon.ico",
+          expenseId: expense.id?.toString() || "",
+          actionType: actionType,
         },
       };
 
@@ -112,7 +136,7 @@ export const sendExpenseNotification = async (
               Authorization: `Bearer ${accessToken}`,
               "Content-Type": "application/json",
             },
-            body: JSON.stringify(message),
+            body: JSON.stringify({ message }),
           }
         );
 
@@ -167,52 +191,83 @@ export const sendExpenseNotification = async (
 };
 
 /**
- * Generate notification title based on expense and action
+ * Generate notification title for new expense
  */
-function getNotificationTitle(expense: History, actionType: string): string {
+function getNotificationTitle(expense: History): string {
   const amount = formatCurrency(expense.value);
+  const category = expense.category || "Expense";
+  const type = expense.type || "";
   
-  switch (actionType) {
-    case "added":
-      return `💰 New Expense: ${amount}`;
-    case "updated":
-      return `✏️ Expense Updated: ${amount}`;
-    case "deleted":
-      return `🗑️ Expense Deleted: ${amount}`;
-    default:
-      return `💰 Expense: ${amount}`;
-  }
+  // Use dollar sign icon for all money-related notifications
+  return `💲 New ${type ? type + ' - ' : ''}${category}: ${amount}`;
 }
 
 /**
- * Generate notification body based on expense details
+ * Generate notification body for new expense
  */
-function getNotificationBody(expense: History, actionType: string): string {
-  const category = expense.category || "Uncategorized";
-  const description = expense.description || "No description";
+function getNotificationBody(expense: History): string {
+  const description = expense.description?.trim();
   const userEmail = expense.userEmail || "Unknown user";
-  const userName = userEmail.split("@")[0]; // Get name part of email
+  // Extract username from email (e.g., "john.smith@gmail.com" -> "john.smith")
+  const userName = userEmail.split("@")[0];
+  const amount = formatCurrency(expense.value);
+  const category = expense.category || "Uncategorized";
+  const type = expense.type || "";
   
-  let bodyText = `${category}: ${description}`;
+  let bodyParts: string[] = [];
   
-  if (actionType === "added") {
-    bodyText += ` (by ${userName})`;
+  // Always show amount and category as primary info
+  bodyParts.push(`${amount} • ${category}`);
+  
+  // Add type if available
+  if (type) {
+    bodyParts.push(`Type: ${type}`);
   }
+  
+  // Add description if available and meaningful
+  if (description && description.toLowerCase() !== "no description" && description !== "") {
+    bodyParts.push(`"${description}"`);
+  }
+  
+  // Add user info (who added the expense)
+  bodyParts.push(`Added by ${userName}`);
   
   // Add HSA info if present
   if (expense.hsaAmount && expense.hsaAmount > 0) {
-    bodyText += ` | HSA: ${formatCurrency(expense.hsaAmount)}`;
+    bodyParts.push(`HSA Reimbursable: ${formatCurrency(expense.hsaAmount)}`);
   }
   
-  return bodyText;
+  // Add date if not today
+  if (expense.date) {
+    const expenseDate = new Date(expense.date);
+    const today = new Date();
+    const isToday = expenseDate.toDateString() === today.toDateString();
+    
+    if (!isToday) {
+      bodyParts.push(`Date: ${expenseDate.toLocaleDateString()}`);
+    }
+  }
+  
+  return bodyParts.join(" • ");
 }
 
 /**
  * Format currency for display
  */
 function formatCurrency(amount: number): string {
-  return new Intl.NumberFormat("en-US", {
-    style: "currency",
-    currency: "USD",
-  }).format(Math.abs(amount));
+  // Validate the amount to prevent RangeError
+  if (typeof amount !== 'number' || isNaN(amount) || !isFinite(amount)) {
+    console.warn('[NotificationHelper] Invalid amount for formatting:', amount);
+    return '$0.00';
+  }
+  
+  try {
+    return new Intl.NumberFormat("en-US", {
+      style: "currency",
+      currency: "USD",
+    }).format(Math.abs(amount));
+  } catch (error: any) {
+    console.error('[NotificationHelper] Error formatting currency:', error.message, 'Amount:', amount);
+    return `$${Math.abs(amount).toFixed(2)}`;
+  }
 }

@@ -266,8 +266,23 @@ export function createSheetRow(
 ): any[] {
   const colMap = columnMappings[sheetType];
 
+  // Handle empty column mappings to prevent "Invalid array length" error
+  const columnValues = Object.values(colMap);
+  if (columnValues.length === 0) {
+    console.warn(`[Sheets] No column mappings found for sheet type: ${sheetType}`);
+    // Return a minimal row with just the data values in order
+    return Object.values(data);
+  }
+
   // Find the maximum column index to ensure array is large enough
-  const maxColIndex = Math.max(...Object.values(colMap));
+  const maxColIndex = Math.max(...columnValues);
+  
+  // Validate maxColIndex to prevent array creation errors
+  if (!Number.isFinite(maxColIndex) || maxColIndex < 0) {
+    console.warn(`[Sheets] Invalid maxColIndex (${maxColIndex}) for sheet type: ${sheetType}`);
+    return Object.values(data);
+  }
+  
   const row = new Array(maxColIndex + 1).fill("");
 
   // Map the data to the correct columns
